@@ -7826,11 +7826,18 @@ async function installSubtreeTools(
         // ONE person is byte-identical to before: the same result object the
         // single-target tool has always produced, returned unchanged.
         if (results.length === 1) return results[0]!;
+        // The roster is mapped through the handle BEFORE the join, the same way
+        // the bench/recall batch above builds its own. Wrapping the joined
+        // string instead would hand one blob to a per-person lookup and leave
+        // every id in it raw.
+        const roster = applied
+          .map((personId) => `@${displayHandle(context.organization, String(personId))}`)
+          .join(", ");
         return toolResult(
           true,
           action === "start-person"
-            ? `Starting ${applied.length} people: ${applied.join(", ")}. Only these people were launched; everyone else is untouched.`
-            : `Stood ${applied.length} people down: ${applied.join(", ")}. They stay employed with their panes down; everyone else keeps running.`,
+            ? `Starting ${applied.length} people: ${roster}. Only these people were launched; everyone else is untouched.`
+            : `Stood ${applied.length} people down: ${roster}. They stay employed with their panes down; everyone else keeps running.`,
           { status: "applied", applied, appliedPersonIds: applied },
         );
       } catch (error) {
