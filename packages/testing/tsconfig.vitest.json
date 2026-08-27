@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // `test/ReactiveScan.test.ts` imports `scripts/reactive-scan.ts`, the real
+    // scanner it drives, and that file ends with Bun's `import.meta.main` entry
+    // guard because `bun run lint:reactive` is how it is invoked. Pulling the
+    // subject into this project is the point of the test; typing the runtime it
+    // actually runs under is what makes that legal. `node` stays: everything
+    // else in this package is Node.
+    "types": ["node", "bun"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@test/*": ["./test/*"]
+    }
+  },
+  "include": ["vitest.config.ts", "src/**/*.ts", "test/**/*.ts"]
+}

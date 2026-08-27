@@ -1,0 +1,144 @@
+[package]
+name = "chiefd-daemon"
+description = "The per-user, per-host Rust backend daemon that owns a company's durable state and host effects. Installed as `chiefd`, spawned by the `chief` operator client, never typed."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# THE INSTALLED NAME IS `chiefd`. The `d` suffix means daemon and this is the
+# daemon; `crates/chief-cli` builds `chief`, the program an operator types. The
+# PACKAGE stays `chiefd-daemon` — it is the daemon crate of chiefd, and the two
+# names are held apart by `scripts/test/binary-names.test.mjs`.
+[[bin]]
+name = "chiefd"
+path = "src/main.rs"
+
+[features]
+default = []
+# Present so `--features test-support` works uniformly across the workspace.
+# The CI release-build assertion checks that no crate resolves it.
+test-support = [
+    "chiefd-core/test-support",
+    "chiefd-host/test-support",
+    "chiefd-api/test-support",
+]
+
+[dependencies]
+# The daemon-level observability stream, and the `tracing` layer that
+# feeds it. A LEAF both sides of the backend/client boundary may link.
+chiefd-log = { path = "../chiefd-log" }
+# `<dir>/.chief/keys`, derived the one way both this daemon and `chief-cli`
+# derive it. A LEAF both sides of the backend/client boundary may link.
+identity-keys = { path = "../identity-keys" }
+# `company_key` and `DaemonRendezvous` — this company's identity,
+# `sha256(canonical <dir>)[..12]`, and the four fields this daemon PUBLISHES at
+# `<dir>/.chief/run/daemon.json` for `chief-cli` to READ. The two programs may
+# not link each other (the backend/client boundary, rules 5 and 7), so a
+# derivation and a wire shape they must agree on exactly live in the one leaf
+# both may link. NOT `workspace = true`, for the same reason beacond is not: a
+# path dependency on a leaf is chosen once, here.
+host-primitives = { path = "../host-primitives" }
+chiefd-api = { workspace = true }
+chiefd-core = { workspace = true }
+chiefd-host = { workspace = true }
+# Promoted from [dev-dependencies]: `beacon.rs` and `lifecycle/discovery.rs`
+# read `beacond::config::default_url()` instead of each compiling in their own
+# copy of the discovery address. Adds no external crate to the graph — beacond's
+# whole dependency set (axum, nix, rusqlite, serde, serde_json, thiserror,
+# tokio, tracing) is already in chiefd's. The dev-dependency stays below as
+# well, and must: it is what gives the integration tests
+# `CARGO_BIN_EXE_beacond`, and a `[dependencies]` entry alone does not build
+# the binary target for them. NOT `workspace = true` — beacond is deliberately
+# absent from [workspace.dependencies], see the dev-dependency's own note.
+beacond = { path = "../beacond" }
+# `beacon.rs`'s production HTTP client to beacond (E10-S3, #764) — register/
+# heartbeat/deregister. Promoted from dev-dependencies. The original note here
+# said this added nothing to the dependency graph because `chiefd-api` already
+# depended on hyper/hyper-util in production; that stopped being true when the
+# unused-dependency sweep removed them from `chiefd-api`, which never spelled
+# `hyper` anywhere in its source. This crate's own use in `beacon.rs` is real
+# and is now the reason the edge exists, which is a better reason than the one
+# it replaced.
+# Never `reqwest`, never a shelled-out `curl`: a `spawn_blocking` thread that
+# cannot be cancelled once held process exit for tens of seconds (#346/#370),
+# and that is the cautionary precedent.
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+http-body-util = { workspace = true }
+# NOT HERE, DELIBERATELY: `chief-cli`. This crate is the backend half of the
+# P6 split and it must never reach back across it — the daemon does not spawn,
+# start or consult the operator client, and the edge would put the runtime back in
+# the daemon's link graph. `scripts/test/backend-runtime-boundary.test.mjs`'s
+# rule 5 fails on it.
+# PR_SET_PDEATHSIG for `chiefd docstore-only`'s parent-death watchdog — zero
+# polling instead of a 1Hz `parent_id()` spin (od:idle-cpu #285).
+nix = { workspace = true }
+# `beacon.rs`'s request bodies / decoded refusal bodies (E10-S3, #764).
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+# Target-conditional (D17): two deps' build scripts compile C with the host
+# cc, which rejects the Darwin-only -arch/-mmacosx-version-min flags on this
+# check-only cross-target — rusqlite's "bundled" feature (sqlite3.c) and
+# signal-hook's "extended-siginfo" feature, which pulls in
+# "extended-siginfo-raw" (src/low_level/extract.c). Dropping both features
+# only for the Darwin target removes every C-compilation step in the graph;
+# the real Linux build keeps bundled sqlite and si_pid attribution unchanged
+# (#841).
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+rusqlite = { workspace = true }
+signal-hook = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+rusqlite = { version = "0.40" }
+signal-hook = { version = "0.4" }
+
+[build-dependencies]
+# build.rs shells out to `cargo metadata` to derive its own `rerun-if-changed`
+# set from the REAL dependency graph (#862) rather than a hand-maintained
+# path list — separate from the ordinary `serde_json` dependency above:
+# build scripts run before the crate itself compiles and do not see
+# `[dependencies]`.
+serde_json = { workspace = true }
+# #979: sha256 of the resolved dependency source tree, embedded as the build
+# fingerprint instead of a wall-clock timestamp. Already a workspace
+# dependency (chiefd-core/chiefd-api/chiefd-host all use it in production) —
+# reused here rather than hand-rolling a hash function.
+sha2 = { workspace = true }
+
+[dev-dependencies]
+# The binary's own unit tests drive a `ManualClock` and seed the northstar
+# conformance company, both of which live behind chiefd-core's `test-support`
+# feature. A self-scoped dev-dependency is how a crate enables a dependency's
+# feature for its tests without leaking it into release builds (CI asserts the
+# feature is absent there). The production-hooks wiring test drives the real
+# `ConvergeActuator` against `chiefd-host`'s scripted runtime (`ScriptedRuntime`,
+# `RecordingWaiter`), which live behind `chiefd-host`'s `test-support` feature —
+# enabled the same self-scoped way, so no real runtime is ever touched in CI.
+chiefd-core = { workspace = true, features = ["test-support"] }
+chiefd-host = { workspace = true, features = ["test-support"] }
+tempfile = { workspace = true }
+# `sigterm_grace.rs` provisions the daemon's operator key and HS256 secret so it
+# can mint its own bearer for the one long-lived route it must hold open across
+# the signal. `/v1/docs/watch` is not exempt and cannot be — an SSE stream is
+# the subject of that test, so it cannot be re-pointed at a route that needs no
+# credential. Test-only: the daemon itself never generates a key (that is
+# `chiefd_host::materialize`'s seam).
+p256 = { workspace = true }
+# beacon.rs's unit tests stand up a throwaway fake beacond over axum, which is
+# a dev-dependency here now: the production axum use went to `chief-cli` with
+# `chief host` and the Founder endpoint in P6.
+axum = { workspace = true }
+# A dev-dependency (not workspace = true -- beacond is not in
+# [workspace.dependencies]) so Cargo provides CARGO_BIN_EXE_beacond to the
+# single_writer_admission.rs / port_walk_and_registration.rs integration
+# tests: they spawn a REAL beacond binary, never a mock of one (E10-S3, #764).
+beacond = { path = "../beacond" }
+
+[lints]
+workspace = true

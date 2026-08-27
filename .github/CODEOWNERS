@@ -1,0 +1,10 @@
+# One maintainer, one row.
+#
+# This file previously carried six placeholder team names and a header
+# explaining the boundaries they were meant to divide. Those boundaries are
+# real and they are documented where a reader can act on them —
+# `docs/ARCHITECTURE.md` — but naming teams that do not exist would read to a
+# stranger as a project that ignores its own review routing, and a CODEOWNERS
+# entry naming a non-existent team silently matches nobody, which is worse
+# than no file at all.
+*                                       @hishboy

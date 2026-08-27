@@ -1,0 +1,102 @@
+{
+  "name": "finish-completes-a-running-request",
+  "family": "session-maintenance",
+  "description": "Finishing terminalizes the request and stamps completion.",
+  "invariants": [
+    "§2.5 finish"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    },
+    {
+      "op": "maint.queue",
+      "in": {
+        "action": "compact",
+        "personId": "signal-researcher",
+        "requestedBy": "signal-researcher",
+        "reason": "Context is nearly full."
+      }
+    },
+    {
+      "op": "maint.start",
+      "in": {
+        "personId": "signal-researcher",
+        "action": "compact",
+        "claim": {
+          "processId": 4242,
+          "sessionId": "session-alpha",
+          "claimToken": "token-alpha"
+        }
+      }
+    }
+  ],
+  "op": "maint.finish",
+  "in": {
+    "requestId": "session-maintenance:1:signal-researcher:compact",
+    "status": "completed"
+  },
+  "expect": {
+    "ok": {
+      "action": "compact",
+      "attempt": 1,
+      "automatic": false,
+      "claimToken": "token-alpha",
+      "claimedProcessId": 4242,
+      "claimedSessionId": "session-alpha",
+      "compactAnchorEntryId": null,
+      "compactSessionId": null,
+      "completedCompactionEntryId": null,
+      "completedSessionId": null,
+      "error": null,
+      "force": false,
+      "id": "session-maintenance:1:signal-researcher:compact",
+      "interruptedSessionId": null,
+      "personId": "signal-researcher",
+      "recoveredFromRequestId": null,
+      "requestedBy": "signal-researcher",
+      "retryNotBefore": null,
+      "status": "completed"
+    }
+  },
+  "expectState": [
+    {
+      "read": "maint.request",
+      "args": {
+        "requestId": "session-maintenance:1:signal-researcher:compact"
+      },
+      "equals": {
+        "action": "compact",
+        "attempt": 1,
+        "automatic": false,
+        "claimToken": "token-alpha",
+        "claimedProcessId": 4242,
+        "claimedSessionId": "session-alpha",
+        "compactAnchorEntryId": null,
+        "compactSessionId": null,
+        "completedCompactionEntryId": null,
+        "completedSessionId": null,
+        "error": null,
+        "force": false,
+        "id": "session-maintenance:1:signal-researcher:compact",
+        "interruptedSessionId": null,
+        "personId": "signal-researcher",
+        "recoveredFromRequestId": null,
+        "requestedBy": "signal-researcher",
+        "retryNotBefore": null,
+        "status": "completed"
+      }
+    },
+    {
+      "read": "maint.summary",
+      "equals": {
+        "requestOrder": [
+          "session-maintenance:1:signal-researcher:compact"
+        ]
+      }
+    }
+  ]
+}

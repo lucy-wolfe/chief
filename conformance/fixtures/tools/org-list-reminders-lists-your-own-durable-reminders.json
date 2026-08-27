@@ -1,0 +1,84 @@
+{
+  "name": "org-list-reminders-lists-your-own-durable-reminders",
+  "family": "tools",
+  "description": "A plain `POST /v1/reminders/list` scoped to the caller; `personId` is sent as the caller's own id, which is what the tool means by 'my own'. The listed record is one the setup step actually armed through `/v1/reminders/arm` — the reminder in this answer exists because it was created, not because a host fabricated it. Replayed against the real route by apps/chiefd/crates/chiefd-api/tests/conformance_reminders.rs.",
+  "invariants": [],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    },
+    {
+      "op": "tools.call",
+      "caller": {
+        "personId": "chief",
+        "role": "executive"
+      },
+      "in": {
+        "tool": "org_create_reminder",
+        "params": {
+          "prompt": "Conformance reminder.",
+          "intervalMs": 3600000
+        }
+      }
+    }
+  ],
+  "op": "tools.call",
+  "caller": {
+    "personId": "chief",
+    "role": "executive"
+  },
+  "in": {
+    "tool": "org_list_reminders",
+    "params": {}
+  },
+  "expect": {
+    "ok": {
+      "details": {
+        "reminders": [
+          {
+            "createdAt": "2026-07-15T12:00:00.000Z",
+            "createdByPersonId": "chief",
+            "fireCount": 0,
+            "id": "reminder:chief:1",
+            "intervalMs": 3600000,
+            "nextDueAt": "2026-07-15T13:00:00.000Z",
+            "personId": "chief",
+            "prompt": "Conformance reminder.",
+            "recurring": true,
+            "status": "active"
+          }
+        ]
+      },
+      "message": "1 armed reminder, 0 stopped."
+    }
+  },
+  "expectState": [
+    {
+      "read": "tools.chiefd_calls",
+      "args": {
+        "personId": "chief"
+      },
+      "equals": [
+        {
+          "body": {
+            "intervalMs": 3600000,
+            "personId": "chief",
+            "prompt": "Conformance reminder.",
+            "slug": "northstar-conformance@<ROOT_DIGEST>"
+          },
+          "path": "/v1/reminders/arm"
+        },
+        {
+          "body": {
+            "personId": "chief",
+            "slug": "northstar-conformance@<ROOT_DIGEST>"
+          },
+          "path": "/v1/reminders/list"
+        }
+      ]
+    }
+  ]
+}

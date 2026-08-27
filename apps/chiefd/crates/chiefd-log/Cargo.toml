@@ -1,0 +1,48 @@
+[package]
+name = "chiefd-log"
+description = "The daemon-level observability stream every chiefd program appends to. One definition, linked by the operator client and by the backend."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# A LEAF, and a leaf for the same reason `host-primitives`
+# is: `chief-cli` is forbidden to depend on
+# `chiefd-core`/`chiefd-host`/`chiefd-api`/`chiefd-daemon` and the backend is
+# forbidden to depend on it (the backend/client boundary guard, rules 5 and 7),
+# so a definition BOTH sides need cannot live in either of them.
+#
+# The sink moved here FROM `chiefd_core::orglog`. It had to move rather than be
+# copied, because the whole point of the move is the window it could not see:
+# `chief` spends its first minutes inside `chief-cli`, before any company
+# directory exists, and `chief-cli` could not link the crate the sink lived in.
+# A second copy of a line schema is the failure mode this workspace has a guard
+# family for.
+#
+# The dependency list is the union of what the sink and the `tracing` layer
+# need, and every entry is one BOTH consumers already carry, so neither link
+# graph gains anything new:
+#   * `host-primitives` — `redact::redact`, the one credential mask both
+#     actuators already use. A log is the last place a secret can escape, so
+#     the mask has to be the same one, not a second opinion.
+#   * `serde_json` — the layer renders `tracing` fields as a JSON object.
+#     Hand-rolling that a third time is how the escaping goes wrong.
+#   * `tracing` / `tracing-subscriber` — the layer IS a
+#     `tracing_subscriber::Layer`; every program in this workspace already
+#     installs a subscriber.
+#
+# NOT listed in `[workspace.dependencies]`, for the same reason `beacond` and
+# `host-primitives` are not: a path dependency is chosen
+# once already, and a version table entry would only add a second place to keep
+# it right.
+[dependencies]
+host-primitives = { path = "../host-primitives" }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+
+[lints]
+workspace = true

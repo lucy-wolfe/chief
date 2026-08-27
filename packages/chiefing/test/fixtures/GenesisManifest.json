@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "kind": "organization",
+  "slug": "chiefing-contract",
+  "name": "Chiefing Contract Fixture Co",
+  "purpose": "A minimal, one-person manifest used only to exercise genesis over the wire in #776's real-binary contract suite -- never a realistic company.",
+  "rootDepartmentId": "executive",
+  "policy": {
+    "supervisionIntervalMs": 900000,
+    "acknowledgementTimeoutMs": 90000,
+    "acknowledgementRetryLimit": 1,
+    "replacementLimit": 1
+  },
+  "departmentOrder": ["executive", "engineering"],
+  "peopleOrder": ["ceo", "eng-head"],
+  "departments": {
+    "executive": {
+      "id": "executive",
+      "name": "Executive",
+      "purpose": "Root unit of the contract fixture company.",
+      "kind": "company",
+      "headPersonId": "ceo",
+      "state": "active",
+      "createdAt": "2026-08-04T00:00:00.000Z"
+    },
+    "engineering": {
+      "id": "engineering",
+      "name": "Engineering",
+      "purpose": "A non-root department the contract suite can pause/resume/reparent -- 'executive' is exec-root-protected and refuses those verbs.",
+      "kind": "department",
+      "parentDepartmentId": "executive",
+      "headPersonId": "eng-head",
+      "state": "active",
+      "createdAt": "2026-08-04T00:00:00.000Z"
+    }
+  },
+  "people": {
+    "ceo": {
+      "id": "ceo",
+      "name": "Ada",
+      "title": "Chief Executive",
+      "mandate": "Exist only so #776's contract suite has a valid CEO to genesis against.",
+      "kind": "executive",
+      "departmentId": "executive",
+      "employmentState": "active",
+      "activation": "resident",
+      "tools": [],
+      "prompts": [],
+      "createdAt": "2026-08-04T00:00:00.000Z"
+    },
+    "eng-head": {
+      "id": "eng-head",
+      "name": "Grace",
+      "title": "Head of Engineering",
+      "mandate": "Exist only so #776's contract suite has a non-root department head.",
+      "kind": "head",
+      "departmentId": "engineering",
+      "employmentState": "active",
+      "activation": "resident",
+      "tools": [],
+      "prompts": [],
+      "createdAt": "2026-08-04T00:00:00.000Z"
+    }
+  },
+  "createdAt": "2026-08-04T00:00:00.000Z",
+  "updatedAt": "2026-08-04T00:00:00.000Z"
+}

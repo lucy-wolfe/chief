@@ -1,0 +1,43 @@
+{
+  // #1041 covered the JavaScript corpus (tsconfig.guards.json); this covers the
+  // TypeScript half of the same directory, which was in NO typechecked project
+  // at all. Proven the way every gap in this repo gets proven: appending
+  // `const __proof: number = "no"` to scripts/tool-surface-artifact.ts and
+  // running `bash scripts/typecheck.sh` exited 0. A deliberate type error
+  // passed, in a file the repo's own guards depend on.
+  //
+  // WHY THIS IS ITS OWN CONFIG RATHER THAN THREE WORDS ADDED TO
+  // tsconfig.guards.json's `include`. That file is `strict: false`, and its own
+  // comment records why: at `strict: true` the JavaScript corpus reports 1233
+  // errors, 922 of them TS7006/TS7031 implicit-any across ~950 JSDoc
+  // annotations. That concession is measured and correct FOR JAVASCRIPT.
+  // TypeScript source must not inherit it. Measured both ways before choosing:
+  // adding `scripts/**/*.ts` to the guards config reports 22 errors across 7
+  // files, of which 20 are manufactured by that config rather than found in the
+  // code — 10 from `types: ["node"]` omitting the @types/bun this repo already
+  // depends on, and 10 in apps/web and packages/piing/extensions files dragged
+  // in transitively, which fail only for want of a `paths` mapping and of
+  // `strict`. The same six files under the settings below report 2, and both
+  // were real.
+  //
+  // The `paths` entry is not a convenience: scripts/tool-surface-artifact.ts
+  // imports apps/web's own `selectTools` by relative path, so this program
+  // contains apps/web modules that resolve their siblings through `@/*`. Those
+  // files are apps/web's to own and are checked by the `tsc -b tsconfig.json`
+  // leg; they are here only as the types this directory is measured against.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    // `bun` because every file here is run by bun (`bun scripts/<x>.ts`), so
+    // `Bun.*` and `import.meta.main` are real at runtime; without it the leg
+    // reports 10 errors that are true of node and false of the actual runtime.
+    "types": ["node", "bun"],
+    "paths": { "@/*": ["./apps/web/src/*"] }
+  },
+  "include": ["scripts/**/*.ts"]
+}

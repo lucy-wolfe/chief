@@ -1,0 +1,21 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // #903: root `test:unit` only declares `dependsOn: ["^build"]` — upstream
+    // packages' builds, not piing's own. Several packages/piing/test/** files
+    // and extensions/*.ts import piing's own published subpath
+    // `@chief/piing/extension-runtime`, which resolves through
+    // `./dist/extensionruntime/index.js`. Under TURBO_FORCE or concurrent
+    // execution that lets test:unit start before piing's own dist/ exists,
+    // producing `Cannot find package '@chief/piing/extension-runtime'`.
+    // This Package Configuration adds piing's own `build` as a prerequisite
+    // of its own test:unit, scoped to this package only. Turbo's array
+    // fields (dependsOn included) completely replace the root value when
+    // specified in a Package Configuration, so `^build` is restated here to
+    // preserve the inherited upstream-build dependency.
+    "test:unit": {
+      "dependsOn": ["build", "^build"]
+    }
+  }
+}

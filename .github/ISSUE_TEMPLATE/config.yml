@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/tribes-protocol/chief/security/advisories/new
+    about: Report privately. Never in a public issue.
+  - name: Question, idea, or something you built
+    url: https://github.com/tribes-protocol/chief/discussions
+    about: Questions go to Discussions, not issues. So do ideas and show-and-tell.
+  - name: How chief works
+    url: https://github.com/tribes-protocol/chief/blob/main/docs/README.md
+    about: The documentation map — start here before filing a question.
+  - name: Contributing
+    url: https://github.com/tribes-protocol/chief/blob/main/CONTRIBUTING.md
+    about: Setup, the standing check list, and the conventions a pull request is reviewed against.

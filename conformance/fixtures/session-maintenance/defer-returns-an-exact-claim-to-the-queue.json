@@ -1,0 +1,106 @@
+{
+  "name": "defer-returns-an-exact-claim-to-the-queue",
+  "family": "session-maintenance",
+  "description": "The claim holder may hand work back; the request returns to queued with its claim fields and anchor cleared, and its attempt unchanged.",
+  "invariants": [
+    "§2.5 defer"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    },
+    {
+      "op": "maint.queue",
+      "in": {
+        "action": "compact",
+        "personId": "signal-researcher",
+        "requestedBy": "signal-researcher",
+        "reason": "Context is nearly full."
+      }
+    },
+    {
+      "op": "maint.start",
+      "in": {
+        "personId": "signal-researcher",
+        "action": "compact",
+        "claim": {
+          "processId": 4242,
+          "sessionId": "session-alpha",
+          "claimToken": "token-alpha"
+        }
+      }
+    }
+  ],
+  "op": "maint.defer",
+  "in": {
+    "requestId": "session-maintenance:1:signal-researcher:compact",
+    "claim": {
+      "processId": 4242,
+      "sessionId": "session-alpha",
+      "claimToken": "token-alpha"
+    }
+  },
+  "expect": {
+    "ok": {
+      "action": "compact",
+      "attempt": 1,
+      "automatic": false,
+      "claimToken": null,
+      "claimedProcessId": null,
+      "claimedSessionId": null,
+      "compactAnchorEntryId": null,
+      "compactSessionId": null,
+      "completedCompactionEntryId": null,
+      "completedSessionId": null,
+      "error": null,
+      "force": false,
+      "id": "session-maintenance:1:signal-researcher:compact",
+      "interruptedSessionId": null,
+      "personId": "signal-researcher",
+      "recoveredFromRequestId": null,
+      "requestedBy": "signal-researcher",
+      "retryNotBefore": null,
+      "status": "queued"
+    }
+  },
+  "expectState": [
+    {
+      "read": "maint.request",
+      "args": {
+        "requestId": "session-maintenance:1:signal-researcher:compact"
+      },
+      "equals": {
+        "action": "compact",
+        "attempt": 1,
+        "automatic": false,
+        "claimToken": null,
+        "claimedProcessId": null,
+        "claimedSessionId": null,
+        "compactAnchorEntryId": null,
+        "compactSessionId": null,
+        "completedCompactionEntryId": null,
+        "completedSessionId": null,
+        "error": null,
+        "force": false,
+        "id": "session-maintenance:1:signal-researcher:compact",
+        "interruptedSessionId": null,
+        "personId": "signal-researcher",
+        "recoveredFromRequestId": null,
+        "requestedBy": "signal-researcher",
+        "retryNotBefore": null,
+        "status": "queued"
+      }
+    },
+    {
+      "read": "maint.summary",
+      "equals": {
+        "requestOrder": [
+          "session-maintenance:1:signal-researcher:compact"
+        ]
+      }
+    }
+  ]
+}

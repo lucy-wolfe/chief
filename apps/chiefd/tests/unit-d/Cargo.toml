@@ -1,0 +1,21 @@
+[package]
+name = "chiefd-unit-d"
+description = "Unit D: assembled-seam integration tests across chiefd-core + chiefd-host (crash injection, safety-gate integration, single-flight) (#871)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+chiefd-core = { workspace = true }
+chiefd-host = { workspace = true }
+tokio = { workspace = true }
+tempfile = { workspace = true }
+
+[dev-dependencies]
+chiefd-core = { workspace = true, features = ["test-support"] }
+chiefd-host = { workspace = true, features = ["test-support"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,11 @@
+{
+  "id": "reminder-1",
+  "personId": "person-1",
+  "createdByPersonId": "person-1",
+  "prompt": "Check the deploy",
+  "intervalMs": 3600000,
+  "nextDueAt": "2026-08-04T01:00:00.000Z",
+  "status": "active",
+  "recurring": true,
+  "createdAt": "2026-08-04T00:00:00.000Z"
+}

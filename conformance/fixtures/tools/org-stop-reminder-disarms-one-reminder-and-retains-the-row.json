@@ -1,0 +1,87 @@
+{
+  "name": "org-stop-reminder-disarms-one-reminder-and-retains-the-row",
+  "family": "tools",
+  "description": "One `POST /v1/reminders/stop` carrying the exact reminderId the setup step armed. The record comes back `stopped`, with `stoppedReason` and `stoppedAt` stamped and the row retained (the card says 'removed'). Recycling the id would collide with already-published effect ids, which is why stop disarms rather than deletes — and why the answer still carries the fire count. Replayed against the real route by apps/chiefd/crates/chiefd-api/tests/conformance_reminders.rs.",
+  "invariants": [],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    },
+    {
+      "op": "tools.call",
+      "caller": {
+        "personId": "chief",
+        "role": "executive"
+      },
+      "in": {
+        "tool": "org_create_reminder",
+        "params": {
+          "prompt": "Conformance reminder.",
+          "intervalMs": 3600000
+        }
+      }
+    }
+  ],
+  "op": "tools.call",
+  "caller": {
+    "personId": "chief",
+    "role": "executive"
+  },
+  "in": {
+    "tool": "org_stop_reminder",
+    "params": {
+      "reminderId": "reminder:chief:1"
+    }
+  },
+  "expect": {
+    "ok": {
+      "details": {
+        "reminder": {
+          "createdAt": "2026-07-15T12:00:00.000Z",
+          "createdByPersonId": "chief",
+          "fireCount": 0,
+          "id": "reminder:chief:1",
+          "intervalMs": 3600000,
+          "nextDueAt": "2026-07-15T13:00:00.000Z",
+          "personId": "chief",
+          "prompt": "Conformance reminder.",
+          "recurring": true,
+          "status": "stopped",
+          "stoppedAt": "2026-07-15T12:00:00.000Z",
+          "stoppedReason": "stopped"
+        }
+      },
+      "message": "Removed reminder reminder:chief:1. It fired 0 times."
+    }
+  },
+  "expectState": [
+    {
+      "read": "tools.chiefd_calls",
+      "args": {
+        "personId": "chief"
+      },
+      "equals": [
+        {
+          "body": {
+            "intervalMs": 3600000,
+            "personId": "chief",
+            "prompt": "Conformance reminder.",
+            "slug": "northstar-conformance@<ROOT_DIGEST>"
+          },
+          "path": "/v1/reminders/arm"
+        },
+        {
+          "body": {
+            "personId": "chief",
+            "reminderId": "reminder:chief:1",
+            "slug": "northstar-conformance@<ROOT_DIGEST>"
+          },
+          "path": "/v1/reminders/stop"
+        }
+      ]
+    }
+  ]
+}

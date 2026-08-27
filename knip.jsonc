@@ -1,0 +1,124 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  // `apps/web/test/**` is DELIBERATELY NOT ignored. A blanket `**/test/**`
+  // hid every test file from the graph, so eleven exports that exist only
+  // because a unit test imports them — `hostedPeople`, `translateFeedFrame`,
+  // `personStreamFrame`, `HEARTBEAT_MS`, `departmentOf`, `contrastRatio`,
+  // `relativeLuminance`, `CHIP_INK_LIGHT`, `CHIP_INK_DARK`,
+  // `ORG_STORE_BASE_STORES`, `useCompanyDirectoryWithClient` — were reported
+  // as unused exports. They are not unused; knip simply could not see the
+  // consumer. Deleting them on that report would have deleted live,
+  // test-covered code, and silencing them with an ignore row would have made
+  // the report worthless for the exports that ARE dead. Naming the test tree
+  // as an entry point is the fix that makes the truth visible instead.
+  "ignore": ["packages/*/test/**", "scripts/test/**", "**/tests/**", "packages/piing/skills/**"],
+  "vitest": false,
+  "workspaces": {
+    ".": {
+      // `scripts/start-stack.ts` is a real entry point and is listed as one:
+      // README documents `bun scripts/start-stack.ts` as how the local stack
+      // boots. It used to be reachable only because root package.json wired a
+      // `"start"` script at it, so knip credited its `@chief/chiefing` import
+      // through the script table; that script is gone with the rest of the
+      // alias drawer, and the honest replacement is to name the file rather
+      // than to excuse the dependency.
+      "entry": ["eslint.config.mjs", "prettier.config.mjs", "scripts/start-stack.ts"],
+      "project": ["eslint.config.mjs", "prettier.config.mjs", "scripts/start-stack.ts"],
+      // #751/G10: "@chief/chiefing" was removed from this list, and the
+      // #751 knip sweep removed "@earendil-works/pi-ai" and
+      // "@earendil-works/pi-coding-agent" for the same reason. knip
+      // reported it as an "Unused item in ignoreDependencies" -- the ignore
+      // matched nothing, i.e. the dependency it excused is genuinely used
+      // now. An ignore that excuses nothing is a stale row (Mandate 0), and
+      // it printed a Configuration hint on every run of what is now a CI
+      // gate. Verified by removing it and re-running `bun run knip`: clean,
+      // no findings, no hints.
+      "ignoreDependencies": [
+        "@chief/eslinter",
+        "@chief/piing",
+        "@chief/testing",
+        "@playwright/cli",
+        "@earendil-works/pi-tui",
+        "@vitest/coverage-v8",
+        "eslint-plugin-jasmine",
+        "vitest"
+      ]
+      // .
+    },
+    "packages/eslinter": {
+      "entry": ["index.js", "vitest.config.js"],
+      "project": ["**/*.js"],
+      // `@typescript-eslint/parser` is imported by thirteen
+      // `packages/eslinter/test/*.test.mjs` rule fixtures, which this config's
+      // top-level `ignore` row `"packages/*/test/**"` deliberately excludes
+      // from analysis — so knip cannot see the use, and the dependency is
+      // real.
+      // It was previously credited by accident, through a root package.json
+      // script that pointed at a file under `scripts/test/`; that whole class
+      // of one-line guard wrapper is gone, and an accident is not a reason.
+      "ignoreDependencies": ["@typescript-eslint/parser"]
+      // packages/eslinter
+    },
+    "packages/piing": {
+      "entry": [
+        "src/index.ts",
+        "src/extensionruntime/index.ts",
+        "extensions/*.ts",
+        "eslint.config.mjs",
+        "vitest.config.ts"
+      ],
+      "project": ["src/**/*.ts", "extensions/*.ts"]
+      // packages/piing
+    },
+    "packages/chiefing": {
+      "entry": [
+        "src/index.ts",
+        "src/extensionruntime/index.ts",
+        "eslint.config.mjs",
+        "vitest.config.ts"
+      ],
+      "project": ["src/**/*.ts"]
+      // packages/chiefing
+    },
+    "packages/testing": {
+      "entry": ["src/index.ts", "eslint.config.mjs", "vitest.config.ts"],
+      "project": ["src/**/*.ts"]
+      // packages/testing
+    },
+    "apps/web": {
+      "entry": [
+        "next.config.ts",
+        "postcss.config.mjs",
+        "eslint.config.mjs",
+        "vitest.config.ts",
+        "src/app/**/*.{ts,tsx}",
+        "src/common/Env.ts",
+        "src/common/PublicEnv.ts",
+        // #809 exposes this private-web SSE surface before the isolated
+        // S5/S6/S7 consumers mount it. These are literal roots, not an
+        // ignore or broad source glob; test:knip-map derives them from
+        // @chief/web's private deferred-consumer metadata.
+        "src/providers/CompanyEventsProvider.tsx",
+        "src/services/SseClientService.ts",
+        "src/hooks/UsePersonStream.ts",
+        "src/hooks/UseCompanyEvents.ts",
+        // The unit suite is an entry point, not noise: see the top-level
+        // `ignore` comment. `vitest.config.ts` runs `test/**/*.test.{ts,tsx}`,
+        // and those files import fixtures out of `test/harness/**` and
+        // `test/types/**`, so the whole tree is the root set.
+        "test/**/*.{ts,tsx}"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
+      // `@test/*` is a real alias — `vitest.config.ts` resolves it to
+      // `./test/*` — but it lives only in the vitest config, so knip read
+      // every `@test/...` import as an unlisted npm dependency. Restating it
+      // here is what makes the alias visible; the app tsconfig cannot carry
+      // it because it excludes `test`.
+      "paths": {
+        "@test/*": ["./test/*"]
+      },
+      "ignoreDependencies": ["tailwindcss"]
+      // apps/web
+    }
+  }
+}

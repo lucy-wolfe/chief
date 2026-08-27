@@ -1,0 +1,82 @@
+{
+  "name": "inv18-abandon-marks-cancelled-with-an-abandoned-stamp",
+  "family": "activity",
+  "description": "An unreachable handoff is cancelled with abandonedAt — never applied, because applied asserts the owner released it.",
+  "invariants": [
+    "inv 18"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    },
+    {
+      "op": "activity.begin_transition",
+      "in": {
+        "personId": "signal-researcher",
+        "action": "park",
+        "reason": "Conformance park."
+      }
+    }
+  ],
+  "op": "activity.abandon_transition",
+  "in": {
+    "transitionId": "transition:1:signal-researcher:park",
+    "personId": "signal-researcher",
+    "reason": "Launch intent excludes this person."
+  },
+  "expect": {
+    "ok": {
+      "abandoned": true,
+      "id": "transition:1:signal-researcher:park",
+      "reason": "Conformance park. Launch intent excludes this person.",
+      "status": "cancelled"
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.transition",
+      "args": {
+        "transitionId": "transition:1:signal-researcher:park"
+      },
+      "equals": {
+        "abandoned": true,
+        "action": "park",
+        "id": "transition:1:signal-researcher:park",
+        "personId": "signal-researcher",
+        "status": "cancelled"
+      }
+    },
+    {
+      "read": "activity.person",
+      "args": {
+        "personId": "signal-researcher"
+      },
+      "equals": {
+        "activeTransitionId": null,
+        "idleSince": null,
+        "lastDesiredActive": false,
+        "lastEmploymentState": "active",
+        "lastOperational": true,
+        "personId": "signal-researcher"
+      }
+    },
+    {
+      "read": "activity.summary",
+      "equals": {
+        "nextTransitionSequence": 2,
+        "personOrder": [
+          "chief",
+          "quant-head",
+          "signal-researcher",
+          "it-head"
+        ],
+        "transitionOrder": [
+          "transition:1:signal-researcher:park"
+        ]
+      }
+    }
+  ]
+}

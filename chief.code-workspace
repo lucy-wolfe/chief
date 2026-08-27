@@ -1,0 +1,112 @@
+{
+  "folders": [
+    {
+      "name": "Chief",
+      "path": "."
+    },
+    {
+      "name": "Web",
+      "path": "apps/web"
+    },
+    {
+      "name": "API",
+      "path": "apps/api"
+    },
+    {
+      "name": "Chiefd",
+      "path": "apps/chiefd"
+    },
+    {
+      "name": "Chiefing",
+      "path": "packages/chiefing"
+    },
+    {
+      "name": "Piing",
+      "path": "packages/piing"
+    },
+    {
+      "name": "Testing",
+      "path": "packages/testing"
+    },
+    {
+      "name": "Linter",
+      "path": "packages/eslinter"
+    }
+  ],
+  "settings": {
+    "js/ts.preferences.includePackageJsonAutoImports": "auto",
+    "js/ts.workspaceSymbols.scope": "allOpenProjects",
+    "eslint.useFlatConfig": true,
+    "eslint.format.enable": true,
+    "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+    "eslint.workingDirectories": ["./", { "pattern": "./apps/*" }, { "pattern": "./packages/*" }],
+    "js/ts.preferences.useAliasesForRenames": true,
+    "js/ts.preferences.preferTypeOnlyAutoImports": true,
+    "js/ts.referencesCodeLens.enabled": true,
+    "typescript.goToSourceDefinition.enabled": true,
+    "javascript.goToSourceDefinition.enabled": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit",
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
+    },
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.rulers": [100],
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "files.autoSave": "afterDelay",
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "[typescript]": {
+      "editor.formatOnSave": true,
+      "editor.formatOnType": true,
+      "editor.rulers": [100],
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[typescriptreact]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[javascript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[javascriptreact]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "rust-analyzer.linkedProjects": ["apps/chiefd/Cargo.toml"],
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/target": true,
+      "**/.next": true,
+      "**/.turbo": true,
+      "**/.wrangler": true,
+      "**/bun.lock": true
+    },
+    "files.exclude": {
+      ".node-xmlhttprequest*": true,
+      "**/__pycache__": true,
+      "**/.DS_Store": true,
+      "**/.git": true,
+      "**/.hg": true,
+      "**/.svn": true,
+      "**/CVS": true,
+      "**/node_modules": true,
+      "node_modules/**": true,
+      "nohup.out": true,
+      "**/.next": true,
+      "**/.turbo": true,
+      "**/target": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "esbenp.prettier-vscode",
+      "ms-vscode.vscode-typescript-next",
+      "dbaeumer.vscode-eslint",
+      "rust-lang.rust-analyzer",
+      "tamasfe.even-better-toml"
+    ]
+  }
+}

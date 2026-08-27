@@ -1,0 +1,35 @@
+{
+  "name": "inv26-start-with-no-work-is-the-literal-null",
+  "family": "session-maintenance",
+  "description": "No work is the four bytes `null` — not an empty object, not an empty array. This exact bug shipped once already.",
+  "invariants": [
+    "inv 26"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "maint.start",
+  "in": {
+    "personId": "signal-researcher",
+    "action": "compact",
+    "claim": {
+      "processId": 4242,
+      "sessionId": "session-alpha",
+      "claimToken": "token-alpha"
+    }
+  },
+  "expect": {
+    "ok": null
+  },
+  "expectState": [
+    {
+      "read": "maint.summary",
+      "equals": null
+    }
+  ]
+}

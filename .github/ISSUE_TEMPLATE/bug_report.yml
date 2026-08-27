@@ -1,0 +1,92 @@
+name: Bug report
+description: Something chief does that it should not, or does not do that it should.
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Not a bug report:** a security issue. Do not file one here — see
+        [SECURITY.md](https://github.com/tribes-protocol/chief/blob/main/SECURITY.md).
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        I ran `chief attach` in a company directory and ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Smallest reproduction
+      description: The fewest steps that produce it. A failing test is the best possible version of this.
+    validations:
+      required: true
+
+  - type: input
+    id: chief-version
+    attributes:
+      label: chief version
+      description: 'Output of `chief --version`. If you built from a checkout, add `git rev-parse --short HEAD` too.'
+      placeholder: '2.0.7'
+    validations:
+      required: true
+
+  - type: input
+    id: pi-version
+    attributes:
+      label: Pi version
+      description: 'Output of `pi --version`. chief declares a minimum; a Pi below it is the first thing to rule out.'
+      placeholder: '0.84.3'
+    validations:
+      required: true
+
+  - type: input
+    id: tmux-version
+    attributes:
+      label: tmux version
+      description: 'Output of `tmux -V`.'
+      placeholder: 'tmux 3.4'
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: 'macOS or Linux, the release, and the architecture. `uname -smr` answers all three.'
+      placeholder: 'Darwin 24.5.0 arm64'
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Anything else about the environment
+      description: 'Only if you built from a checkout: `bun --version` and `rustc --version`.'
+      render: text
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: |
+        Diagnostics live under `<company>/.chief/log/` (chief) and `<company>/.chief/logs/`
+        (Pi and company services). Redact anything that looks like a credential before pasting —
+        chief redacts conservatively, but check.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before filing
+      options:
+        - label: I am on the latest release (`chief upgrade --check` says so), or I built from a checkout with `bun run release` — never `release:fast`.
+          required: true
+        - label: My Pi is at or above the minimum chief declares.
+          required: true
+        - label: I searched existing issues and Discussions.
+          required: true

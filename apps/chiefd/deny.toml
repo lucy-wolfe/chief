@@ -1,0 +1,51 @@
+# `cargo deny check licenses` — the gate that stops a future dependency
+# dragging a copyleft licence into an Apache-2.0 product unseen.
+#
+# THE ALLOWLIST IS THE WHOLE POINT, so it is short and it is permissive-only.
+# A crate whose licence is not below fails the build and needs a human to say
+# either "add it" or "drop the dependency". Do not add an exception to make a
+# red go green without answering that question in the pull request.
+#
+# `Apache-2.0 WITH LLVM-exception` is here because the Rust standard library's
+# own dependency chain uses it; it is Apache-2.0 with a linking carve-out, not
+# a different family. The Unicode spellings cover `unicode-ident` and the
+# ICU-derived crates, whose terms are attribution-only.
+#
+# MPL-2.0 and every GPL family member are deliberately ABSENT rather than
+# denied by name: an unknown licence should fail because nobody approved it,
+# not because somebody remembered to list it.
+
+[licenses]
+version = 2
+confidence-threshold = 0.93
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "Unicode-DFS-2016",
+  "Zlib",
+]
+
+# Every entry names the crate, its licence, and why the project accepts it.
+#
+# `notify` is CC0-1.0 — a public-domain dedication, which is more permissive
+# than everything in the allowlist above. It is an EXCEPTION rather than a
+# blanket allowance on purpose: CC0 is a dedication rather than a licence, some
+# organisations' policies treat it separately, and this way the next crate that
+# arrives under it gets read by a person instead of inheriting a decision made
+# about a filesystem watcher.
+exceptions = [{ crate = "notify", allow = ["CC0-1.0"] }]
+
+[bans]
+multiple-versions = "allow"
+
+[advisories]
+version = 2
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

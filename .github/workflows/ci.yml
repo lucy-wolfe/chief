@@ -1,0 +1,1041 @@
+name: CI
+
+# ── WHAT THIS WORKFLOW GATES (E9-S6 second pass; banner rewritten #751/G10) ─
+# Every workspace member gates. There is no non-gating tier and no
+# quarantine: a suite is either run here and required to pass, or it does not
+# exist. See the CI-has-one-tier entry in DECISIONS.md for why that tier was
+# dropped rather than left unstated, and what to do with a suite that cannot
+# hold it.
+#
+# The jobs, and what each is the authority for:
+#   guard                 pull-request-wide docs-only detection; every other job gates
+#                         on its output
+#   build-chiefd          THE ARTIFACT PRODUCER, and nothing else
+#   chiefd-checks         all Rust verification (build, clippy, fmt, macOS
+#                         cross-check, warning-free release proof, seam
+#                         fixture, feature resolution)
+#   licence-scan          `cargo deny check licenses` against apps/chiefd/deny.toml
+#   secret-scan           gitleaks over the commits this pull request adds
+#   typecheck             `bun run typecheck` (three legs)
+#   lint                  stable collector for independent `bun run lint` and
+#                         `bun run knip` convention checks
+#   test-unit             stable collector for the per-package vitest jobs;
+#                         the base packages and Piing shards run in parallel
+#   repo-guards           the repo-invariant `node --test scripts/test/*` guards,
+#                         invoked by FILE — there is no package.json wrapper
+#   cargo-test-workspace  `cargo test --workspace` behind #857's floors
+#
+# HISTORY, because the banner this replaced was still claiming it: E0-S2
+# (2026-08-04) removed the 8-shard bun unit lane, the tmux-single-writer-p1
+# evidence lane and chiefd-checks' `cargo test` step, and the pre-removal
+# workflow lives at git SHA de72d660 (736 lines). E9-S6 (#838/#865) then
+# brought test execution back in the per-package shape above — the parked
+# `bun test tests` corpus itself stays parked (docs/testing/
+# parked-suite-triage.json holds its per-file disposition) and is NOT what
+# these jobs run. The old banner survived that reinstatement unedited and sat
+# above three live test jobs saying tests were disabled;
+# scripts/test/ci-workflow-shape.test.mjs now fails if this file ever again
+# claims tests are off while running them.
+# ───────────────────────────────────────────────────────────────────────────
+
+on:
+  # Do not use a path filter here. The guard below must create a visible check
+  # for every pull request, and it uses commit history to include paths that a
+  # later commit reverted out of the net tree diff.
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      debug_891:
+        description: 'Emit #891 type-state diagnostics from the eslinter union fixture (manual investigation only)'
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  # Keep CI and local Cargo on one known compiler. The manifest's MSRV remains
+  # lower; this pin is the reproducible verification environment, not a
+  # product runtime requirement.
+  RUST_TOOLCHAIN: 1.97.1
+
+# Pull-request runs are cancelled when a new commit supersedes them. The new
+# run checks every file touched by every pull-request commit, so a final
+# docs-only commit or a later revert cannot hide earlier code. Runs for commits
+# ON MAIN are kept separate because every commit is deployable.
+# Every commit on main is a thing we deploy, so it must carry its own
+# verdict. Keyed on the ref alone, every push to main joined one shared
+# `refs/heads/main` group and killed its predecessor — 5 of 12 consecutive
+# landings were cancelled-by-successor, and a cancelled run is not a passing
+# run while looking exactly like one in `gh run list`.
+#
+# The group suffix is `shared` for every pull request. This makes a new commit
+# cancel the older run for that same pull request. A non-PR run uses its SHA,
+# so different main commits do not cancel one another.
+concurrency:
+  # `github.event.pull_request.number` is added so that a PR's group is keyed
+  # on the PR itself, not just its head ref -- makes the "supersede the prior
+  # run on this PR" behavior explicit rather than incidental to `github.ref`
+  # already being unique per PR for `pull_request` events. `|| github.ref`
+  # covers non-PR triggers (`workflow_dispatch`, `push`) where the field is
+  # unset. `cancel-in-progress` is a literal `true`. Do not replace it with a
+  # boolean expression: GitHub Actions can treat the string `"false"` as
+  # truthy. The group makes the literal safe: every PR uses `shared`, while a
+  # non-PR run uses its SHA and does not cancel a different commit.
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.number && 'shared' || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  # The guard checks the union of paths touched by all current pull-request
+  # commits. It deepens shallow history only to a fixed bound and runs the
+  # complete matrix if it cannot prove the merge base. Every other job
+  # `needs: [guard, ...]` and gates on this
+  # job's output -- a job-level `if:` still SKIPS the job (visible in the run
+  # as `conclusion: skipped`, not absent), which is the win: zero matrix
+  # runners spin up for a docs-only pull request, not zero rows in `gh run list`.
+  guard:
+    name: Guard (pull-request scope detection)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs-only: ${{ steps.check.outputs.docs-only }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          # The required history is fetched on demand below. A full clone made
+          # this small gate spend 31s before it could decide whether to skip CI.
+          fetch-depth: 2
+      # NODE IS PINNED, RATHER THAN INHERITED FROM THE RUNNER IMAGE.
+      #
+      # Every `node` in this workflow used to be whatever `ubuntu-latest`
+      # shipped, and the "Bun jobs" are Bun-as-package-manager only: `bun
+      # install` then `bun run X` -> `node_modules/.bin/turbo` -> vitest,
+      # eslint, tsc and knip, all `#!/usr/bin/env node`. So the suites, the
+      # typecheck and the lint already ran on Node, on a version no commit
+      # here chose and GitHub could move under us.
+      #
+      # CI's Node is TOOLING's Node. It is NOT the runtime the Pi extensions
+      # execute on -- that is the operator's node, floored at Pi's own
+      # `engines.node` -- and `types-match-extension-runtime` pins the types to
+      # THAT rather than to this.
+      #
+      # 26 -> 24, AND THE REASON IS WORTH MORE THAN THE NUMBER. This was pinned
+      # at 26 on the argument that "tooling's Node is free to be ahead". It
+      # turned `main` red at `0a967895a`: `PiLiveThemeAuthority`'s live-bridge
+      # test, which waits on a `watchFile` poll, timed out. A re-run of the same
+      # tree passed, so it is a FLAKE that 26 exposed rather than a break — and
+      # a flake adopted voluntarily, for the cosmetic benefit of retiring
+      # deprecation warnings, is not worth keeping.
+      #
+      # The argument was too broad and that is the durable part: **tooling's
+      # Node is free to be ahead of PRODUCTION's, not free to be ahead of what
+      # the tests were written against.** The test suite is itself a consumer of
+      # the runtime it runs on, and a file-watcher test consumes exactly the
+      # semantics a Node major is most likely to move. 24 is the version every
+      # green run before `0a967895a` used.
+      #
+      # Moving to 26 is a change worth making on its own, with its own PR, by
+      # somebody who can watch what it does to the timing-sensitive tests.
+      #
+      # UPDATE (2026-08-25): `PiLiveThemeAuthority` is DELETED with the Pi
+      # patch, so the specific test whose `watchFile` poll flaked under 26 no
+      # longer exists. That REMOVES THE KNOWN BLOCKER; it does not make the
+      # move safe, because the argument above was never about one test — it was
+      # that the suite is a consumer of the runtime it runs on. The pin stays
+      # at 24 here. Whoever takes the 26 PR now starts from a tree without the
+      # one measured failure.
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Determine whether this pull request touches non-documentation files
+        id: check
+        env:
+          CI_SCOPE_EVENT_NAME: ${{ github.event_name }}
+          CI_SCOPE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_SCOPE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/ci-pr-scope.mjs
+
+  # THE ARTIFACT PRODUCER, AND NOTHING ELSE.
+  #
+  # The chiefd workspace is the repo's only Rust workspace (see
+  # apps/chiefd/README.md). This job was split out from the rest of the
+  # Rust verification (see `chiefd-checks` below) because `needs:` waits for
+  # the JOB, not for the step that produced the artifact: when this workflow
+  # binary-backed Vitest lanes consume this artifact via `needs: build-chiefd`.
+  # A slow verification step ahead of the upload once blocked every one of
+  # them from starting — measured on run 30675792052, the release binary
+  # was finished at 00:37:48 and the upload did not start until 00:43:35, so
+  # seven downstream test jobs sat idle for 5m47s behind verification work
+  # that produced nothing any of them read.
+  #
+  # The verification steps this job used to also carry (debug build, clippy, the
+  # warning-free release proof, `cargo test --workspace`, the seam/feature
+  # assertions) all still run, unconditionally, on the same commit — in
+  # `chiefd-checks` below, in parallel, blocking nobody.
+  build-chiefd:
+    name: Build chiefd CI binaries
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 20
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      # Keep the fast debug target path, but avoid the unoptimized runtime.
+      # The live Piing contract suite was 13m04s at level 0 and 5m01s with
+      # the old release binary. Level 2 is the middle path.
+      RUSTFLAGS: "-C opt-level=2"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      # Pinned, not inherited: see the note in the `guard` job.
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      # No `--component clippy` here: this job never lints. The linting job is
+      # `chiefd-checks`, which installs it.
+      - name: Install Rust toolchain
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update && rustup default "$RUST_TOOLCHAIN"
+      # This cache is only for the optimized runtime binaries. Cargo test
+      # shards have independent level-0 test caches and start after guard.
+      - name: Restore cargo registry and target cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/chiefd
+          shared-key: chiefd-debug-opt2-nodebug-v1
+          cache-workspace-crates: true
+      # The Cargo target cache still has to inspect and link the final binary
+      # on a warm runner. Cache the exact executable set separately, keyed by
+      # the complete chiefd source tree and the fixed build inputs. A
+      # TypeScript-only or documentation-only commit can then reuse a binary
+      # that is proven to come from the same Rust input set and skip the
+      # 4-7 minute link step entirely. No restore prefix is allowed: a nearby
+      # binary is not a current binary.
+      - name: Restore exact chiefd CI binary cache
+        id: chiefd-binary-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            apps/chiefd/target/debug/chief
+            apps/chiefd/target/debug/chiefd
+            apps/chiefd/target/debug/beacond
+          key: chiefd-ci-binaries-v1-${{ runner.os }}-rust-1.97.1-${{ hashFiles('apps/chiefd/**', '!apps/chiefd/target/**', '.cargo/**', 'rust-toolchain.toml', 'rust-toolchain') }}-opt2-nodebug
+      - name: Report exact chiefd CI binary cache status
+        run: |
+          if [[ "${{ steps.chiefd-binary-cache.outputs.cache-hit }}" == true ]]; then
+            echo "chiefd CI binary cache: exact hit"
+          else
+            echo "chiefd CI binary cache: miss; Cargo will build current outputs"
+          fi
+      - name: Build optimized CI debug-path binaries
+        if: steps.chiefd-binary-cache.outputs.cache-hit != 'true'
+        run: cargo build --locked --manifest-path apps/chiefd/Cargo.toml --bin chief --bin chiefd --bin beacond
+      - name: Restore executable bits on cached or built binaries
+        run: chmod +x apps/chiefd/target/debug/chief apps/chiefd/target/debug/chiefd apps/chiefd/target/debug/beacond
+      - name: Assert cached or built binaries are present
+        run: test -x apps/chiefd/target/debug/chief && test -x apps/chiefd/target/debug/chiefd && test -x apps/chiefd/target/debug/beacond
+      # #918: the CI binaries cross to their consumers only via
+      # actions/upload-artifact -> actions/download-artifact, a boundary
+      # with no shared CARGO_TARGET_DIR for #914's stamp mechanism to live
+      # in and no preserved mtimes. A sidecar content-hash manifest, written
+      # here and uploaded alongside the binaries, travels WITH the artifact
+      # instead. THE MANIFEST IS STILL WRITTEN HERE AND NOTHING NOW VERIFIES
+      # IT: its only consumer was deleted with the retired end-to-end corpus.
+      # Left stated rather than tidied away -- an artifact written and checked
+      # by nobody is a real coverage loss, and a comment that reads clean is
+      # how it stops being noticed.
+      - name: Write prebuilt-binary content-hash manifest (#918)
+        run: node scripts/prebuilt-binary-manifest.mjs write --binary-dir apps/chiefd/target/debug --binaries chief,chiefd,beacond
+      - name: Upload chiefd CI binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: chiefd-ci-binary
+          path: |
+            apps/chiefd/target/debug/chief
+            apps/chiefd/target/debug/chiefd
+            apps/chiefd/target/debug/beacond
+            apps/chiefd/target/debug/prebuilt-binary-manifest.json
+          if-no-files-found: error
+          retention-days: 1
+
+  # These checks were one serial job. They have no data dependency, so each
+  # runs on its own runner. `chiefd-checks` below remains the stable required
+  # status that collects their results.
+  chiefd-clippy:
+    name: chiefd Clippy and format checks
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update --component clippy --component rustfmt && rustup default "$RUST_TOOLCHAIN"
+      - name: Restore cargo registry and target cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/chiefd
+          shared-key: chiefd-clippy
+          cache-workspace-crates: true
+      - name: Clippy (seam rules are denied, not warned)
+        run: cargo clippy --workspace --all-targets --locked --manifest-path apps/chiefd/Cargo.toml -- -D warnings
+      # #850: named alongside Clippy per #838's CI reinstatement, in the
+      # same gate set rather than its own job -- rustfmt.toml + the
+      # repo-wide reformat (98e2515c) are the prerequisites this step is
+      # the actual deliverable for ("Rust formatting is ungated" closes
+      # here, not at the reformat). The count assertion guards the same
+      # vacuous-scope failure mode every other guard in this repo checks
+      # for: `cargo fmt --check` against a root that resolved zero files
+      # exits 0 and is indistinguishable from a genuinely clean tree.
+      - name: Assert the Rust source tree cargo fmt --check will scan is non-vacuous
+        run: |
+          count=$(find apps/chiefd -name '*.rs' -not -path '*/target/*' | wc -l)
+          echo "apps/chiefd .rs file count: $count"
+          if [ "$count" -lt 100 ]; then
+            echo "::error::apps/chiefd resolves only $count .rs files under find -- cargo fmt --check below would pass vacuously if this count is wrong (expected 200+)"
+            exit 1
+          fi
+      - name: cargo fmt --check (rustfmt.toml, #850)
+        run: cargo fmt --manifest-path apps/chiefd/Cargo.toml --all --check
+      # The seam lints are only worth something if we know they still fire. This fixture crate is planted with a direct
+      # std::fs::write, an OpenOptions, an unwrap and an expect; clippy MUST
+      # reject it. A zero exit here means the seam has stopped protecting the
+      # real crates.
+      - name: Assert the clippy seam actually fires
+        run: |
+          if cargo clippy --manifest-path apps/chiefd/tests/seam-fixture/Cargo.toml -- -D warnings; then
+            echo "::error::seam-fixture passed clippy; the chiefd seam lints are no longer enforced"
+            exit 1
+          fi
+          echo "seam lints fired as expected"
+      # The zero-wait retry ladder and the manual clock must never reach a
+      # live company.
+      - name: Assert test-support is absent from the shipping feature set
+        run: |
+          resolved=$(cargo tree --workspace -e normal -f '{p} [{f}]' --manifest-path apps/chiefd/Cargo.toml)
+          if grep -q 'test-support' <<<"$resolved"; then
+            echo "::error::test-support is enabled in a default build:"
+            grep 'test-support' <<<"$resolved"
+            exit 1
+          fi
+          echo "test-support absent from the default feature resolution"
+
+  chiefd-macos-check:
+    name: chiefd macOS cross-target check
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update && rustup default "$RUST_TOOLCHAIN"
+      - name: Restore cargo registry and target cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/chiefd
+          shared-key: chiefd-macos-check
+          cache-workspace-crates: true
+      - name: macOS cross-target check
+        run: bash scripts/cargo-check-macos.sh
+
+  chiefd-release-check:
+    name: chiefd release profile check
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update && rustup default "$RUST_TOOLCHAIN"
+      - name: Restore cargo registry and target cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/chiefd
+          shared-key: chiefd-release-check
+          cache-workspace-crates: true
+      # The deploy path performs the linked release build. CI checks the
+      # release profile here for warnings and feature resolution without
+      # spending minutes linking a production artifact that no CI test uses.
+      - name: Check release profile with warnings denied
+        env:
+          RUSTFLAGS: -D warnings
+        run: cargo check --release --workspace --all-targets --locked --manifest-path apps/chiefd/Cargo.toml
+
+  # ── PUBLICATION GATES ──────────────────────────────────────────────────
+  # Two jobs that exist because this repository is public. Neither guards
+  # behaviour; both guard what leaves the building.
+  # ───────────────────────────────────────────────────────────────────────
+
+  # A dependency cannot drag a copyleft licence into an Apache-2.0 product
+  # without a human saying so. The allowlist is `apps/chiefd/deny.toml`, and it
+  # is permissive-only by construction: an unrecognised licence fails because
+  # nobody approved it, not because somebody remembered to deny it.
+  licence-scan:
+    name: Dependency licences
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Check dependency licences against the allowlist
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: apps/chiefd/Cargo.toml
+          command: check licenses
+          command-arguments: '--hide-inclusion-graph'
+
+  # A secret cannot land after publication. THIS SCANS THE DIFF, NOT THE TREE,
+  # and that is deliberate rather than lazy: the tip carries 108 gitleaks
+  # findings that a full audit confirmed are every one of them test fixtures
+  # (`sk-live-abc123` and friends, the inputs to the redaction tests), so a
+  # whole-tree scan would be permanently red and would therefore be ignored.
+  # A diff scan is red only for something this pull request introduced.
+  #
+  # THE HOLE, stated rather than hidden: this job skips a docs-only pull
+  # request, because every job in this workflow does (the shape guard requires
+  # it). GitHub's own push protection is the net for that case and is enabled
+  # on the repository — this is the second line, not the only one.
+  secret-scan:
+    name: Secret scan (diff)
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 10
+    env:
+      # Pinned. The audit that produced the triage table ran this version, so
+      # a finding here is comparable to that table rather than to a moving
+      # detector.
+      GITLEAKS_VERSION: 8.24.3
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL "$url" -o /tmp/gitleaks.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+      - name: Scan the commits this pull request adds
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${BASE_SHA:-}" && -n "${HEAD_SHA:-}" ]]; then
+            range="${BASE_SHA}..${HEAD_SHA}"
+          else
+            range="HEAD~1..HEAD"
+          fi
+          echo "scanning $range"
+          gitleaks git --no-banner --redact --log-opts="--no-merges $range" .
+
+  # The stable required status. The three child jobs above carry the actual
+  # checks; this collector makes a child failure visible under the existing
+  # branch-protection context.
+  chiefd-checks:
+    name: chiefd workspace checks
+    runs-on: ubuntu-latest
+    needs: [guard, chiefd-clippy, chiefd-macos-check, chiefd-release-check]
+    if: always() && needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 5
+    steps:
+      - name: Require every Rust check lane to pass
+        run: |
+          for result in \
+            "${{ needs.chiefd-clippy.result }}" \
+            "${{ needs.chiefd-macos-check.result }}" \
+            "${{ needs.chiefd-release-check.result }}"; do
+            if [[ "$result" != success ]]; then
+              echo "::error::Rust check lane result was $result"
+              exit 1
+            fi
+          done
+          echo "all Rust check lanes passed"
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      # Pinned, not inherited: see the note in the `guard` job.
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - name: Restore Bun dependency cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+      - name: Install locked dependencies
+        # CI invokes the build explicitly in the task that needs it. Skipping
+        # lifecycle scripts avoids the root postinstall build, which would
+        # compile the workspace once before Turbo builds it again for the real
+        # check.
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Typecheck
+        run: bun run typecheck
+
+  # #751/G10: until this job existed, EVERY convention this repo enforces by
+  # lint -- the `as`/`any`/non-null-assertion ban, the relative-import ban,
+  # the env fences, exact dependency pins, the 37 `lucy/*` rules, plus knip's
+  # unused-file/unused-dependency sweep -- was gated only by whoever
+  # remembered to run `bun run lint` on their own machine before pushing.
+  # One-way drift: a convention violation could land and every CI job stayed
+  # green. Both commands were measured clean against the tree before this job
+  # was added; neither is being introduced on faith that someone will fix the
+  # backlog later.
+  #
+  # The checks have no dependency on each other, so they use separate runners.
+  lint-eslint:
+    name: Lint (ESLint workspace conventions)
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      # Pinned, not inherited: see the note in the `guard` job.
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - name: Restore Bun dependency cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+      - name: Install locked dependencies
+        # CI invokes the build explicitly in the task that needs it. Skipping
+        # lifecycle scripts avoids the root postinstall build, which would
+        # compile the workspace once before Turbo builds it again for the real
+        # check.
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: bun run lint (eslint across every workspace member, turbo-fanned-out)
+        run: bun run lint
+      # WIRED HERE RATHER THAN IN ITS OWN JOB, BECAUSE IT IS A LINT.
+      #
+      # `lint:reactive` has been on this repo's standing pre-push list since
+      # #827 and was wired into NO CI job at all — so the only thing that ever
+      # ran it was a human remembering to. That is the same defect the
+      # `test:pre-push-guards` gap was: a correct, documented gate that nobody
+      # executes produces exactly the outcome of a broken one.
+      #
+      # It shares this job because it shares this job's inputs — the same
+      # checkout, the same `bun install` — and a separate job would pay both
+      # again to run a scan measured in seconds. It runs AFTER eslint so a
+      # single red step is unambiguous about which gate refused.
+      - name: bun run lint:reactive (Mandate 1 — no unlisted recurring timers)
+        run: bun run lint:reactive
+
+  lint-knip:
+    name: Knip (dead code and dependency drift)
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      # Pinned, not inherited: see the note in the `guard` job.
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - name: Restore Bun dependency cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: bun run knip (unused files and undeclared/unused dependencies)
+        run: bun run knip
+
+  lint:
+    name: Lint and knip
+    runs-on: ubuntu-latest
+    needs: [guard, lint-eslint, lint-knip]
+    if: always() && needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 5
+    steps:
+      - name: Require lint and knip to pass
+        run: |
+          echo "lint: ${{ needs.lint-eslint.result }}"
+          echo "knip: ${{ needs.lint-knip.result }}"
+          if [ "${{ needs.lint-eslint.result }}" != success ] || [ "${{ needs.lint-knip.result }}" != success ]; then
+            echo '::error::lint or knip failed'
+            exit 1
+          fi
+
+  # #838 (E9-S6, CI second pass): the per-package vitest lanes -- the
+  # terminal convention's replacement for E0-S2's removed 8-shard bun:test
+  # lane, not a reinstatement of the parked corpus itself. Keep the required
+  # status context below as a collector, while the real test work runs in
+  # parallel. Piing is the largest package and uses Vitest's native file
+  # sharding plus four lanes for its large stateful tool-contract file; the
+  # web and eslinter start at once because they use no Rust binary. Chiefing
+  # and testing wait for build-chiefd because @chief/testing drives the real
+  # daemon. Piing keeps its binary-backed shard and contract lanes.
+  test-unit-base:
+    name: Test (vitest, web and eslinter)
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 20
+    # #891 is a correctness investigation, not a timeout investigation. The
+    # manual workflow input reaches only this diagnostic branch; empty is
+    # falsy for ordinary push/PR runs, so they retain their normal output.
+    env:
+      DEBUG_891: ${{ inputs.debug_891 == true && '1' || '' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      # Pinned, not inherited: see the note in the `guard` job.
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - name: Restore Bun dependency cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+      - name: Install locked dependencies
+        # CI invokes the build explicitly in the task that needs it. Skipping
+        # lifecycle scripts avoids the root postinstall build, which would
+        # compile the workspace once before Turbo builds it again for the real
+        # check.
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Vitest for web and eslinter
+        run: TURBO_UI=0 bun x turbo run test:unit --filter=@chief/web --filter=@chief/eslinter --continue --output-logs=full
+
+  test-unit-chiefd:
+    name: Test (vitest, chiefing and testing)
+    runs-on: ubuntu-latest
+    needs: [guard, build-chiefd]
+    if: needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      # Pinned, not inherited: see the note in the `guard` job.
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - name: Restore Bun dependency cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Download chiefd CI debug binary (testing drives the current daemon)
+        uses: actions/download-artifact@v8
+        with:
+          name: chiefd-ci-binary
+          path: apps/chiefd/target/debug
+      - name: Restore the executable bit (artifact upload/download does not guarantee it)
+        run: chmod +x apps/chiefd/target/debug/chief apps/chiefd/target/debug/chiefd apps/chiefd/target/debug/beacond
+      - name: Stamp the downloaded binaries as current (built from this commit)
+        run: touch apps/chiefd/target/debug/chief apps/chiefd/target/debug/chiefd apps/chiefd/target/debug/beacond
+      - name: Vitest for chiefing and testing
+        run: TURBO_UI=0 bun x turbo run test:unit --filter=@chief/chiefing --filter=@chief/testing --continue --output-logs=full
+
+  # The import-derived partition guard keeps real-daemon tests out of these
+  # early shards. Only the contract lanes below wait for the Rust binaries.
+  test-unit-piing:
+    name: Test (vitest, Piing shard ${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    needs: [guard]
+    if: needs.guard.outputs.docs-only != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1/2, 2/2]
+    timeout-minutes: 15
+    env:
+      DEBUG_891: ${{ inputs.debug_891 == true && '1' || '' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      # Pinned, not inherited: see the note in the `guard` job.
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - name: Restore Bun dependency cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+      - name: Install locked dependencies
+        # CI invokes the build explicitly in the task that needs it. Skipping
+        # lifecycle scripts avoids the root postinstall build, which would
+        # compile the workspace once before Turbo builds it again for the real
+        # check.
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Assert Piing has test files
+        run: |
+          count=$(find packages/piing/test -type f -name '*.test.ts' | wc -l | tr -d ' ')
+          echo "Piing test files: $count"
+          if [ "$count" -lt 1 ]; then
+            echo '::error::Piing has no test files; the shard matrix would pass vacuously'
+            exit 1
+          fi
+      - name: Vitest for binary-independent Piing shard
+        run: TURBO_UI=0 bun x turbo run test:unit --filter=@chief/piing -- --shard=${{ matrix.shard }} --exclude='test/toolcontract/OrganizationToolContract.test.ts' --exclude='test/toolcontract/ReminderDeliveryContract.test.ts' --exclude='test/toolcontract/EnforcedGateToolSurfaceContract.test.ts' --exclude='test/toolcontract/RendezvousWriterBytesContract.test.ts' --reporter=dot
+
+  test-unit-piing-contract:
+    name: Test (vitest, Piing contract ${{ matrix.lane }})
+    runs-on: ubuntu-latest
+    needs: [guard, build-chiefd]
+    if: needs.guard.outputs.docs-only != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [ordered, independent-a, independent-b, independent-c]
+    timeout-minutes: 15
+    env:
+      DEBUG_891: ${{ inputs.debug_891 == true && '1' || '' }}
+      CI_TOOL_CONTRACT_LANE: ${{ matrix.lane }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      # Pinned, not inherited: see the note in the `guard` job.
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - name: Restore Bun dependency cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+      - name: Install locked dependencies
+        # CI invokes the build explicitly in the task that needs it. Skipping
+        # lifecycle scripts avoids the root postinstall build, which would
+        # compile the workspace once before Turbo builds it again for the real
+        # check.
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Download chiefd CI debug binary (Piing contract tests use the current daemon)
+        uses: actions/download-artifact@v8
+        with:
+          name: chiefd-ci-binary
+          path: apps/chiefd/target/debug
+      - name: Restore the executable bit (artifact upload/download does not guarantee it)
+        run: chmod +x apps/chiefd/target/debug/chief apps/chiefd/target/debug/chiefd apps/chiefd/target/debug/beacond
+      - name: Stamp the downloaded binaries as current (built from this commit)
+        run: touch apps/chiefd/target/debug/chief apps/chiefd/target/debug/chiefd apps/chiefd/target/debug/beacond
+      - name: Assert tmux is present (the contract tests use a real tmux host)
+        run: tmux -V
+      - name: Assert the contract suite has test files
+        run: test -f packages/piing/test/toolcontract/OrganizationToolContract.test.ts
+      - name: Vitest for Piing contract lane
+        run: |
+          case "${{ matrix.lane }}" in
+            ordered)
+              files='test/toolcontract/OrganizationToolContract.test.ts test/toolcontract/ReminderDeliveryContract.test.ts test/toolcontract/EnforcedGateToolSurfaceContract.test.ts test/toolcontract/RendezvousWriterBytesContract.test.ts'
+              pattern='the organization tools|durable reminders|the last four families|caller authentication|durable reminder delivery, in an isolated live company|the organization tool surface installs under an enforced auth gate|the daemon rendezvous is read from the writer, not from a fixture'
+              ;;
+            independent-a)
+              files='test/toolcontract/OrganizationToolContract.test.ts'
+              pattern='post-commit convergence|refusal reaches|web-hosted person|two companies'
+              ;;
+            independent-b)
+              files='test/toolcontract/OrganizationToolContract.test.ts'
+              pattern='reminder may be armed|structural family'
+              ;;
+            independent-c)
+              files='test/toolcontract/OrganizationToolContract.test.ts'
+              pattern='operator escalation|baseline mailbox|department end-of-life|contract family|staffing and placement'
+              ;;
+            *)
+              echo "::error::unknown contract lane: ${{ matrix.lane }}"
+              exit 1
+              ;;
+          esac
+          TURBO_UI=0 bun x turbo run test:unit --filter=@chief/piing -- $files --testNamePattern="$pattern" --reporter=dot
+
+  # Keep the branch-protection context stable while the real test lanes
+  # run in parallel. A matrix job cannot keep the old required context name.
+  test-unit:
+    name: Test (vitest, per-package)
+    runs-on: ubuntu-latest
+    needs: [guard, test-unit-base, test-unit-chiefd, test-unit-piing, test-unit-piing-contract]
+    if: always() && needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 5
+    steps:
+      - name: Collect vitest lane results
+        run: |
+          echo "web and eslinter: ${{ needs.test-unit-base.result }}"
+          echo "chiefing and testing: ${{ needs.test-unit-chiefd.result }}"
+          echo "Piing shards: ${{ needs.test-unit-piing.result }}"
+          echo "Piing contract lanes: ${{ needs.test-unit-piing-contract.result }}"
+          if [ "${{ needs.test-unit-base.result }}" != success ] || [ "${{ needs.test-unit-chiefd.result }}" != success ] || [ "${{ needs.test-unit-piing.result }}" != success ] || [ "${{ needs.test-unit-piing-contract.result }}" != success ]; then
+            echo '::error::one or more vitest lanes failed'
+            exit 1
+          fi
+
+  # Run the derived repo-invariant shards on separate runners. The old shape
+  # created four worktrees inside one runner, so checkout, Bun, and CPU work
+  # still shared one critical path. The serial guard stays separate because
+  # it edits a package and runs the full typecheck build as a mutation test.
+  repo-guards-shard:
+    name: Repo guards shard (${{ matrix.label }})
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: 0
+            label: 1
+          - shard: 1
+            label: 2
+          - shard: 2
+            label: 3
+          - shard: 3
+            label: 4
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Pinned, not inherited: see the note in the `guard` job.
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - name: Restore Bun dependency cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+      - name: Install locked dependencies
+        # CI invokes the build explicitly in the task that needs it. Skipping
+        # lifecycle scripts avoids the root postinstall build, which would
+        # compile the workspace once before Turbo builds it again for the real
+        # check.
+        run: bun install --frozen-lockfile --ignore-scripts
+      # ci-guard-shards.mjs owns this shard's build. Keeping a workflow build
+      # here would compile the same workspace twice in this job.
+      - name: Run one derived repo guard shard
+        run: node scripts/ci-guard-shards.mjs --shards 4 --shard ${{ matrix.shard }} --skip-serial
+
+  repo-guards-serial:
+    name: Repo guards serial mutation check
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Pinned, not inherited: see the note in the `guard` job.
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - name: Restore Bun dependency cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+      - name: Install locked dependencies
+        # CI invokes the build explicitly in the task that needs it. Skipping
+        # lifecycle scripts avoids the root postinstall build, which would
+        # compile the workspace once before Turbo builds it again for the real
+        # check.
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: clean-install smoke (README quick-start module graph)
+        run: bash scripts/clean-install-smoke.sh --mode fast
+      - name: Run the isolated serial mutation guard
+        run: node scripts/ci-guard-shards.mjs --shards 4 --serial-only
+
+  # Keep the required check name stable while the real guard jobs run in
+  # parallel. A matrix job cannot keep the old required context name.
+  repo-guards:
+    name: Repo guards (node --test repo invariants)
+    runs-on: ubuntu-latest
+    needs: [guard, repo-guards-shard, repo-guards-serial]
+    if: always() && needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 5
+    steps:
+      - name: Collect repo guard results
+        run: |
+          echo "derived guard shards: ${{ needs.repo-guards-shard.result }}"
+          echo "serial mutation guard: ${{ needs.repo-guards-serial.result }}"
+          if [ "${{ needs.repo-guards-shard.result }}" != success ] || [ "${{ needs.repo-guards-serial.result }}" != success ]; then
+            echo '::error::one or more repo guard lanes failed'
+            exit 1
+          fi
+
+  # #865/#857: run every workspace test, but keep each runner's target
+  # directory bounded. Each shard compiles and runs its own package group in
+  # one job. Cargo provides the tested executables through CARGO_BIN_EXE, so
+  # these lanes do not wait for or download build-chiefd's optimized artifact.
+  cargo-test-workspace-shard:
+    name: cargo test --workspace shard (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    needs: guard
+    if: needs.guard.outputs.docs-only != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: core
+            packages: chiefd-core
+            members: crates/chiefd-core
+          - shard: host
+            packages: chiefd-host
+            members: crates/chiefd-host
+          - shard: api
+            packages: chiefd-api
+            members: crates/chiefd-api
+          - shard: cli
+            packages: chief-cli
+            members: crates/chief-cli
+            parallel_targets: lib bin:chief doc attach_viewport_recovery actuator_presents_a_bearer crash_loop_never_gives_up daemon_level_log interpret_crash interpret_crash_session one_host_vocabulary sleeping_card_tmux trust_rules
+          - shard: daemon
+            packages: chiefd-daemon beacond
+            members: crates/chiefd-daemon crates/beacond
+            # chiefd-daemon integration tests spawn beacond. Build the complete
+            # package group first so CARGO_BIN_EXE_beacond resolves before the
+            # sequential package execution starts.
+            precompile: true
+          - shard: support
+            packages: host-primitives identity-keys chiefd-log chiefd-unit-d chiefd-wire-boundary
+            members: crates/host-primitives crates/identity-keys crates/chiefd-log tests/unit-d tests/wire-boundary
+    timeout-minutes: 20
+    env:
+      CARGO_INCREMENTAL: "0"
+      # CI validates test behavior, not debugger backtraces. Removing test
+      # debuginfo cuts the size and link time of the many integration targets
+      # without changing which tests Cargo builds or runs.
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      # Keep the test profile at Cargo's fast-to-compile default. The binary
+      # producer above has its own optimized profile for tests that spawn it.
+      CARGO_PROFILE_TEST_OPT_LEVEL: "0"
+      CI_CARGO_PACKAGES: ${{ matrix.packages }}
+      CI_CARGO_MEMBERS: ${{ matrix.members }}
+      CI_CARGO_PARALLEL_TARGETS: ${{ matrix.parallel_targets }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update && rustup default "$RUST_TOOLCHAIN"
+      - name: Restore cargo registry and target cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/chiefd
+          # Test targets use the default level-0 test profile. Keep one cache
+          # per shard because Cargo fingerprints include compiler flags and a
+          # matrix runner must never save one shard's target set as another's.
+          shared-key: chiefd-test-opt0-v1-${{ matrix.shard }}
+          cache-workspace-crates: true
+      - name: Precompile cross-package test executables
+        if: matrix.precompile == true
+        run: bash scripts/cargo-test-workspace.sh --no-run
+      - name: Run exact-floor cargo test package group
+        run: bash scripts/cargo-test-workspace.sh
+
+  # Stable required status for branch protection. The matrix above carries
+  # the tests; this collector fails if any shard or its artifact producer did
+  # not pass.
+  cargo-test-workspace:
+    name: cargo test --workspace (#857 floors)
+    runs-on: ubuntu-latest
+    needs: [guard, cargo-test-workspace-shard]
+    if: always() && needs.guard.outputs.docs-only != 'true'
+    timeout-minutes: 5
+    steps:
+      - name: Require every cargo test shard to pass
+        run: |
+          if [[ "${{ needs.cargo-test-workspace-shard.result }}" != success ]]; then
+            echo "::error::cargo test workspace shard result was ${{ needs.cargo-test-workspace-shard.result }}"
+            exit 1
+          fi
+          echo "all cargo test workspace shards passed"

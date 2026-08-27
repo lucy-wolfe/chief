@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "files": ["eslint.config.mjs", "prettier.config.mjs"],
+  "include": [
+    "scripts/**/*.mjs",
+    "packages/eslinter/**/*.js",
+    "packages/eslinter/**/*.mjs",
+    "packages/*/eslint.config.mjs",
+    "apps/*/*.mjs",
+    "tests/**/*.mjs"
+  ]
+}

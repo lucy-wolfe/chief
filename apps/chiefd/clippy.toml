@@ -1,0 +1,46 @@
+# chiefd seam configuration — the design record.
+#
+# The seam this file defends: SQLite connections may only be opened by the
+# per-company writer actor (`chiefd_core::store`), and the filesystem may only
+# be touched by the host executor (`chiefd_host`). Anywhere else, opening a
+# connection or writing a file re-creates the multi-writer world chiefd exists
+# to delete. clippy.toml is workspace-global, so the two legitimate owners
+# carry a narrow, commented `#[allow(clippy::disallowed_methods)]` at the exact
+# call site — which makes every such site greppable and reviewable.
+#
+# `unwrap_used` / `expect_used` / `panic` are denied in Cargo.toml
+# `[workspace.lints.clippy]`; the three `allow-*-in-tests` switches below keep
+# test code readable without weakening production builds.
+
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+
+disallowed-methods = [
+    { path = "rusqlite::Connection::open", reason = "only chiefd_core::store may open a company connection — one writer thread per chief.db (README §5.2)" },
+    { path = "rusqlite::Connection::open_with_flags", reason = "only chiefd_core::store may open a company connection (README §5.2)" },
+    { path = "std::fs::write", reason = "filesystem effects belong to chiefd_host::executor, inside a host transaction (README §5.6)" },
+    { path = "std::fs::remove_file", reason = "filesystem effects belong to chiefd_host::executor, inside a host transaction (README §5.6)" },
+    { path = "std::fs::rename", reason = "publish-by-rename is a HostExecutor step, never an ad-hoc call (README §5.6)" },
+    { path = "std::thread::sleep", reason = "all waiting flows through the injected Clock so tests never sleep (TESTING.md §4.2)" },
+    { path = "tokio::time::sleep", reason = "all waiting flows through the injected Clock so tests never sleep (TESTING.md §4.2)" },
+    # A recurring ticker is a poll with a nicer name, and the two bans above did
+    # not cover it: a sweep that matched `sleep` was exhaustive over the wrong
+    # set, so `tokio::time::interval(..)` + `.tick()` was the one periodic-timer
+    # shape that could land in these crates unclassified. Reconcilers here are
+    # event-primary -- a committed mutation wakes the duty -- and a periodic pass
+    # survives only as a level-triggered BACKSTOP for state that emits no event
+    # (a dead pane, a rebooted box). Both are expressed through the injected
+    # Clock, never a ticker. A genuine exception (a heartbeat, an external
+    # protocol's own keepalive) takes the same narrow, commented
+    # `#[allow(clippy::disallowed_methods)]` at the exact call site that every
+    # other exemption in this file takes, naming its class -- which is what keeps
+    # the whole set greppable.
+    { path = "tokio::time::interval", reason = "a recurring ticker is a poll; reconcile duties are event-primary with a Clock-driven backstop (README §5.2, scripts/reactive-allowlist.ts classes)" },
+    { path = "tokio::time::interval_at", reason = "same as tokio::time::interval — a phase offset does not make a ticker reactive" },
+]
+
+disallowed-types = [
+    { path = "std::fs::OpenOptions", reason = "file handles belong to chiefd_host::executor (README §5.6)" },
+    { path = "std::fs::File", reason = "file handles belong to chiefd_host::executor (README §5.6)" },
+]

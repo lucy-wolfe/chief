@@ -1,0 +1,24 @@
+# Deliberately-failing clippy fixture. NOT a member of the chiefd workspace
+# (it carries its own `[workspace]` table), so `cargo build --workspace` never
+# sees it. CI runs clippy against it and asserts a NON-ZERO exit: if this crate
+# ever passes, the seam lints have stopped protecting the real crates.
+#
+# See apps/chiefd/README.md, "The seam lints".
+[workspace]
+
+[package]
+name = "chiefd-seam-fixture"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+disallowed_methods = "deny"
+disallowed_types = "deny"

@@ -1,0 +1,36 @@
+{
+  "name": "defer-of-an-unknown-request-is-refused",
+  "family": "session-maintenance",
+  "description": "An unknown request id is refused.",
+  "invariants": [],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "maint.defer",
+  "in": {
+    "requestId": "session-maintenance:1:signal-researcher:compact",
+    "claim": {
+      "processId": 4242,
+      "sessionId": "session-alpha",
+      "claimToken": "token-alpha"
+    }
+  },
+  "expect": {
+    "error": {
+      "type": "Refused",
+      "code": "unknown-request",
+      "message": "Unknown session maintenance request 'session-maintenance:1:signal-researcher:compact'"
+    }
+  },
+  "expectState": [
+    {
+      "read": "maint.summary",
+      "equals": null
+    }
+  ]
+}

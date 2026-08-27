@@ -1,0 +1,44 @@
+{
+  "name": "release-for-an-unknown-transition-is-refused",
+  "family": "activity",
+  "description": "An unknown transition id is refused rather than creating one.",
+  "invariants": [],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "activity.release",
+  "caller": {
+    "personId": "signal-researcher",
+    "role": "worker"
+  },
+  "in": {
+    "transitionId": "transition:99:signal-researcher:park"
+  },
+  "expect": {
+    "error": {
+      "type": "Refused",
+      "code": "unknown-transition",
+      "message": "Unknown graceful transition 'transition:99:signal-researcher:park' for 'signal-researcher'"
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.summary",
+      "equals": {
+        "nextTransitionSequence": 1,
+        "personOrder": [
+          "chief",
+          "quant-head",
+          "signal-researcher",
+          "it-head"
+        ],
+        "transitionOrder": []
+      }
+    }
+  ]
+}

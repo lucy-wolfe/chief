@@ -1,0 +1,1628 @@
+// PARKED by E0-S2 (monorepo revamp wave 0): this file pins the pre-monorepo
+// CI/scripts layout (shard matrix, e2e job, concurrency clauses) that E0-S2
+// deliberately removed from ci.yml. Kept as reference for the later-wave
+// test-reinstatement work (E9-S2 triage, E9-S6 per-package vitest CI).
+import { expect, test } from "bun:test";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  E2E_SCENARIO_TIMEOUT_MS,
+  E2E_REACTIVE_FALLBACK_FLOOR_MS,
+  E2E_SHARD_COUNT,
+  E2E_SUITE_BUDGET_MS,
+  SHARD_COUNT,
+  UNIT_SCENARIO_TIMEOUT_MS,
+  UNIT_SHARD_BUDGET_MS,
+  committedE2eTestFiles,
+  committedManualTestFiles,
+  committedTestFiles,
+  evaluateUnitShard,
+  isManualTestFile,
+  runUnitShard,
+  weightFor,
+  computeE2eShards,
+  e2eWeightFor,
+  computeShards,
+  evaluateE2eBudget,
+  isE2eTestFile,
+  partitionFiles,
+  assertExhaustivePartition,
+  BUDGET_KILL_GRACE_MS,
+  runE2eShard,
+  shardCoverageSnapshot,
+  shardCoveragePath,
+  writeShardCoverageSnapshot,
+} from "../scripts/ci-shard.ts";
+
+test("requires locked typecheck and cached setup on pull requests and main", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+
+  expect(workflow).toContain("pull_request:");
+  expect(workflow).toContain("workflow_dispatch:");
+  expect(workflow).toContain("branches:\n      - main");
+  expect(workflow).toContain("permissions:\n  contents: read");
+  expect(workflow).toContain("uses: oven-sh/setup-bun@v2");
+  expect(workflow).toContain("bun-version: 1.3.10");
+  expect(workflow).toContain("run: bun install --frozen-lockfile");
+  expect(workflow).toContain("run: bun run typecheck");
+
+  // Warm runs restore the Bun dependency cache so setup stays a small fraction
+  // of the wall-clock budget; the key is pinned to the committed lockfile.
+  expect(workflow).toContain("uses: actions/cache@v4");
+  expect(workflow).toContain("path: ~/.bun/install/cache");
+  expect(workflow).toContain("key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}");
+});
+
+test("pins Rust and provisions native commands for every runtime test lane", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+  const toolchain = readFileSync(join(process.cwd(), "rust-toolchain.toml"), "utf8");
+  const nativeTools = readFileSync(join(process.cwd(), "scripts", "ci-ensure-test-tools.sh"), "utf8");
+
+  // A moving stable compiler changes fingerprints and can make a warm cache
+  // cold without a source or lockfile change. The checked-in toolchain file is
+  // the local/CI contract, while the workflow's explicit install makes the
+  // runner environment independent of the image's preinstalled toolchains.
+  expect(toolchain).toContain('channel = "1.97.1"');
+  expect(toolchain).toContain('profile = "minimal"');
+  expect(workflow).toContain("RUST_TOOLCHAIN: 1.97.1");
+  expect(workflow).toContain('rustup toolchain install "$RUST_TOOLCHAIN"');
+
+  // Real tmux, fd, and ripgrep are test prerequisites, not accidental
+  // properties of ubuntu-latest. The helper installs only missing packages,
+  // so a runner that already has them does not pay an apt update.
+  expect(nativeTools).toContain("commands=(tmux rg fd)");
+  expect(nativeTools).toContain("packages=(tmux ripgrep fd-find)");
+  expect(nativeTools).toContain("sudo apt-get update");
+  expect(nativeTools).toContain("sudo ln -s");
+  expect(nativeTools).toContain("ensure_fd_alias");
+  expect(nativeTools).toContain("! command -v fd >/dev/null 2>&1 && command -v fdfind >/dev/null 2>&1");
+  expect(nativeTools).not.toContain("--version | head");
+
+  // Ubuntu's package exposes `fdfind`, not `fd`. Alias it before the missing
+  // package pass: an image that already has `fdfind` must not do apt work just
+  // to satisfy the portable command name.
+  const fdAliasBeforeDetection = nativeTools.indexOf("ensure_fd_alias\n\ncommands=(tmux rg fd)");
+  const packageDetection = nativeTools.indexOf('for index in "${!commands[@]}"');
+  const aptUpdate = nativeTools.indexOf("sudo apt-get update");
+  expect(fdAliasBeforeDetection).toBeGreaterThan(-1);
+  expect(packageDetection).toBeGreaterThan(fdAliasBeforeDetection);
+  expect(aptUpdate).toBeGreaterThan(packageDetection);
+
+  for (const [job, testCommand] of [
+    ["chiefd-checks", "run: cargo build --workspace --locked --manifest-path services/chiefd/Cargo.toml"],
+    ["tests", "run: bun scripts/ci-shard.ts ${{ matrix.shard }}"],
+    ["e2e", "run: bun scripts/ci-shard.ts --e2e"],
+    ["tmux-single-writer-p1", "run_capture tmux-single-writer-probe/raw-logs/rust-control.log cargo test"],
+  ] as const) {
+    const start = workflow.indexOf(`\n  ${job}:`);
+    expect(start).toBeGreaterThan(-1);
+    const nextJobOffset = workflow.slice(start + 1).search(/\n  [A-Za-z0-9_-]+:/);
+    const end = nextJobOffset === -1 ? -1 : start + 1 + nextJobOffset;
+    const block = workflow.slice(start, end === -1 ? undefined : end);
+    const helper = block.indexOf("run: bash scripts/ci-ensure-test-tools.sh");
+    const test = block.indexOf(testCommand);
+    expect(helper).toBeGreaterThan(-1);
+    expect(test).toBeGreaterThan(helper);
+  }
+});
+
+test("never cancels a CI run for a commit on main, but still cancels superseded PR runs", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+
+  // `concurrency.group` is keyed on the ref, so every push to main joins ONE
+  // shared `refs/heads/main` group. With an unconditional `cancel-in-progress`
+  // each landing killed its predecessor mid-flight: five of twelve consecutive
+  // runs were cancelled by their successor, including main's own tip. A
+  // cancelled run reports `cancelled`, not `failure`, so a commit carrying NO
+  // verdict is indistinguishable at a glance from one that passed — which is
+  // why this is asserted rather than left to reviewer memory.
+  // Every main commit gets its OWN concurrency group, so there is never a
+  // sibling run to cancel. Done by group rather than by the flag on purpose:
+  // `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` was tried and
+  // measurably did NOT work — 71b9a893 was still cancelled by its successor
+  // with that config live, because the expression yields the STRING "false",
+  // which is truthy. Group identity needs no boolean coercion to be correct.
+  expect(workflow).toContain(
+    "group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arch-impl/handoff' || github.head_ref == 'arch-impl/handoff' || github.ref == 'refs/heads/feat/ci-unit-green' || github.head_ref == 'feat/ci-unit-green') && github.sha || 'shared' }}",
+  );
+
+  // Ordinary PRs are keyed on the PR number, not just `github.ref` (which
+  // happens to already be unique per PR for `pull_request` events via
+  // `refs/pull/<N>/merge`, but was reported to the team as NOT cancelling
+  // superseded runs -- keying explicitly on the PR number makes the "kill my
+  // own prior run" behavior structural rather than incidental). Non-PR
+  // triggers (`workflow_dispatch`, `push`) fall back to `github.ref`, where
+  // `github.event.pull_request.number` is unset.
+  expect(workflow).toContain("github.event.pull_request.number || github.ref");
+
+  // The negative is the load-bearing half. A group keyed on the ref ALONE is
+  // the defect: it puts every main commit in one bucket. A test that merely
+  // asserted "a concurrency group exists" passes on the broken config, and so
+  // does one that only checks the cancel flag.
+  expect(workflow).not.toContain("group: ci-${{ github.workflow }}-${{ github.ref }}\n");
+
+  // Separation is by GROUP IDENTITY, never by an expression in the flag. A
+  // `${{ }}` here yields the STRING "false", which is truthy — measured: with
+  // `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` live, 71b9a893
+  // was still cancelled by its successor.
+  expect(workflow).toContain("cancel-in-progress: true");
+  expect(workflow).not.toMatch(/cancel-in-progress:\s*\$\{\{/);
+
+  // The main-only discriminator is the state this replaced, and it must not
+  // come back: it left the INTEGRATION branch on the shared group. Measured
+  // over `arch-impl/handoff`'s last 30 runs with it live: 9 cancelled,
+  // 7 failure, 0 success — no commit on the branch everything lands through
+  // carried a verdict.
+  expect(workflow).not.toContain(
+    "group: ci-${{ github.workflow }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || 'shared' }}",
+  );
+});
+
+test("the integration branch is exempted via github.head_ref, because a github.ref-only exemption would silently do nothing", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+
+  const group = workflow
+    .split("\n")
+    .find((line) => line.trimStart().startsWith("group: ci-"));
+  expect(group).toBeDefined();
+
+  // Both halves of the integration-branch exemption must be present.
+  //
+  // This is THE assertion of this change, and it exists because the plausible
+  // version of the fix is inert. Runs on `arch-impl/handoff` are
+  // `pull_request` events, so `github.ref` is `refs/pull/<n>/merge` — never
+  // `refs/heads/arch-impl/handoff`. An exemption written only against
+  // `github.ref` reads correctly to a reviewer, ships, and changes nothing:
+  // every push still lands in the same `…/merge-shared` group and still kills
+  // its predecessor. `github.head_ref` carries the branch name on
+  // `pull_request` events (and only there), so it is the half that actually
+  // fires on the runs that were being cancelled.
+  expect(group).toContain("github.head_ref == 'arch-impl/handoff'");
+  // ...and the `github.ref` half still covers `workflow_dispatch` / `push` for
+  // the same branch, where `head_ref` is empty.
+  expect(group).toContain("github.ref == 'refs/heads/arch-impl/handoff'");
+  // main's original exemption is preserved, not traded away.
+  expect(group).toContain("github.ref == 'refs/heads/main'");
+  // The suffix must be the SHA — that is what makes each commit its own group
+  // and therefore un-cancellable. `true`/`1` would put them all back together.
+  expect(group).toContain("&& github.sha || 'shared'");
+
+  // Ordinary feature PRs keep supersede-cancellation: a superseded feature run
+  // really is waste. The `'shared'` fallback is what preserves that, so its
+  // absence would mean nothing is ever cancelled anywhere.
+  expect(group).toContain("'shared'");
+});
+
+test("builds the chiefd docstore binary once and shares it with every test shard", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+
+  // Durable org state is SQL-only: the shards spawn the real chiefd docstore
+  // surface (`chiefd docstore-only`), so a workflow without a Rust build is red
+  // on every machine but the author's. chiefd is built once and shipped as an
+  // artifact rather than compiled in each of the six shard jobs.
+  expect(workflow).toContain("build-chiefd:");
+  expect(workflow).toContain('rustup toolchain install "$RUST_TOOLCHAIN"');
+  expect(workflow).toContain("uses: Swatinem/rust-cache@v2");
+  expect(workflow).toContain(
+    "cargo build --release --locked --manifest-path services/chiefd/Cargo.toml --bin chiefd",
+  );
+  expect(workflow).toContain(
+    "cargo rustc --release --locked --manifest-path services/chiefd/Cargo.toml -p chiefd --bin chiefd -- -D warnings",
+  );
+
+  // Built once, not once per shard: the six-way matrix depends on the build job
+  // and pulls the binary as an artifact instead of compiling it again.
+  // E4-RETRY added the `guard` job to this `needs:` list (see the dedicated
+  // E4-RETRY test below), so the array form is what actually ships now.
+  expect(workflow).toContain("needs: [guard, build-chiefd]");
+
+  // `needs:` waits for the JOB, not for the step that made the artifact. So the
+  // job every test lane waits on must contain ONLY the release build and the
+  // upload. Measured on run 30675792052: with clippy + `cargo test --workspace`
+  // + the seam assertions inside this job, the binary was ready at 00:37:48 and
+  // the upload did not begin until 00:43:35 — seven downstream jobs (six unit shards +
+  // e2e) idle for 5m47s behind work none of them reads.
+  //
+  // This is the negative half, and it is the load-bearing one: asserting
+  // merely that a `build-chiefd` job exists passes on the slow config too.
+  // Sliced to this job's own block so `chiefd-checks` (which legitimately runs
+  // every one of these commands) cannot satisfy it by proxy.
+  const buildBlockStart = workflow.indexOf("\n  build-chiefd:");
+  expect(buildBlockStart).toBeGreaterThan(-1);
+  const checksBlockStart = workflow.indexOf("\n  chiefd-checks:");
+  expect(checksBlockStart).toBeGreaterThan(buildBlockStart);
+  const buildBlock = workflow.slice(buildBlockStart, checksBlockStart);
+  expect(buildBlock).toContain(
+    "cargo build --release --locked --manifest-path services/chiefd/Cargo.toml --bin chiefd",
+  );
+  expect(buildBlock).toContain("shared-key: chiefd-release-fast");
+  expect(buildBlock).toContain('CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"');
+  expect(buildBlock).toContain('CARGO_PROFILE_RELEASE_LTO: "false"');
+  expect(buildBlock).toContain('CARGO_PROFILE_RELEASE_INCREMENTAL: "true"');
+  expect(buildBlock).toContain("uses: actions/upload-artifact@v4");
+  expect(buildBlock).not.toContain("cargo test");
+  expect(buildBlock).not.toContain("cargo clippy");
+  expect(buildBlock).not.toContain("cargo tree");
+  expect(buildBlock).not.toContain("cargo rustc");
+
+  // Relocated, never dropped: every verification the old build-chiefd carried
+  // still runs on every trigger, in `chiefd-checks`, in parallel.
+  const checksBlock = workflow.slice(checksBlockStart);
+  const typecheckStart = checksBlock.indexOf("\n  typecheck:");
+  expect(typecheckStart).toBeGreaterThan(-1);
+  const checksJob = checksBlock.slice(0, typecheckStart);
+  for (const command of [
+    "cargo build --workspace --locked --manifest-path services/chiefd/Cargo.toml",
+    "cargo clippy --workspace --all-targets --locked --manifest-path services/chiefd/Cargo.toml -- -D warnings",
+    "cargo rustc --release --locked --manifest-path services/chiefd/Cargo.toml -p chiefd --bin chiefd -- -D warnings",
+    "cargo test --workspace --all-features --locked --no-fail-fast --manifest-path services/chiefd/Cargo.toml",
+    "cargo clippy --manifest-path services/chiefd/tests/seam-fixture/Cargo.toml -- -D warnings",
+    "cargo tree --workspace -e normal",
+  ]) {
+    expect(checksJob).toContain(command);
+  }
+  // ...and it blocks nothing ON THE BINARY. A `needs: build-chiefd` on the
+  // checks job would put the whole 11-minute chain back, one indirection
+  // further away. E4-RETRY legitimately adds `needs: guard` (a ~seconds-long
+  // job, not the release build) to every real job including this one, so the
+  // narrower assertion is "never waits on build-chiefd", not "carries no
+  // needs: at all".
+  expect(checksJob).not.toContain("needs: build-chiefd");
+  expect(checksJob).not.toMatch(/needs:\s*\[?\s*build-chiefd/);
+  expect(workflow).toContain("name: chiefd-release-binary");
+  expect(workflow).toContain("uses: actions/upload-artifact@v4");
+  expect(workflow).toContain("uses: actions/download-artifact@v4");
+
+  // A stale-artifact fallback is still a release build in the harness. Keep
+  // that exceptional path fast too, without exporting the CI profile into the
+  // shipping warning-proof job.
+  const testsBlockStart = workflow.indexOf("\n  tests:");
+  const e2eBlockStartForFastFallback = workflow.indexOf("\n  e2e:");
+  expect(testsBlockStart).toBeGreaterThan(-1);
+  expect(e2eBlockStartForFastFallback).toBeGreaterThan(testsBlockStart);
+  const testsBlock = workflow.slice(testsBlockStart, e2eBlockStartForFastFallback);
+  const fallbackRustInstall = 'name: Install Rust toolchain for stale-artifact fallback';
+  const fallbackCache = 'name: Restore cargo registry and target cache (fallback rebuild only)';
+  const shardRunner = 'name: Run balanced test shard';
+  const fallbackRustInstallAt = testsBlock.indexOf(fallbackRustInstall);
+  const fallbackCacheAt = testsBlock.indexOf(fallbackCache);
+  const shardRunnerAt = testsBlock.indexOf(shardRunner);
+  expect(fallbackRustInstallAt).toBeGreaterThan(-1);
+  expect(fallbackCacheAt).toBeGreaterThan(fallbackRustInstallAt);
+  expect(shardRunnerAt).toBeGreaterThan(fallbackCacheAt);
+  const fallbackCacheBlock = testsBlock.slice(fallbackCacheAt, shardRunnerAt);
+  expect(fallbackCacheBlock).toContain("uses: Swatinem/rust-cache@v2");
+  expect(fallbackCacheBlock).toContain("workspaces: services/chiefd");
+  expect(fallbackCacheBlock).toContain("shared-key: chiefd-release-fast");
+  expect(fallbackCacheBlock).toContain('save-if: "false"');
+  expect(testsBlock.slice(fallbackRustInstallAt, fallbackCacheAt)).toContain(
+    'rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update && rustup default "$RUST_TOOLCHAIN"',
+  );
+  for (const flag of [
+    'CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"',
+    'CARGO_PROFILE_RELEASE_LTO: "false"',
+    'CARGO_PROFILE_RELEASE_INCREMENTAL: "true"',
+  ]) {
+    expect(testsBlock).toContain(flag);
+    // `chiefd-checks` is the shipping warning-proof job. Its normal release
+    // settings must never inherit the test-only fast fallback profile.
+    expect(checksJob).not.toContain(flag);
+  }
+
+  // The download must land on the exact path the preload spawns, and artifacts
+  // do not preserve the executable bit.
+  expect(workflow).toContain("path: services/chiefd/target/release/chiefd");
+  expect(workflow).toContain("run: chmod +x services/chiefd/target/release/chiefd");
+
+  // A missing build must name the path and the build command, not degrade to an
+  // in-process stub whose subprocess tests fail as "no activity ledger". The
+  // preload resolves the binary through the shared CARGO_TARGET_DIR-aware
+  // resolver (gh#143) — pin the resolver wiring, not a hardcoded literal.
+  const preload = readFileSync(join(process.cwd(), "tests", "setup-durable-store.ts"), "utf8");
+  expect(preload).toContain("resolveChiefdBinaryPath");
+  const resolver = readFileSync(join(process.cwd(), "tests", "e2e", "harness", "chiefd-binary-path.ts"), "utf8");
+  expect(resolver).toContain('"services", "chiefd", "target"');
+  expect(resolver).toContain('"release", "chiefd"');
+  expect(resolver).toContain("CARGO_TARGET_DIR");
+  expect(preload).toContain("cargo build --release --manifest-path services/chiefd/Cargo.toml --bin chiefd");
+  expect(preload).toContain("chiefd docstore test service unavailable");
+  expect(preload).not.toContain("InProcessSqliteTransport");
+});
+
+test("runs every committed test file across balanced parallel shards", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+  const packageJson = JSON.parse(
+    readFileSync(join(process.cwd(), "package.json"), "utf8"),
+  ) as { scripts: Record<string, string> };
+
+  // The workflow drives sharding through the committed script, and the matrix
+  // enumerates exactly one job per shard index.
+  expect(packageJson.scripts["test:ci"]).toBe("bun scripts/ci-shard.ts");
+  expect(workflow).toContain("run: bun scripts/ci-shard.ts ${{ matrix.shard }}");
+  const expectedMatrix = `shard: [${Array.from({ length: SHARD_COUNT }, (_, index) => index).join(", ")}]`;
+  expect(workflow).toContain(expectedMatrix);
+
+  // CI receives the committed tree, not a developer's unrelated local files.
+  const expectedTests = committedTestFiles().slice().sort();
+  const shards = computeShards();
+  expect(shards).toHaveLength(SHARD_COUNT);
+
+  // Every committed test file is assigned to exactly one shard, with no
+  // omissions and no duplicates. This is the drift guard: a newly added
+  // tests/*.test.ts file is covered automatically and this assertion fails if
+  // the discovery logic ever misses one.
+  const shardedTests = shards.flat().slice().sort();
+  expect(shardedTests).toEqual(expectedTests);
+  expect(new Set(shardedTests).size).toBe(shardedTests.length);
+
+  // No shard is empty; sharding stays meaningful even as the suite grows.
+  for (const shard of shards) expect(shard.length).toBeGreaterThan(0);
+});
+
+test("the e2e lane is a dedicated CI job, separate from the bin-packed unit shards", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+  const packageJson = JSON.parse(
+    readFileSync(join(process.cwd(), "package.json"), "utf8"),
+  ) as { scripts: Record<string, string> };
+
+  // Real-daemon + real-tmux soaks get their own job, driven through the
+  // committed script, gated on the same `build-chiefd` binary the unit
+  // shards use.
+  expect(packageJson.scripts["test:ci:e2e"]).toBe("bun scripts/ci-shard.ts --e2e");
+  expect(workflow).toContain("e2e:");
+  // E4-RETRY: the e2e job also gates on `guard` now (array form), same as `tests`.
+  expect(workflow).toContain("needs: [guard, build-chiefd]");
+  expect(workflow).toContain("run: bun scripts/ci-shard.ts --e2e");
+
+  // #474: the lane is sub-sharded. The matrix must enumerate exactly one job
+  // per e2e shard index and the run step must thread the index through, or the
+  // jobs all silently re-run shard 0 and most of the lane never executes.
+  const expectedE2eMatrix = `e2e_shard: [${Array.from({ length: E2E_SHARD_COUNT }, (_, i) => i).join(", ")}]`;
+  expect(workflow).toContain(expectedE2eMatrix);
+  expect(workflow).toContain("run: bun scripts/ci-shard.ts --e2e ${{ matrix.e2e_shard }}");
+
+  // `E2E_REAL_MODEL` must never be SET anywhere in the CI workflow (env: block
+  // or inline `E2E_REAL_MODEL=`): the real-model lane is manual/nightly-only
+  //. Mentioning the name in an explanatory
+  // comment, as this very workflow does, is fine -- assigning it is not.
+  expect(workflow).not.toMatch(/E2E_REAL_MODEL\s*[:=]/);
+
+  // #474: the e2e JOB itself must pre-place the built chiefd binary before any
+  // test module loads. tests/setup-durable-store.ts is a preload whose
+  // `missingBinary()` throws at import time, so a binary that exists only after
+  // the harness's own in-process `ensureChiefdBinaryBuilt` is too late for the
+  // docstore-surface e2e cases (`#11 identity-color`, `e2e-harness H3 person
+  // driver`) -- they died on "chiefd binary not found ... 127.0.0.1:8792". The
+  // e2e job carries `needs: build-chiefd`, so download that exact artifact and
+  // restore its executable bit, same as the unit shards. Asserted against the
+  // e2e job's own block, not the whole file, so the unit shards' identical
+  // steps cannot satisfy this by proxy.
+  const e2eBlockStart = workflow.indexOf("\n  e2e:");
+  expect(e2eBlockStart).toBeGreaterThan(-1);
+  const e2eBlock = workflow.slice(e2eBlockStart);
+  expect(e2eBlock).toContain("uses: actions/download-artifact@v4");
+  expect(e2eBlock).toContain("name: chiefd-release-binary");
+  expect(e2eBlock).toContain("path: services/chiefd/target/release");
+  expect(e2eBlock).toContain("run: chmod +x services/chiefd/target/release/chiefd");
+  // The pre-placed artifact only helps if the harness is allowed to TRUST it:
+  // without `CHIEFD_PREBUILT_BINARY=1` on the run step, ensureChiefdBinaryBuilt
+  // runs a cold-cache release rebuild that the lane's speed budgets SIGTERM
+  // (the repeated `chiefd build failed (exit SIGTERM)` job death). With it, a
+  // freshness-gate pass makes the build a no-op hit; a stale artifact still
+  // fails the gate closed into a real build.
+  expect(e2eBlock).toContain('CHIEFD_PREBUILT_BINARY: "1"');
+  for (const flag of [
+    'CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"',
+    'CARGO_PROFILE_RELEASE_LTO: "false"',
+    'CARGO_PROFILE_RELEASE_INCREMENTAL: "true"',
+  ]) {
+    expect(e2eBlock).toContain(flag);
+  }
+
+  // ORDER, not just presence. The e2e job's rust-cache restore now shares
+  // `build-chiefd`'s key instead of being job-id-keyed, so it genuinely HITS
+  // where it used to report "No cache found" every run — and a hit un-tars a
+  // `services/chiefd/target` tree over the exact directory the artifact
+  // download writes into. rust-cache prunes top-level profile artifacts before
+  // saving, so its archive is not expected to carry `release/chiefd`, but the
+  // lane's entire correctness rests on which bytes are at that path, and
+  // "expected not to" is not evidence. Downloading AFTER the restore, and
+  // chmod-ing last, makes the question moot at zero cost — so the ordering is
+  // pinned here rather than left to whoever next edits this job.
+  const restoreAt = e2eBlock.indexOf("uses: Swatinem/rust-cache@v2");
+  const downloadAt = e2eBlock.indexOf("uses: actions/download-artifact@v4");
+  const chmodAt = e2eBlock.indexOf("run: chmod +x services/chiefd/target/release/chiefd");
+  expect(restoreAt).toBeGreaterThan(-1);
+  expect(downloadAt).toBeGreaterThan(restoreAt);
+  expect(chmodAt).toBeGreaterThan(downloadAt);
+});
+
+test("e2e discovery is drift-proof: every committed tests/e2e/**/*.e2e.test.ts file is in the lane, and NEVER duplicated into a unit shard", () => {
+  const e2eFiles = committedE2eTestFiles();
+  const unitFiles = committedTestFiles();
+
+  // Every e2e file really does look like an e2e file, and no unit-shard file
+  // is secretly an e2e file that slipped past the exclusion filter.
+  for (const file of e2eFiles) expect(isE2eTestFile(file)).toBe(true);
+  for (const file of unitFiles) expect(isE2eTestFile(file)).toBe(false);
+
+  // No overlap, and no test file lost between the two discovery functions:
+  // together they must equal every committed `tests/**/*.test.ts` file, the
+  // same drift guard the unit-shard test above applies to itself.
+  const overlap = e2eFiles.filter((file) => unitFiles.includes(file));
+  expect(overlap).toEqual([]);
+
+  const shards = computeShards();
+  const manualFiles = committedManualTestFiles();
+  const allCovered = [...shards.flat(), ...e2eFiles, ...manualFiles].slice().sort();
+  const expectedTests = committedTestFiles()
+    .concat(committedE2eTestFiles())
+    .concat(manualFiles)
+    .slice()
+    .sort();
+  expect(allCovered).toEqual(expectedTests);
+  expect(new Set(allCovered).size).toBe(allCovered.length);
+
+  // The harness smoke tests (#413/#414/#415) are already committed under
+  // tests/e2e/harness/*.e2e.test.ts -- the lane must be non-empty today, not
+  // just "correct once #418-#428 land".
+  expect(e2eFiles.length).toBeGreaterThan(0);
+  expect(e2eFiles).toContain("tests/e2e/harness/chiefd.e2e.test.ts");
+});
+
+test("the e2e sub-shard partition covers every committed e2e file exactly once", () => {
+  const e2eFiles = committedE2eTestFiles();
+  const shards = computeE2eShards();
+
+  expect(shards).toHaveLength(E2E_SHARD_COUNT);
+
+  // The whole point of sub-sharding is that the lane still runs in full. A
+  // partition that drops files would make CI faster AND blind — it would go
+  // green having never executed the missing scenarios, which looks identical
+  // to a green lane that ran everything.
+  const covered = shards.flat().slice().sort();
+  expect(covered).toEqual(e2eFiles.slice().sort());
+  expect(new Set(covered).size).toBe(covered.length);
+  expect(covered.length).toBe(e2eFiles.length);
+
+  // No shard is empty; sharding stays meaningful as the lane grows.
+  for (const shard of shards) expect(shard.length).toBeGreaterThan(0);
+
+  // Balance is asserted on WEIGHT, not on file count. Equal counts were the
+  // original defect: the lane was split 31/31/31/30 and shard 2 still ran
+  // 15m11s against ~6m30s for shards 1 and 3, because it drew six of the
+  // fifteen heaviest files. A count-based assertion passes on exactly that
+  // broken split, so it would be a blind instrument.
+  const loads = shards.map((shard) =>
+    shard.reduce((total, file) => total + e2eWeightFor(file), 0),
+  );
+  const heaviest = Math.max(...loads);
+  const lightest = Math.min(...loads);
+  // The lane's wall clock is the SLOWEST shard, never the average. Bin-packing
+  // cannot beat the single heaviest file, so the bar is expressed against that
+  // floor rather than as a fixed number of seconds that would rot.
+  const floor = Math.max(...committedE2eTestFiles().map(e2eWeightFor));
+  expect(heaviest - lightest).toBeLessThanOrEqual(floor);
+  // And the packing must actually be doing something: a 19x spread left
+  // unpacked produced a 2.4x ratio between heaviest and lightest shard.
+  expect(heaviest / lightest).toBeLessThan(1.5);
+});
+
+test("the e2e WEIGHTS table cannot silently drift away from the committed tree", () => {
+  // A weights table that has drifted from the file list is a blind instrument:
+  // it keeps returning numbers, the balancer keeps consuming them, and nothing
+  // reports that they now describe files that no longer exist. That failure is
+  // silent by construction, so it gets an explicit test rather than trust.
+  const committed = new Set(committedE2eTestFiles().map((f) => f.replace(/^tests\/e2e\//, "")));
+  const source = readFileSync(join(process.cwd(), "scripts", "ci-shard.ts"), "utf8");
+
+  const block = source.slice(
+    source.indexOf("const E2E_WEIGHTS"),
+    source.indexOf("export function e2eWeightFor"),
+  );
+  const keyed = [...block.matchAll(/^\s*"([^"]+\.e2e\.test\.ts)":/gm)].map((m) => m[1]!);
+
+  // The table is non-empty — otherwise every assertion below is vacuously true
+  // and this test would pass against a table that had been deleted outright.
+  expect(keyed.length).toBeGreaterThan(20);
+
+  // Every weighted file still exists. A renamed or deleted e2e file leaves a
+  // dead entry that quietly stops steering anything.
+  const orphans = keyed.filter((f) => !committed.has(f));
+  expect(orphans).toEqual([]);
+
+  // No duplicate keys: a repeated key silently wins with its LAST value, so a
+  // bad refresh could halve a heavy file's weight with nothing to show for it.
+  expect(new Set(keyed).size).toBe(keyed.length);
+
+  // The heavy tail is actually covered. The table may legitimately omit cheap
+  // files (they use DEFAULT_WEIGHT and do not move balance), but if the
+  // HEAVIEST files were missing the balancer would be flying blind exactly
+  // where it matters — which is the state this whole change fixed.
+  const weighted = committedE2eTestFiles().filter((f) => e2eWeightFor(f) > 60);
+  expect(weighted.length).toBeGreaterThan(0);
+});
+
+test("computeE2eShards is a real partition on inputs that do not divide evenly, and is deterministic", () => {
+  // Fixed input rather than the committed tree: this pins the ALGORITHM, so it
+  // keeps its meaning when the real lane's file count changes underneath it.
+  const files = ["a", "b", "c", "d", "e", "f", "g"];
+  const shards = computeE2eShards(files, 3);
+
+  expect(shards).toEqual([
+    ["a", "d", "g"],
+    ["b", "e"],
+    ["c", "f"],
+  ]);
+  expect(shards.flat().slice().sort()).toEqual(files.slice().sort());
+
+  // Deterministic: two calls on the same input must agree, or two CI jobs of
+  // the same run could disagree about who owns a file and skip it.
+  expect(computeE2eShards(files, 3)).toEqual(shards);
+
+  // A single shard is the rollback lever and must degrade to "run everything".
+  expect(computeE2eShards(files, 1)).toEqual([files]);
+});
+
+test("e2e speed budgets are real enforced constants, not aspirational comments", () => {
+  // Per-scenario: bun's OWN --timeout flag applies this, so a scenario over
+  // budget fails loudly with bun's own timeout report.
+  expect(E2E_SCENARIO_TIMEOUT_MS).toBe(30_000);
+  expect(E2E_REACTIVE_FALLBACK_FLOOR_MS).toBe(60_000);
+  // Whole suite: enforced by runE2eShard's own wall-clock guard.
+  expect(E2E_SUITE_BUDGET_MS).toBe(20 * 60 * 1000);
+  // The invocation actually threads the per-scenario timeout through to bun.
+  const source = readFileSync(join(process.cwd(), "scripts", "ci-shard.ts"), "utf8");
+  expect(source).toContain("--timeout=${E2E_SCENARIO_TIMEOUT_MS}");
+  expect(source).toContain("CHIEFD_REACTIVE_FALLBACK_FLOOR_MS");
+  expect(source).toContain('"nice", "-n", "19"');
+});
+
+test("evaluateE2eBudget FAILS the shard on an over-budget wall clock even when every scenario passed", () => {
+  // Under budget, passing run: stays green.
+  expect(evaluateE2eBudget(E2E_SUITE_BUDGET_MS - 1, 0)).toEqual({ exitCode: 0, overBudget: false, missingFiles: [] });
+  // Exactly at budget is still fine (the guard is a strict "exceeded").
+  expect(evaluateE2eBudget(E2E_SUITE_BUDGET_MS, 0)).toEqual({ exitCode: 0, overBudget: false, missingFiles: [] });
+  // Over budget flips a would-be-green run to red -- this is the "silently
+  // get slower" failure mode the plan calls out by name.
+  expect(evaluateE2eBudget(E2E_SUITE_BUDGET_MS + 1, 0)).toEqual({ exitCode: 1, overBudget: true, missingFiles: [] });
+  // A genuine test failure still fails even when comfortably under budget.
+  expect(evaluateE2eBudget(1_000, 1)).toEqual({ exitCode: 1, overBudget: false, missingFiles: [] });
+
+  // E5-E2E: missingFiles fails the shard even under budget with an
+  // otherwise-clean exit -- same rule as the unit lane's evaluateUnitShard,
+  // and it STACKS with the other two failure modes rather than being
+  // silently subsumed by them.
+  expect(evaluateE2eBudget(1_000, 0, ["tests/e2e/x.e2e.test.ts"])).toEqual({
+    exitCode: 1,
+    overBudget: false,
+    missingFiles: ["tests/e2e/x.e2e.test.ts"],
+  });
+  expect(evaluateE2eBudget(E2E_SUITE_BUDGET_MS + 1, 0, ["tests/e2e/x.e2e.test.ts"])).toEqual({
+    exitCode: 1,
+    overBudget: true,
+    missingFiles: ["tests/e2e/x.e2e.test.ts"],
+  });
+  // No missing files -> untouched, same as before E5-E2E existed.
+  expect(evaluateE2eBudget(1_000, 0, [])).toEqual({ exitCode: 0, overBudget: false, missingFiles: [] });
+});
+
+test(
+  "E5-E2E: a shard that crashes mid-file fails LOUDLY BY NAME, the same instrument the unit lane has -- real spawn, red-first",
+  async () => {
+    // The e2e lane had NO completeness instrument before this: measurement
+    // rested entirely on bun's own summary, the exact un-instrumented
+    // footing that hid unit shard 1's truncation for its whole life. This
+    // proves the SAME mechanism (partitionFiles/assertExhaustivePartition,
+    // reused verbatim from the unit lane, not duplicated) now catches the
+    // e2e-lane equivalent: a file whose own group opens but whose process
+    // dies before printing a verdict, taking every still-unverdicted file in
+    // the same invocation down with it (`bun test` is one process for the
+    // whole shard, same as the unit lane).
+    //
+    // Self-inflicted crash, not an external kill -- this is deliberate:
+    // E5-E2E's scope is CAPTURE, not kill (see runE2eShard's own doc
+    // comment), so there is no active timer or signal on this lane to
+    // trigger the truncation with. A real `process.exit()` from inside a
+    // test is exactly the shard-1 shape (the process ends before finishing
+    // its assigned work), reproduced without touching kill topology.
+    //
+    // REPO-RELATIVE paths under `tests/manual/` (excluded from both real CI
+    // lanes by an existing test above), same fixture-path lesson E5-SKIPFIX
+    // learned the hard way: an absolute path would show up in bun's group
+    // header in a form `partitionFiles` cannot match, producing a false
+    // "missing" for a reason that has nothing to do with the crash.
+    const crashFile = join("tests", "manual", "zz-e5-e2e-crash.test.ts");
+    const neverReachedFile = join("tests", "manual", "zz-e5-e2e-never-reached.test.ts");
+    const orders = [
+      [crashFile, neverReachedFile],
+      [neverReachedFile, crashFile],
+    ];
+    const barrierDir = mkdtempSync(join(tmpdir(), "ci-shard-e5-e2e-barrier-"));
+    const secondStartedMarker = join(barrierDir, "second-started");
+    writeFileSync(
+      crashFile,
+      `import { test, expect } from "bun:test";
+import { existsSync } from "node:fs";
+// This forced module-load import registers the potential blocker before the
+// crash test exists, independent of Bun's assigned-file load order.
+import "./zz-e5-e2e-never-reached.test.ts";
+test("crashes only after the second fixture has started", async () => {
+  expect(1).toBe(1);
+  const marker = ${JSON.stringify(secondStartedMarker)};
+  if (!existsSync(marker)) throw new Error("second fixture never started");
+  process.exit(7); // deliberately dies mid-test, no (pass)/(fail)/(skip) line
+});
+`,
+    );
+    writeFileSync(
+      neverReachedFile,
+      `import { test, expect } from "bun:test";
+import { writeFileSync } from "node:fs";
+writeFileSync(${JSON.stringify(secondStartedMarker)}, "started");
+if (!process.env.E5_E2E_BARRIER_ONLY) {
+  test("starts, then cannot print a verdict before the coordinated crash", async () => {
+    expect(1).toBe(1);
+    await new Promise(() => {});
+  });
+}
+`,
+    );
+    const originalLog = console.log;
+    const originalError = console.error;
+    const logged: string[] = [];
+    console.log = (...args: unknown[]) => {
+      logged.push(args.map(String).join(" "));
+      originalLog(...args);
+    };
+    console.error = (...args: unknown[]) => {
+      logged.push(args.map(String).join(" "));
+      originalError(...args);
+    };
+    // `runE2eShard` inherits this process environment when it spawns Bun.
+    // Set it before either generated module can load; setting it inside the
+    // crash test is too late for the forced module-load import above.
+    const inheritedBarrierOnly = process.env.E5_E2E_BARRIER_ONLY;
+    process.env.E5_E2E_BARRIER_ONLY = "1";
+    try {
+      for (const files of orders) {
+        rmSync(secondStartedMarker, { force: true });
+        const before = logged.length;
+        const code = await runE2eShard(files, "e2e shard test");
+        const runLogs = logged.slice(before);
+        // Not clean -- a crashed shard is not a passing shard.
+        expect(code).not.toBe(0);
+
+        // This is the determinism barrier: the second fixture module has
+        // actually begun before the crash, but it has no printed verdict.
+        // The two file orders prove the child inherited barrier mode BEFORE
+        // either module loaded, not only after the crash fixture ran first.
+        expect(existsSync(secondStartedMarker)).toBe(true);
+
+        // The truncation error names the shard's OWN label (not a numeric
+        // index -- the e2e lane's shards are already named) and BOTH files by
+        // path: the crash file and the second fixture, whose module had started
+        // in barrier-only mode but emitted no verdict before the coordinated
+        // exit. Same mechanism, same "any state short of a printed verdict is
+        // missing" rule as the unit lane.
+        const truncationLine = runLogs.find((line) => line.includes("produced NO verdict"));
+        expect(truncationLine).toBeDefined();
+        expect(truncationLine).toContain("e2e shard test");
+        expect(truncationLine).toContain("TRUNCATED");
+        expect(truncationLine).toContain(crashFile);
+        expect(truncationLine).toContain(neverReachedFile);
+
+        // And the affirmative line must NOT also have printed -- a shard
+        // cannot be both truncated and "all assigned files produced
+        // verdicts" in the same run.
+        expect(runLogs.some((line) => line.includes("assigned files produced verdicts") && !line.includes("produced NO verdict"))).toBe(false);
+      }
+    } finally {
+      if (inheritedBarrierOnly === undefined) delete process.env.E5_E2E_BARRIER_ONLY;
+      else process.env.E5_E2E_BARRIER_ONLY = inheritedBarrierOnly;
+      console.log = originalLog;
+      console.error = originalError;
+      rmSync(crashFile, { force: true });
+      rmSync(neverReachedFile, { force: true });
+      rmSync(barrierDir, { recursive: true, force: true });
+    }
+  },
+  15_000,
+);
+
+test(
+  "E5-E2E: a clean e2e shard prints the SAME pinned affirmative wording the unit lane's E5d has",
+  async () => {
+    // (b2) discipline carried over: the zero in "0 files missing" must be a
+    // MEASURED zero, not an absence, and the wording is pinned so the two
+    // lanes' output is grep-identical in shape for anyone parsing CI logs.
+    const okFile = join("tests", "manual", "zz-e5-e2e-clean.test.ts");
+    writeFileSync(
+      okFile,
+      `import { test, expect } from "bun:test";
+test("a real assertion actually runs", () => {
+  expect(1).toBe(1);
+});
+`,
+    );
+    const originalLog = console.log;
+    const logged: string[] = [];
+    console.log = (...args: unknown[]) => {
+      logged.push(args.map(String).join(" "));
+      originalLog(...args);
+    };
+    try {
+      const code = await runE2eShard([okFile], "e2e shard test");
+      expect(code).toBe(0);
+      // Exact match against the unit lane's own pinned wording (E5d),
+      // modulo the label standing in for "unit shard ${index}".
+      expect(logged).toContain("e2e shard test: all 1 assigned files produced verdicts");
+    } finally {
+      console.log = originalLog;
+      rmSync(okFile, { force: true });
+    }
+  },
+  15_000,
+);
+
+
+test("the exemption list is LITERALS with deletion conditions, never a prefix — it must stay narrow", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+  const group = workflow.split("\n").find((l) => l.trimStart().startsWith("group: ci-"))!;
+  expect(group).toBeDefined();
+
+  // `feat/ci-unit-green` is the ci-unit-green project's integration target and
+  // has the same every-push-kills-its-predecessor problem: three runs, two
+  // cancellations, no completed verdict. Both halves, for the same reason the
+  // integration branch needs both — `head_ref` for pull_request events (where
+  // `github.ref` is `refs/pull/N/merge`), `github.ref` for push/dispatch.
+  expect(group).toContain("github.head_ref == 'feat/ci-unit-green'");
+  expect(group).toContain("github.ref == 'refs/heads/feat/ci-unit-green'");
+
+  // THE NEGATIVE, and it is the point of this test. No prefix/glob/startsWith
+  // matching. A prefix silently converts the policy from "these specific
+  // integration points" into "a class of branches" — nobody decides that, it
+  // just happens, and then the rule can never be argued down because every
+  // step that widened it was individually justified.
+  expect(group).not.toContain("startsWith");
+  expect(group).not.toContain("feat/ci-*");
+  expect(group).not.toMatch(/contains\(\s*github\.head_ref/);
+
+  // Ordinary feature PRs still collapse to 'shared' and are still cancelled —
+  // a superseded feature run really is waste. Without this the exemption has
+  // quietly become "never cancel anything".
+  expect(group).toContain("'shared'");
+
+  // Every temporary clause carries a deletion condition a reader can act on,
+  // so the list self-retires instead of accumulating.
+  const concurrencyComment = workflow.slice(0, workflow.indexOf("group: ci-"));
+  expect(concurrencyComment).toContain("remove the two `feat/ci-unit-green`");
+});
+
+test("tests/manual/** is excluded from BOTH CI lanes, by directory and not by filename suffix", () => {
+  const manual = committedManualTestFiles();
+  const unit = committedTestFiles();
+  const e2e = committedE2eTestFiles();
+
+  // Non-vacuous: there is at least one manual file, so the exclusions below are
+  // asserting something. Without this the whole test passes on an empty dir.
+  expect(manual.length).toBeGreaterThan(0);
+
+  // The concrete defect: a MANUAL macOS soak executed in unit shard 4 on a
+  // Linux runner, and shard 4 then blew its 15-minute job cap producing no
+  // verdict at all. It landed there because routing keyed off the
+  // `.e2e.test.ts` suffix, that file did not live under `tests/e2e/`, and the
+  // unit lane was the default bucket for anything unrecognised.
+  expect(manual).toContain("tests/manual/macos-founder-installed.e2e.test.ts");
+
+  for (const file of manual) {
+    expect(unit).not.toContain(file);
+    expect(e2e).not.toContain(file);
+    expect(computeShards().flat()).not.toContain(file);
+    expect(computeE2eShards().flat()).not.toContain(file);
+  }
+
+  // Keyed on the DIRECTORY. A suffix rule cannot fix this class — the next
+  // manual test may be named anything at all, and "anything unrecognised runs
+  // in the unit lane" is what put a macOS test on a Linux runner.
+  expect(isManualTestFile("tests/manual/anything-at-all.test.ts")).toBe(true);
+  expect(isManualTestFile("tests/manual/nested/deep.e2e.test.ts")).toBe(true);
+  expect(isManualTestFile("tests/not-manual.test.ts")).toBe(false);
+  // ...and a manual file must not be claimable by the e2e lane either.
+  expect(isE2eTestFile("tests/manual/macos-founder-installed.e2e.test.ts")).toBe(false);
+});
+
+test("every .e2e.test.ts file runs in the e2e lane wherever it lives, never in a unit shard", () => {
+  // Six `.e2e.test.ts` files lived outside `tests/e2e/` and were therefore
+  // silently executed by the UNIT shards — real daemon soaks the unit balancer
+  // could not even see, because they carry no unit WEIGHTS entry. That is what
+  // pushed shard 4 past its cap.
+  const unit = committedTestFiles();
+  const strays = unit.filter((f) => f.endsWith(".e2e.test.ts"));
+  expect(strays).toEqual([]);
+
+  // Positive control — the search could have returned a hit. These are the
+  // files that were misrouted; they must now be in the e2e lane.
+  const e2e = committedE2eTestFiles();
+  for (const file of [
+    "tests/boot-credential-authjson.e2e.test.ts",
+    "tests/per-person-containment-fleet.e2e.test.ts",
+    "tests/work-item-writethrough-wire.e2e.test.ts",
+  ]) {
+    expect(e2e).toContain(file);
+  }
+  // And the lane genuinely reaches outside tests/e2e/, so discovery scoped to
+  // that one directory would fail this.
+  expect(e2e.some((f) => !f.startsWith("tests/e2e/"))).toBe(true);
+});
+
+test("a unit shard that is KILLED or over budget fails LOUDLY — a cancelled shard is not a passing shard", () => {
+  // The defect this pins: `Tests (shard 4)` was killed at 15m16s by
+  // `timeout-minutes: 15`, printed no `N pass / N fail` line, and reported as
+  // `cancelled` — which reads as "not green" rather than "failed" and is why it
+  // went unnoticed while four engineers hunted unit failures it never reported.
+  expect(evaluateUnitShard(1_000, 0, "SIGTERM")).toEqual({ exitCode: 1, overBudget: false, killed: true, missingFiles: [] });
+  expect(evaluateUnitShard(1_000, null, "SIGKILL")).toEqual({ exitCode: 1, overBudget: false, killed: true, missingFiles: [] });
+
+  // Over budget fails even on a clean exit 0 — same rule the e2e lane has.
+  expect(evaluateUnitShard(UNIT_SHARD_BUDGET_MS + 1, 0)).toEqual({ exitCode: 1, overBudget: true, killed: false, missingFiles: [] });
+  expect(evaluateUnitShard(UNIT_SHARD_BUDGET_MS, 0)).toEqual({ exitCode: 0, overBudget: false, killed: false, missingFiles: [] });
+
+  // Ordinary pass/fail still behave.
+  expect(evaluateUnitShard(1_000, 0)).toEqual({ exitCode: 0, overBudget: false, killed: false, missingFiles: [] });
+  expect(evaluateUnitShard(1_000, 1)).toEqual({ exitCode: 1, overBudget: false, killed: false, missingFiles: [] });
+
+  const source = readFileSync(join(process.cwd(), "scripts", "ci-shard.ts"), "utf8");
+  // The per-test bound must actually be threaded to bun. The unit lane shipped
+  // with NO timeout at all while e2e had one; that asymmetry is the bug.
+  expect(source).toContain("--timeout=${UNIT_SCENARIO_TIMEOUT_MS}");
+  // The guard must sit UNDER the workflow cap or the runner wins the race and
+  // the failure is silent again.
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+  const capMatch = /\n  tests:[\s\S]*?timeout-minutes: (\d+)/.exec(workflow);
+  expect(capMatch).not.toBeNull();
+  expect(UNIT_SHARD_BUDGET_MS).toBeLessThan(Number(capMatch![1]) * 60 * 1000);
+  // Chosen against this lane's own numbers: above the heaviest measured unit
+  // FILE (company-boot, a deliberate real-tmux soak) since the bound is
+  // per-test and WEIGHTS is per-file.
+  expect(UNIT_SCENARIO_TIMEOUT_MS).toBeGreaterThan(weightFor("tests/company-boot.test.ts") * 1000);
+});
+
+test("E5: a shard that drops an assigned file fails LOUDLY BY NAME, even with an otherwise-clean exit", () => {
+  // The defect this pins: unit shard 1 crashed mid-run on TWO separate CI
+  // runs (30687481984 and 30691559347), on the identical two files both
+  // times (`tests/durable-store-in-process-fetch.test.ts`,
+  // `tests/triber-ls.test.ts`) -- neither file ever produced a pass OR a
+  // fail. Both runs' `Tests (shard 1)` step conclusion was "failure" only
+  // because OTHER files in the same run happened to also fail; a shard whose
+  // only casualty was a silently-dropped file, with every REACHED file
+  // green, would have exited 0 and read as a clean pass. This is why the
+  // check must be independent of `exitCode` -- mechanism, not outcome.
+  expect(
+    evaluateUnitShard(1_000, 0, null, [
+      "tests/durable-store-in-process-fetch.test.ts",
+      "tests/triber-ls.test.ts",
+    ]),
+  ).toEqual({
+    exitCode: 1,
+    overBudget: false,
+    killed: false,
+    missingFiles: ["tests/durable-store-in-process-fetch.test.ts", "tests/triber-ls.test.ts"],
+  });
+
+  // No missing files -> untouched, same as before this unit existed.
+  expect(evaluateUnitShard(1_000, 0, null, [])).toEqual({
+    exitCode: 0,
+    overBudget: false,
+    killed: false,
+    missingFiles: [],
+  });
+
+  // Missing files stack with the other two failure modes rather than being
+  // silently subsumed by them (a killed shard's missing-file LIST is still
+  // worth reporting by name, even though `killed` alone already fails it).
+  expect(evaluateUnitShard(1_000, 0, "SIGKILL", ["tests/x.test.ts"])).toEqual({
+    exitCode: 1,
+    overBudget: false,
+    killed: true,
+    missingFiles: ["tests/x.test.ts"],
+  });
+
+  const source = readFileSync(join(process.cwd(), "scripts", "ci-shard.ts"), "utf8");
+  // The mechanism is wired into the real spawn path, not just the pure
+  // decision function -- a diff against what the shard was ASSIGNED, derived
+  // from the child's own combined output, not from its exit code.
+  expect(source).toContain("::group::");
+  // E5-SKIPFIX reworked this from a boolean `verified()` into a three-state
+  // partition (see the E5-SKIPFIX test below); the underlying per-file
+  // classifier is `classifyFile`, consumed through `partitionFiles`.
+  expect(source).toContain("function classifyFile(file: string, combined: string): FileVerdictState");
+  expect(source).toContain("partitionFiles(files, combined)");
+  // The check requires an actual VERDICT inside the file's own slice, not
+  // just its header opening -- a file that crashes right after its header
+  // prints (group opened, zero pass/fail/skip) must still count as missing.
+  // E5-SKIPFIX split the single three-way regex into two ordered checks
+  // (pass/fail first, skip as the fallback) so a mixed file with both a real
+  // verdict AND a skip line is classified "verdicted", not "fully-skipped".
+  expect(source).toContain("/^\\(pass\\) |^\\(fail\\) /m.test(slice)");
+  expect(source).toContain("/^\\(skip\\) /m.test(slice)");
+  // The report itself must name the files, not just a count -- a bare "2
+  // files missing" sends the next engineer back to manual log archaeology,
+  // which is the exact cost this unit exists to remove.
+  expect(source).toContain("missingFiles.join(\", \")");
+});
+
+test("E5b: the truncation detector's budgetMs is configurable and stacks correctly", () => {
+  // `evaluateUnitShard` defaults to the real 12-minute budget so production
+  // behaviour is unchanged; the parameter exists purely so `runUnitShard`'s
+  // ACTIVE kill-on-budget mechanism (below) is testable without waiting out
+  // the real window.
+  expect(evaluateUnitShard(100, 0, null, [], 50)).toEqual({
+    exitCode: 1,
+    overBudget: true,
+    killed: false,
+    missingFiles: [],
+  });
+  expect(evaluateUnitShard(100, 0, null, [], 500)).toEqual({
+    exitCode: 0,
+    overBudget: false,
+    killed: false,
+    missingFiles: [],
+  });
+});
+
+test(
+  "E5c: a HUNG shard is actively killed at its budget, not left to hang forever, and reports the same named truncation",
+  async () => {
+    // The other half of the shard-death family (operator-captured live
+    // specimen on a build host: a `bun test` process hung ~9h from the crashed
+    // session). A hang produces NO truncation signature on its own -- no
+    // mid-write cut, no exit -- so the PRIOR version of `runUnitShard`
+    // (`await proc.exited` with no active timer) would never regain control
+    // at all; the workflow's own `timeout-minutes` cap would eventually
+    // cancel the JOB, which is the exact invisible-cancellation shape this
+    // whole script exists to prevent. This test proves the child is
+    // genuinely killed within its budget (not merely reported on eventually)
+    // by bounding the WHOLE test at a small multiple of that budget -- if
+    // the kill mechanism regressed to a no-op, this test would hang and fail
+    // on bun's own per-test timeout (the third argument below) rather than
+    // hanging the whole suite forever.
+    const dir = mkdtempSync(join(tmpdir(), "ci-shard-e5c-"));
+    const hangFile = join(dir, "hang.test.ts");
+    writeFileSync(
+      hangFile,
+      `import { test, expect } from "bun:test";
+test("never returns", async () => {
+  expect(1).toBe(1);
+  await new Promise(() => {}); // deliberately hangs forever
+});
+`,
+    );
+    try {
+      const budgetMs = 500;
+      const start = performance.now();
+      const code = await runUnitShard(97, [hangFile], budgetMs);
+      const elapsedMs = performance.now() - start;
+
+      expect(code).not.toBe(0);
+      // Genuinely killed near the budget, not left running. W3-TEARDOWN
+      // (group SIGTERM-first, bounded grace, then group SIGKILL) WIDENS this
+      // bound on purpose, not a weakening: this exact fixture is a live
+      // specimen of the case the grace period exists for -- a `bun test`
+      // process that does NOT exit on SIGTERM (empirically observed on
+      // On that build host: this hang consistently rides out the full
+      // `BUDGET_KILL_GRACE_MS` before the group SIGKILL lands), so the
+      // worst-case wait is legitimately `budgetMs + BUDGET_KILL_GRACE_MS`
+      // now, not just `budgetMs`. The bound stays a generous multiple (not
+      // an exact one) for scheduling jitter on top of that -- nowhere close
+      // to "never returns," which is still the property this test exists to
+      // catch a regression of.
+      expect(elapsedMs).toBeLessThan(budgetMs + BUDGET_KILL_GRACE_MS + budgetMs * 10);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+  15_000,
+);
+
+test(
+  "W3-TEARDOWN: the budget kill reaches the WHOLE process group, not just the direct child -- the actual shape of the #131 leak",
+  async () => {
+    // eng-4's zipbox-validated finding (3-level reproduction, their own
+    // regression 040aa260): the PRIOR budget-kill (`proc.kill("SIGKILL")`)
+    // only ever signalled the DIRECT `bun test` child. Anything THAT process
+    // spawned -- a driver process, a provider-server, a tmux session --
+    // inherited none of the kill and kept running after the shard "died",
+    // which is the actual mechanism behind #131's orphaned
+    // daemons/tmux-servers/provider-servers accumulating across boxes over a
+    // session. `detached: true` (this file) makes the shard's `bun test`
+    // child its own process-GROUP leader, and the budget-kill now targets
+    // that whole group via `process.kill(-pid, ...)` -- this is eng-4's fix,
+    // implemented here since it lands in E5's budget-kill diff path
+    // (ci-shard.ts is this file's ownership).
+    //
+    // This is a SEPARATE, narrower proof than eng-4's own regression branch
+    // (which is the authoritative multi-level reproduction): it spawns one
+    // real OS descendant from inside the hung shard, using an ordinary
+    // (non-`setsid`) `Bun.spawn`, which inherits its parent's process group
+    // by plain POSIX fork/exec semantics -- exactly the shape a real driver
+    // process or provider-server would be in. If the group-kill regressed to
+    // a direct-child-only kill, this descendant would still be alive after
+    // `runUnitShard` returns.
+    const dir = mkdtempSync(join(tmpdir(), "ci-shard-w3-teardown-"));
+    const hangFile = join(dir, "hang-with-descendant.test.ts");
+    const pidFile = join(dir, "descendant.pid");
+    writeFileSync(
+      hangFile,
+      `import { test, expect } from "bun:test";
+import { writeFileSync } from "node:fs";
+test("spawns a real OS descendant, then hangs forever", async () => {
+  const descendant = Bun.spawn(["sleep", "300"], { stdout: "ignore", stderr: "ignore" });
+  writeFileSync(${JSON.stringify(pidFile)}, String(descendant.pid));
+  expect(1).toBe(1);
+  await new Promise(() => {}); // deliberately hangs forever
+});
+`,
+    );
+    try {
+      const budgetMs = 500;
+      const code = await runUnitShard(93, [hangFile], budgetMs);
+      expect(code).not.toBe(0);
+
+      // The descendant really was spawned before the shard died -- a
+      // non-vacuous positive control, or "the descendant is gone" below
+      // would be trivially true of a fixture that never ran.
+      const descendantPid = Number(readFileSync(pidFile, "utf8"));
+      expect(Number.isInteger(descendantPid)).toBe(true);
+      expect(descendantPid).toBeGreaterThan(0);
+
+      // ...and now GONE. Signal 0 to a pid is the standard liveness probe
+      // (no signal is actually delivered; it throws ESRCH once the process
+      // no longer exists). THIS is the assertion the whole unit exists for:
+      // a direct-child-only kill would leave this descendant running.
+      let stillAlive = true;
+      try {
+        process.kill(descendantPid, 0);
+      } catch {
+        stillAlive = false;
+      }
+      expect(stillAlive).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+  15_000,
+);
+
+test("E5d: a clean shard prints an AFFIRMATIVE per-shard line naming how many files it verified", () => {
+  // Operator-driven addition: the final green claim now carries a
+  // "not-measured ledger" (files planned but never verdicted, expected zero
+  // rows) -- and a zero that comes from SILENCE is indistinguishable from a
+  // detector that never ran. The zero must be a printed measurement.
+  const source = readFileSync(join(process.cwd(), "scripts", "ci-shard.ts"), "utf8");
+  expect(source).toContain('console.log(`unit shard ${index}: all ${files.length} assigned files produced verdicts`)');
+  // Proven able to lie if written carelessly: the line must be inside the
+  // `missingFiles.length === 0` branch, not printed unconditionally --
+  // asserted by checking the affirmative line's call site is preceded by the
+  // negative branch's `if (missingFiles.length > 0)` in the same block
+  // (an `else`), not a bare sibling statement that would print BOTH lines
+  // on a truncated run and blur the two states together.
+  const missingBranch = source.indexOf("if (missingFiles.length > 0)");
+  const affirmativeLine = source.indexOf("all ${files.length} assigned files produced verdicts");
+  expect(missingBranch).toBeGreaterThan(-1);
+  expect(affirmativeLine).toBeGreaterThan(missingBranch);
+  const between = source.slice(missingBranch, affirmativeLine);
+  expect(between).toContain("} else {");
+});
+
+test("E5-SKIPFIX: assertExhaustivePartition is a REAL guard, proven able to fail red on rigged inputs, not a re-derivation that cannot fail by construction", () => {
+  // The operator's trap, directly: a naive fix folds `(skip)` into the same
+  // bucket as `(pass)`/`(fail)`, which is numerically fine but throws away
+  // the distinction the spec requires. `assertExhaustivePartition` exists to
+  // catch that class of mistake even if some FUTURE refactor of
+  // `partitionFiles` reintroduces it -- so it must be checked against
+  // deliberately broken inputs here, independent of `partitionFiles` itself,
+  // or this "guard" is just a comment that happens to never fire.
+  // Correct partition: no error.
+  expect(() =>
+    assertExhaustivePartition(["a", "b", "c"], ["a"], ["b"], ["c"]),
+  ).not.toThrow();
+  expect(() => assertExhaustivePartition([], [], [], [])).not.toThrow();
+
+  // RIGGED: a file dropped entirely (undercounts) -- the exact silent-loss
+  // shape a careless refactor could produce.
+  expect(() => assertExhaustivePartition(["a", "b"], ["a"], [], [])).toThrow(
+    /partition arithmetic broken/,
+  );
+  // RIGGED: a file counted in TWO buckets at once (verdicted AND
+  // fully-skipped), with the TOTAL still equal to the assigned count (1 + 1
+  // = 2) -- so the numeric-only half of the check ("do the lengths add up")
+  // would PASS this input. Only the separate duplicate check catches it,
+  // which is exactly why the duplicate check exists as its own pass rather
+  // than being folded into the arithmetic comparison.
+  expect(() =>
+    assertExhaustivePartition(["a", "b"], ["a"], ["a"], []),
+  ).toThrow(/counted in more than one state/);
+
+  // RIGGED: same shape, but the duplicate is WITHIN a single bucket (a file
+  // double-counted as verdicted twice) while a different file is silently
+  // dropped -- totals still coincidentally add up (2 = 2). This is the case
+  // that makes "just add the three lengths" an insufficient guard on its
+  // own.
+  expect(() =>
+    assertExhaustivePartition(["a", "b"], ["a", "a"], [], []),
+  ).toThrow(/counted in more than one state/);
+});
+
+test("E5-SKIPFIX: partitionFiles classifies verdicted / fully-skipped / not-measured as an exhaustive, exclusive three-state split", () => {
+  // Pure-function coverage of the classifier boundary conditions, ahead of
+  // the real-spawn proof below (which covers the actual bun output format).
+  const combined = [
+    "::group::tests/a.test.ts:",
+    "(pass) real assertion ran [1ms]",
+    "::group::tests/b.test.ts:",
+    "(skip) declined on purpose",
+    "(skip) also declined",
+    "::group::tests/c.test.ts:",
+    "(pass) mixed file has a real assertion [1ms]",
+    "(skip) and also a skip",
+    "::group::tests/d.test.ts:",
+    "",
+  ].join("\n");
+
+  const { verdicted, fullySkipped, missing } = partitionFiles(
+    ["tests/a.test.ts", "tests/b.test.ts", "tests/c.test.ts", "tests/d.test.ts", "tests/never-opened.test.ts"],
+    combined,
+  );
+
+  // a: pure pass -> verdicted.
+  expect(verdicted).toContain("tests/a.test.ts");
+  // b: pure skip -> fully-skipped, NOT verdicted, NOT missing.
+  expect(fullySkipped).toContain("tests/b.test.ts");
+  expect(verdicted).not.toContain("tests/b.test.ts");
+  expect(missing).not.toContain("tests/b.test.ts");
+  // c: a real pass alongside a skip -> verdicted wins (the file DID produce
+  // real assertions; the "fully" in fully-skipped is load-bearing).
+  expect(verdicted).toContain("tests/c.test.ts");
+  expect(fullySkipped).not.toContain("tests/c.test.ts");
+  // d: group opened, no verdict line inside it (crashed right after header)
+  // -> not-measured, same as E5's original truncation shape.
+  expect(missing).toContain("tests/d.test.ts");
+  // never-opened: no header at all -> not-measured.
+  expect(missing).toContain("tests/never-opened.test.ts");
+
+  // Exhaustive and exclusive over all five assigned files.
+  expect(() => assertExhaustivePartition(
+    ["tests/a.test.ts", "tests/b.test.ts", "tests/c.test.ts", "tests/d.test.ts", "tests/never-opened.test.ts"],
+    verdicted,
+    fullySkipped,
+    missing,
+  )).not.toThrow();
+  expect(verdicted.length + fullySkipped.length + missing.length).toBe(5);
+});
+
+test(
+  "E5-SKIPFIX: a file whose every test is a loud reasoned skip is NAMED as fully-skipped, never silently folded into verdicted or into the not-measured ledger",
+  async () => {
+    // eng-4's independent second-instrument verification of E5 found the
+    // ORIGINAL defect: this team's own standing pattern (task #14/#23, a
+    // loud `test.skip(...)` with a named reason) false-reported as "NO
+    // verdict ... TRUNCATED". The FIRST fix (1fd74497) over-corrected: it
+    // folded `(skip)` into the same boolean as `(pass)`/`(fail)`, so a
+    // 100%-skipped file was silently absorbed into "all M assigned files
+    // produced verdicts" -- unnamed, in no ledger. That is the operator's
+    // trap: a skip-only file whose flag silently flipped to skip EVERYTHING
+    // would vanish from both ledgers with nothing to show for it -- the
+    // shard-1 defect reintroduced through the door built to prevent it. This
+    // test proves the AFFIRMATIVE line stays honest: it must name the
+    // fully-skipped file and report the real (smaller) verdicted count, not
+    // just "exit 0, no error" (which the over-corrected version also
+    // satisfied).
+    //
+    // Real spawn path, not a source-string check -- bun's raw skip-line
+    // format was verified empirically under GITHUB_ACTIONS=true on a build host
+    // before trusting it (pasted to the architect): `(skip) <test name>`,
+    // no trailing `[Nms]`, no colon -- distinct enough from `(pass)`/`(fail)`
+    // that a regex written against the WRONG format is exactly the kind of
+    // mistake this test exists to catch (see E5's own `##[group]` vs
+    // `::group::` near-miss).
+    //
+    // REPO-RELATIVE paths, deliberately, under `tests/manual/` (already
+    // excluded from BOTH real CI lanes by an existing test above, so a
+    // leftover file here can never leak into a real shard). An earlier draft
+    // used an absolute mkdtemp() path and got a SECOND real bug from it: bun
+    // prints its group header relative to CWD, so an absolute path argument
+    // shows up in the header as a `../../../tmp/...` relative form that
+    // never matches the classifier's exact-string regex -- a false "missing"
+    // for a reason that has nothing to do with skip-handling. Production
+    // `files` are always repo-relative (`committedTestFiles()`), so this
+    // mismatch cannot happen for real.
+    //
+    // MIXED shard, deliberately -- one skip-only file AND one real-verdict
+    // file -- so the test can discriminate "verdicted count is genuinely
+    // smaller than assigned count" from a version that silently counts the
+    // skip-only file as verdicted too (which would also print SOME
+    // plausible-looking affirmative line, just the wrong one).
+    const skipOnlyFile = join("tests", "manual", "zz-e5-skipfix-scratch-skip.test.ts");
+    const realFile = join("tests", "manual", "zz-e5-skipfix-scratch-real.test.ts");
+    writeFileSync(
+      skipOnlyFile,
+      `import { test, expect } from "bun:test";
+test.skip("declined on purpose, loud reasoned skip -- e.g. task #14/#23 shape", () => {
+  expect(1).toBe(2);
+});
+`,
+    );
+    writeFileSync(
+      realFile,
+      `import { test, expect } from "bun:test";
+test("a real assertion actually runs", () => {
+  expect(1).toBe(1);
+});
+`,
+    );
+    const originalLog = console.log;
+    const logged: string[] = [];
+    console.log = (...args: unknown[]) => {
+      logged.push(args.map(String).join(" "));
+      originalLog(...args);
+    };
+    try {
+      const code = await runUnitShard(95, [skipOnlyFile, realFile], 30_000);
+      // Neither file is missing/truncated -- exit 0, both ran to completion.
+      expect(code).toBe(0);
+
+      // THE ASSERTION THIS TEST EXISTS FOR: the affirmative line must NAME
+      // the fully-skipped file and report the SMALLER verdicted count (1 of
+      // 2), not silently claim "all 2 assigned files produced verdicts" --
+      // that exact string is what the over-corrected first fix would have
+      // printed here, and this line proves it cannot.
+      const affirmative = logged.find((line) => line.includes("assigned files produced verdicts"));
+      expect(affirmative).toBeDefined();
+      expect(affirmative).toContain("1 of 2 assigned files produced verdicts");
+      expect(affirmative).toContain("1 fully-skipped by name");
+      expect(affirmative).toContain(skipOnlyFile);
+      // And it must NOT be the old unconditional-success wording, which
+      // would be true of the byte count (2 files ran) but false of the claim
+      // (2 files were VERIFIED) -- the exact conflation this rework exists
+      // to undo.
+      expect(logged.some((line) => line.includes(`all 2 assigned files produced verdicts`))).toBe(false);
+    } finally {
+      console.log = originalLog;
+      rmSync(skipOnlyFile, { force: true });
+      rmSync(realFile, { force: true });
+    }
+  },
+  15_000,
+);
+
+test("the unit WEIGHTS table cannot silently drift away from the committed tree", () => {
+  // Same blind-instrument class already found in the e2e table: a weights table
+  // divorced from the file list keeps returning numbers while steering nothing,
+  // and the balancer cannot report that its inputs are fiction.
+  const committed = new Set(committedTestFiles().map((f) => f.replace(/^tests\//, "")));
+  const source = readFileSync(join(process.cwd(), "scripts", "ci-shard.ts"), "utf8");
+  const block = source.slice(
+    source.indexOf("const WEIGHTS"),
+    source.indexOf("export function committedTestFiles"),
+  );
+  const keyed = [...block.matchAll(/^\s*"([^"]+\.test\.ts)":/gm)].map((m) => m[1]!);
+
+  // Non-vacuous, or "no orphans" is trivially true of a deleted table.
+  expect(keyed.length).toBeGreaterThan(10);
+  // Every weighted file still exists under its keyed name.
+  expect(keyed.filter((f) => !committed.has(f))).toEqual([]);
+  // No duplicate keys — a repeat silently wins with its LAST value.
+  expect(new Set(keyed).size).toBe(keyed.length);
+});
+
+
+test("the UNIT lane trusts the pre-placed chiefd binary too — not just the e2e lane", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+
+  // Six unit-shard files import `tests/e2e/harness/chiefd.ts`, and
+  // `ensureChiefdBinaryBuilt` only treats the downloaded artifact as a no-op
+  // hit when CHIEFD_PREBUILT_BINARY=1 is set. The `tests` job downloaded the
+  // artifact but never set the marker, so those tests fell through to a REAL
+  // `cargo build --release` on the runner — 136 `Compiling` lines in shard 4's
+  // log on run 30683946024 — and inside a 15-minute job that build is what
+  // produced the baseline's `chiefd build failed (exit SIGTERM)` failures.
+  //
+  // The e2e job has had this since #474. The asymmetry was the bug, so this is
+  // asserted on the `tests` job's OWN block: a whole-file `toContain` would be
+  // satisfied by the e2e job's copy and prove nothing.
+  const testsStart = workflow.indexOf("\n  tests:");
+  const e2eStart = workflow.indexOf("\n  e2e:");
+  expect(testsStart).toBeGreaterThan(-1);
+  expect(e2eStart).toBeGreaterThan(testsStart);
+  const testsBlock = workflow.slice(testsStart, e2eStart);
+
+  // Non-vacuous: this really is the unit-shard job we sliced.
+  expect(testsBlock).toContain("run: bun scripts/ci-shard.ts ${{ matrix.shard }}");
+  expect(testsBlock).toContain('CHIEFD_PREBUILT_BINARY: "1"');
+
+  // The marker is only sound because this job downloads the artifact
+  // build-chiefd produced from the SAME commit — that is the provenance.
+  // Trusting a pre-placed binary with no artifact download would be trusting
+  // whatever happened to be on the runner.
+  expect(testsBlock).toContain("uses: actions/download-artifact@v4");
+  expect(testsBlock).toContain("name: chiefd-release-binary");
+
+  // And the e2e job keeps its own copy — this change adds a lane, never moves it.
+  expect(workflow.slice(e2eStart)).toContain('CHIEFD_PREBUILT_BINARY: "1"');
+});
+
+test("E4: RETIRED — pull_request.paths-ignore is gone, replaced by the guard job below (E4-RETRY)", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+
+  // E4's mechanism (`pull_request.paths-ignore: [plans/**]`) never worked:
+  // GitHub evaluates a `pull_request` paths filter against the WHOLE PR diff
+  // (base...head), not the pushed commit, and PR #726 carries 135 commits
+  // touching src/tests — the filter could STRUCTURALLY never match, and five
+  // docs-only heads pushed after E4 landed each still spawned a full run
+  // (operator-observed). It must not come back in any form.
+  const onStart = workflow.indexOf("\non:");
+  const permissionsStart = workflow.indexOf("\npermissions:");
+  expect(onStart).toBeGreaterThan(-1);
+  expect(permissionsStart).toBeGreaterThan(onStart);
+  const onBlock = workflow.slice(onStart, permissionsStart);
+  // The word "paths-ignore" legitimately still appears in the E4-RETRY
+  // explanatory COMMENT (naming what was removed and why); the test asserts
+  // the actual YAML KEY is gone, not that the string never appears in prose.
+  expect(onBlock).not.toMatch(/^\s*paths-ignore:\s*$/m);
+  expect(onBlock).not.toContain('- "plans/**"');
+});
+
+test("E4-RETRY: a per-push guard job gates every real job, immune to the PR-cumulative-diff trap that made E4 inert", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+
+  // The guard job exists, needs no upstream job (it is the first thing that
+  // runs), and exposes a `docs-only` output every other job reads.
+  const guardStart = workflow.indexOf("\n  guard:");
+  const buildStart = workflow.indexOf("\n  build-chiefd:");
+  expect(guardStart).toBeGreaterThan(-1);
+  expect(buildStart).toBeGreaterThan(guardStart);
+  const guardBlock = workflow.slice(guardStart, buildStart);
+  expect(guardBlock).toContain("docs-only: ${{ steps.check.outputs.docs-only }}");
+
+  // Full history is required: the diff basis is `github.event.before`, which
+  // a shallow (default) checkout can leave unreachable.
+  expect(guardBlock).toContain("fetch-depth: 0");
+
+  // Diff basis is the PUSH range (`github.event.before`...`github.sha`), NOT
+  // the PR's cumulative base...head — that distinction is the entire point,
+  // since base...head is exactly what made `paths-ignore` unable to fire.
+  expect(guardBlock).toContain("BEFORE=");
+  expect(guardBlock).toContain("github.event.before");
+  expect(guardBlock).not.toMatch(/git diff --name-only\s+\$\{\{\s*github\.event\.pull_request\.base\.sha/);
+
+  // Conservative default: anything other than a resolvable `synchronize`
+  // diff (opened/reopened/workflow_dispatch/push, or an unresolvable BEFORE
+  // such as a force-push) must run everything, never be silently treated as
+  // docs-only. Same "absence is not evidence" discipline as the rest of this
+  // file — an unproven diff basis must fail CLOSED (assume code).
+  expect(guardBlock).toContain('RUN_EVERYTHING=1');
+  expect(guardBlock).toContain('if [ "$RUN_EVERYTHING" = "1" ]');
+  expect(guardBlock).toContain('echo "docs-only=false"');
+
+  // Only a POSITIVE match against plans/** or *.md marks docs-only=true — a
+  // grep for anything ELSE flips it back to false, so the default even on a
+  // non-empty CHANGED list is "run everything" unless every file matches.
+  expect(guardBlock).toContain("grep -qvE '^(plans/.*|.*\\.md)$'");
+  expect(guardBlock).toContain('echo "docs-only=true"');
+
+  // Every real job — build-chiefd, chiefd-checks, typecheck, tests, e2e, P1 —
+  // both `needs` the guard AND gates on its output. Sliced per-job-block so
+  // one job's wiring cannot satisfy the assertion for another (the same
+  // per-block discipline the build-chiefd/chiefd-checks split test above
+  // uses, and for the same reason: a whole-file `toContain` would pass if
+  // only ONE job were wired and the rest still spun up unconditionally).
+  const jobNames = ["build-chiefd", "chiefd-checks", "typecheck", "tests", "e2e", "tmux-single-writer-p1"];
+  const starts = jobNames.map((name) => {
+    const at = workflow.indexOf(`\n  ${name}:`);
+    expect(at).toBeGreaterThan(-1);
+    return at;
+  });
+  for (let i = 0; i < jobNames.length; i++) {
+    const start = starts[i]!;
+    // Bound the slice to the next top-level job (2-space-indented `name:`)
+    // so a later job's `needs:`/`if:` cannot be read as this one's.
+    const rest = workflow.slice(start + 1);
+    const nextJobOffset = rest.slice(1).search(/\n  [a-zA-Z][\w-]*:\n/);
+    const block = nextJobOffset === -1 ? rest : rest.slice(0, nextJobOffset + 1);
+    expect(block).toMatch(/needs:\s*(guard|\[guard(,|\]))/);
+    expect(block).toContain("if: needs.guard.outputs.docs-only != 'true'");
+  }
+
+  // A job-level `if:` SKIPS the job (visible as `conclusion: skipped`) rather
+  // than removing it from the run — the win over E4's inert paths-ignore is
+  // zero matrix runners spinning up, not zero rows in `gh run list`. Pinned
+  // as a comment assertion so the next reader does not mistake this for
+  // trying to reproduce a top-level `paths-ignore:` a second time.
+  expect(workflow).toContain("visible in the run");
+  expect(workflow).toContain("conclusion: skipped");
+});
+
+test("P1 single-writer evidence is a separate fail-closed artifact lane", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+  const start = workflow.indexOf("\n  tmux-single-writer-p1:");
+  expect(start).toBeGreaterThan(-1);
+  const block = workflow.slice(start);
+  expect(block).toContain("needs: [guard, build-chiefd]");
+  expect(block).toContain("converge_apply::interpret::tests::p1_forced_dual_writer_control_creates_the_physical_ts_target");
+  expect(block).toContain("tests/tmux-single-writer-p1-probe.test.ts");
+  expect(block).toContain("bun scripts/verify-tmux-single-writer-probe.ts");
+  expect(block).toContain("--rerun-each=2");
+  expect(block).toContain("overall=0");
+  expect(block).toContain("mkdir -p tmux-single-writer-probe/raw-logs || exit 1");
+  expect(block).toContain("set +e");
+  expect(block).toContain("local statuses=(\"${PIPESTATUS[@]}\")");
+  expect(block).toContain("local tee_status=\"${statuses[1]}\"");
+  expect(block).toContain("exit \"$overall\"");
+  for (const held of [
+    "staffing-transfer-offboard-integrity.e2e.test.ts",
+    "atomic-agent-transfer.e2e.test.ts",
+    "org-reorg-movement.e2e.test.ts",
+    "running-transfer-continuity.e2e.test.ts",
+  ]) expect(block).toContain(held);
+  for (const heldId of [
+    "p1-held-staffing-transfer-offboard-integrity.e2e.test.ts",
+    "p1-held-atomic-agent-transfer.e2e.test.ts",
+    "p1-held-org-reorg-movement.e2e.test.ts",
+    "p1-held-running-transfer-continuity.e2e.test.ts",
+  ]) expect(block).toContain(`--require-test ${heldId}`);
+  expect(block.match(/verifier-(?:before-held|after-held)\.log/g)).toHaveLength(2);
+  expect(block).toContain("if: always()");
+  expect(block).toContain("tmux-single-writer-probe/");
+});
+
+test("P1 capture aggregation continues after an inherited-errexit pipeline failure", () => {
+  const root = mkdtempSync(join(tmpdir(), "ci-p1-capture-"));
+  const script = `
+set -uo pipefail
+mkdir -p "$1/raw" || exit 1
+: > "$1/events.jsonl" || exit 1
+set +e
+overall=0
+run_capture() {
+  local log="$1"
+  shift
+  "$@" 2>&1 | tee "$log"
+  local statuses=("\${PIPESTATUS[@]}")
+  local command_status="\${statuses[0]}"
+  local tee_status="\${statuses[1]}"
+  if [ "$command_status" -ne 0 ] || [ "$tee_status" -ne 0 ]; then
+    overall=1
+  fi
+}
+run_capture "$1/raw/control.log" bash -c 'printf "control-red\\n"; exit 7'
+run_capture "$1/raw/held.log" bash -c 'printf "held-ran\\n"'
+run_capture "$1/raw/verifier.log" bash -c 'printf "verifier-ran\\n"'
+printf 'overall=%s\\n' "$overall"
+exit "$overall"
+`;
+  try {
+    const result = Bun.spawnSync(["bash", "-e", "-o", "pipefail", "-c", script, "bash", root], { stdout: "pipe", stderr: "pipe" });
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout.toString()).toContain("held-ran");
+    expect(result.stdout.toString()).toContain("verifier-ran");
+    expect(result.stdout.toString()).toContain("overall=1");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// --------------------------------------------------------------------------
+// Shard coverage snapshot: truncation must be self-describing (P0-adjacent,
+// team-lead's "make truncation loud" packet).
+// --------------------------------------------------------------------------
+
+test("shardCoverageSnapshot classifies a mid-run partial output the same way partitionFiles does, marked incomplete", () => {
+  const files = ["tests/a.test.ts", "tests/b.test.ts", "tests/c.test.ts"];
+  // Only "a" has a verdict line yet -- exactly the shape mid-run stdout has:
+  // some files done, some not started, none of that is an error.
+  const combined = "tests/a.test.ts:\n(pass) some test [1ms]\n";
+  const snapshot = shardCoverageSnapshot(7, files, combined, 1234, false);
+  expect(snapshot).toEqual({
+    shardIndex: 7,
+    verdicted: ["tests/a.test.ts"],
+    fullySkipped: [],
+    missing: ["tests/b.test.ts", "tests/c.test.ts"],
+    elapsedMs: 1234,
+    complete: false,
+  });
+});
+
+test("shardCoverageSnapshot at the very start of a run reports every file missing, honestly", () => {
+  const files = ["tests/a.test.ts", "tests/b.test.ts"];
+  const snapshot = shardCoverageSnapshot(0, files, "", 0, false);
+  expect(snapshot.verdicted).toEqual([]);
+  expect(snapshot.missing).toEqual(files);
+  expect(snapshot.complete).toBe(false);
+});
+
+test("writeShardCoverageSnapshot writes a snapshot that reads back exactly, and shardCoveragePath is stable per index", () => {
+  const root = mkdtempSync(join(tmpdir(), "ci-shard-coverage-"));
+  try {
+    const path = shardCoveragePath(2, root);
+    expect(shardCoveragePath(2, root)).toBe(path); // stable, not randomized per call
+    const snapshot = shardCoverageSnapshot(2, ["tests/x.test.ts"], "tests/x.test.ts:\n(pass) ok [1ms]\n", 500, true);
+    writeShardCoverageSnapshot(path, snapshot);
+    expect(JSON.parse(readFileSync(path, "utf8"))).toEqual(snapshot);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("THE PROOF: a run killed mid-way (no chance to write its own completion record) leaves an accurate, non-stale coverage snapshot behind", () => {
+  const root = mkdtempSync(join(tmpdir(), "ci-shard-coverage-kill-"));
+  try {
+    const path = shardCoveragePath(3, root);
+    const files = ["tests/a.test.ts", "tests/b.test.ts", "tests/c.test.ts"];
+
+    // t=0: the real runUnitShard writes this the instant the child spawns.
+    writeShardCoverageSnapshot(path, shardCoverageSnapshot(3, files, "", 0, false));
+    // t=1: one chunk of child stdout arrives -- "a" gets a verdict.
+    const afterFirstChunk = "tests/a.test.ts:\n(pass) ok [1ms]\n";
+    writeShardCoverageSnapshot(path, shardCoverageSnapshot(3, files, afterFirstChunk, 900, false));
+    // t=2: a second chunk arrives -- "b" gets a verdict too.
+    const afterSecondChunk = `${afterFirstChunk}tests/b.test.ts:\n(fail) broke [2ms]\n`;
+    writeShardCoverageSnapshot(path, shardCoverageSnapshot(3, files, afterSecondChunk, 1800, false));
+    // THE KILL: an external SIGKILL (the CI job's own timeout-minutes cap, or
+    // an operator's hand) takes the whole wrapper process down HERE -- no
+    // further code in runUnitShard ever runs, including its final
+    // `complete: true` write. Nothing more happens in this test either,
+    // simulating exactly that: no third write.
+
+    const survived = JSON.parse(readFileSync(path, "utf8"));
+    // The record left behind is accurate up to the exact moment of the kill:
+    // a and b verdicted, c never reached, and honestly marked incomplete --
+    // not silently indistinguishable from a clean finish.
+    expect(survived).toEqual({
+      shardIndex: 3,
+      verdicted: ["tests/a.test.ts", "tests/b.test.ts"],
+      fullySkipped: [],
+      missing: ["tests/c.test.ts"],
+      elapsedMs: 1800,
+      complete: false,
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("PROVING THE GAP THIS CLOSES: writing a coverage record ONLY at the end (the old shape) leaves a stale, misleading snapshot after the same kill", () => {
+  const root = mkdtempSync(join(tmpdir(), "ci-shard-coverage-old-shape-"));
+  try {
+    const path = shardCoveragePath(4, root);
+    const files = ["tests/a.test.ts", "tests/b.test.ts", "tests/c.test.ts"];
+
+    // Old shape: the only write is the one at the very start (mirroring
+    // "nothing is written until the run finishes" -- before this packet,
+    // there was no periodic write at all, so a kill left either no file, or,
+    // if a caller wrote an initial placeholder and nothing else, a STALE one
+    // that never reflects any real progress).
+    writeShardCoverageSnapshot(path, shardCoverageSnapshot(4, files, "", 0, false));
+
+    // The same two chunks of real progress happen as in the proof above --
+    // "a" and "b" get real verdicts -- but nothing writes a new snapshot for
+    // either, because (in this simulated old shape) only the start and the
+    // final write existed. Then the same external kill hits before the final
+    // write ever runs.
+    const afterBothChunks = "tests/a.test.ts:\n(pass) ok [1ms]\ntests/b.test.ts:\n(fail) broke [2ms]\n";
+    void afterBothChunks; // real progress happened; the old shape never recorded it
+
+    const survived = JSON.parse(readFileSync(path, "utf8"));
+    // This is the misleading artifact the packet closes: the file on disk
+    // claims EVERY file is still missing, even though two of three actually
+    // ran and produced real verdicts moments before the kill -- a truncated
+    // run that looks, from this record alone, like it never started at all.
+    expect(survived.missing).toEqual(files);
+    expect(survived.verdicted).toEqual([]);
+    // Which is exactly wrong: it should have shown "a" and "b" verdicted.
+    expect(survived.missing).not.toEqual(["tests/c.test.ts"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

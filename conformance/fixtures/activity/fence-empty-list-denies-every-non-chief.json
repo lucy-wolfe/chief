@@ -1,0 +1,64 @@
+{
+  "name": "fence-empty-list-denies-every-non-chief",
+  "family": "activity",
+  "description": "An explicit empty allow-list behaves exactly like omission: it denies every non-root person. The root survives it on its unconditional organization-root lease rather than on anything the fence says, and the fence could not refuse the root in any case.",
+  "invariants": [
+    "inv c-1",
+    "\u00a75.5 FailSafeValue"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "activity.reconcile",
+  "in": {
+    "launchIntentPersonIds": []
+  },
+  "expect": {
+    "ok": {
+      "people": {
+        "chief": {
+          "active": true,
+          "reasons": [
+            "organization-root"
+          ],
+          "transitionId": null
+        },
+        "it-head": {
+          "active": false,
+          "reasons": [],
+          "transitionId": null
+        },
+        "quant-head": {
+          "active": false,
+          "reasons": [],
+          "transitionId": null
+        },
+        "signal-researcher": {
+          "active": false,
+          "reasons": [],
+          "transitionId": null
+        }
+      }
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.summary",
+      "equals": {
+        "nextTransitionSequence": 1,
+        "personOrder": [
+          "chief",
+          "quant-head",
+          "signal-researcher",
+          "it-head"
+        ],
+        "transitionOrder": []
+      }
+    }
+  ]
+}

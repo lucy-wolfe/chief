@@ -1,0 +1,61 @@
+{
+  "name": "@chief/piing",
+  "license": "Apache-2.0",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist",
+    "extensions",
+    "skills"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./extension-runtime": {
+      "types": "./dist/extensionruntime/index.d.ts",
+      "import": "./dist/extensionruntime/index.js"
+    },
+    "./extensions/*": {
+      "types": "./extensions/*.ts",
+      "import": "./extensions/*.ts"
+    },
+    "./skills/*": "./skills/*"
+  },
+  "scripts": {
+    "build": "rimraf tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths",
+    "dev": "concurrently \"tsc -p tsconfig.build.json --watch --preserveWatchOutput\" \"tsc-alias -p tsconfig.build.json --watch --resolve-full-paths\"",
+    "test:unit": "vitest run",
+    "test:unit:coverage": "vitest run --coverage",
+    "lint": "eslint . package.json --ext .ts --max-warnings 0 --no-warn-ignored",
+    "lint:fix": "eslint . package.json --ext .ts --fix --max-warnings 0 --no-warn-ignored",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md}\""
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.80.10",
+    "@earendil-works/pi-tui": "0.80.10",
+    "typebox": "1.3.16"
+  },
+  "devDependencies": {
+    "@chief/chiefing": "workspace:*",
+    "@chief/testing": "workspace:*",
+    "@eslint/eslintrc": "3.3.6",
+    "@eslint/js": "10.0.1",
+    "@typescript-eslint/eslint-plugin": "8.67.0",
+    "@typescript-eslint/parser": "8.67.0",
+    "concurrently": "9.2.1",
+    "eslint": "10.9.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-import": "2.32.0",
+    "eslint-plugin-jasmine": "4.2.2",
+    "eslint-plugin-prettier": "5.5.6",
+    "prettier": "3.9.6",
+    "rimraf": "6.1.3",
+    "tsc-alias": "1.9.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

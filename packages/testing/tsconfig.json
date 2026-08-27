@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "./tsconfig.vitest.json"
+    }
+  ]
+}

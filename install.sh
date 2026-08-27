@@ -1,0 +1,129 @@
+#!/bin/sh
+# chief installer — download a prebuilt release, verify it, and install it under
+# ~/.chief. No clone, no Rust toolchain, no build.
+#
+#   curl -fsSL https://raw.githubusercontent.com/tribes-protocol/chief/main/install.sh | sh
+#
+# It installs the SAME versioned layout `bun run release` and `chief upgrade`
+# produce — bin/ symlinks into versions/<v>/{bin,resources,manifest.json} — so
+# `chief upgrade` takes over seamlessly afterwards. macOS and Linux only.
+#
+# POSIX sh on purpose: it is piped into `sh`, so it uses no bashisms.
+set -eu
+
+REPO="tribes-protocol/chief"
+CHIEF_HOME="${CHIEF_HOME:-$HOME/.chief}"
+PI_INSTALL="npm install -g --ignore-scripts @earendil-works/pi-coding-agent"
+
+say() { printf '%s\n' "$*"; }
+die() { printf 'chief install: %s\n' "$*" >&2; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# --- the host ---------------------------------------------------------------
+# The target triple is spelled exactly as the release assets are, from the four
+# the release workflow builds. An unlisted pair refuses by name rather than
+# downloading an asset that cannot be there.
+os="$(uname -s)"
+machine="$(uname -m)"
+case "$machine" in
+  arm64 | aarch64) cpu="aarch64" ;;
+  x86_64 | amd64) cpu="x86_64" ;;
+  *) die "unsupported CPU architecture '$machine'. chief ships aarch64 and x86_64 only." ;;
+esac
+case "$os" in
+  Darwin) target="${cpu}-apple-darwin" ;;
+  Linux) target="${cpu}-unknown-linux-gnu" ;;
+  *) die "unsupported operating system '$os'. chief runs on macOS and Linux only." ;;
+esac
+
+have curl || die "curl is required to download the release, and it is not on PATH."
+have tar || die "tar is required to unpack the release, and it is not on PATH."
+
+# --- the release ------------------------------------------------------------
+api="https://api.github.com/repos/${REPO}/releases/latest"
+say "Resolving the latest chief release…"
+tag="$(curl -fsSL -H 'Accept: application/vnd.github+json' "$api" \
+  | grep -m1 '"tag_name"' \
+  | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
+[ -n "$tag" ] || die "could not read the latest release tag from GitHub (rate-limited, or no release yet)."
+
+base="https://github.com/${REPO}/releases/download/${tag}"
+asset="chief-$(printf '%s' "$tag" | sed 's/^v//')-${target}.tar.gz"
+
+work="$(mktemp -d "${TMPDIR:-/tmp}/chief-install.XXXXXX")"
+trap 'rm -rf "$work"' EXIT INT TERM
+
+say "Downloading ${asset}…"
+curl -fsSL -o "$work/$asset" "$base/$asset" \
+  || die "could not download $asset. This host's target may not be published for $tag."
+curl -fsSL -o "$work/SHA256SUMS" "$base/SHA256SUMS" \
+  || die "could not download SHA256SUMS for $tag."
+
+# --- verify, and refuse to install a tarball whose digest disagrees ---------
+say "Verifying the download against SHA256SUMS…"
+expected="$(grep "  ${asset}\$" "$work/SHA256SUMS" | awk '{print $1}')"
+[ -n "$expected" ] || die "SHA256SUMS names no $asset; refusing to install it."
+if have sha256sum; then
+  actual="$(sha256sum "$work/$asset" | awk '{print $1}')"
+else
+  actual="$(shasum -a 256 "$work/$asset" | awk '{print $1}')"
+fi
+[ "$actual" = "$expected" ] \
+  || die "$asset does not match SHA256SUMS (expected $expected, got $actual). Nothing was installed."
+
+# --- unpack, name by the manifest version, and swap the symlinks ------------
+tar -xzf "$work/$asset" -C "$work" || die "the release archive could not be unpacked."
+[ -f "$work/manifest.json" ] || die "the release is missing manifest.json."
+version="$(grep -m1 '"version"' "$work/manifest.json" \
+  | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
+[ -n "$version" ] || die "the release manifest names no version."
+
+# macOS quarantine: curl never sets it, but a browser-downloaded tarball would.
+# Cleared defensively before the binaries are placed; a failure here is not one.
+if [ "$os" = "Darwin" ]; then
+  xattr -dr com.apple.quarantine "$work/bin" >/dev/null 2>&1 || true
+fi
+
+versions="$CHIEF_HOME/versions"
+mkdir -p "$versions" "$CHIEF_HOME/bin" "$CHIEF_HOME/state"
+dest="$versions/$version"
+rm -rf "$dest"
+# The unpacked top level (bin/ resources/ manifest.json) IS the version dir.
+mkdir -p "$dest"
+mv "$work/bin" "$work/resources" "$work/manifest.json" "$dest/"
+
+for name in chief chiefd beacond; do
+  tmp="$CHIEF_HOME/bin/.$name.tmp.$$"
+  rm -f "$tmp"
+  ln -s "$dest/bin/$name" "$tmp"
+  mv "$tmp" "$CHIEF_HOME/bin/$name"
+done
+
+say ""
+say "chief $version is installed under $CHIEF_HOME."
+
+# --- PATH and the two host prerequisites ------------------------------------
+case ":$PATH:" in
+  *":$CHIEF_HOME/bin:"*) ;;
+  *)
+    say ""
+    say "Add chief to your PATH — put this in your shell profile:"
+    say "    export PATH=\"$CHIEF_HOME/bin:\$PATH\""
+    ;;
+esac
+
+have tmux || {
+  say ""
+  say "tmux is required and was not found. Install it:"
+  say "    macOS:         brew install tmux"
+  say "    Debian/Ubuntu: apt-get install -y tmux"
+}
+have pi || {
+  say ""
+  say "Pi is the agent runtime every person in a company runs, and was not found. Install it:"
+  say "    $PI_INSTALL"
+}
+
+say ""
+say "Then found your first company:"
+say "    mkdir acme && cd acme && chief"

@@ -1,0 +1,1740 @@
+---
+source: crates/chiefd-api/src/wire/mod.rs
+expression: "Value::Object(registry)"
+---
+{
+  "activity.status": {
+    "$defs": {
+      "PersonId": {
+        "description": "A person's stable identifier. Never a display name.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`activity.status` — a pure read.",
+    "properties": {
+      "personId": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/PersonId"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Whose status to read. Absent means the authenticated caller — the\nperson id is injected, not claimed."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "ActivityStatusRequest",
+    "type": "object"
+  },
+  "company.boot": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`company.boot` — it names the company and nothing else.\n\n#751-P9: it used to carry an optional, fully-specified runtime target\n(socket + session, D17's unrepresentable-half-set pair). Booting a company\nis a decision about PEOPLE; which terminal socket the operator happens to\nbe attached to is the operator client's own business and never travelled\nusefully — the durable ownership record already answers \"where\", for the\none client that has a \"where\" at all.\n\n`company.ceo` shared this request type until chief-home-is-cwd §4c deleted\nthe verb with the daemon-side CEO boot.",
+    "properties": {
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "CompanyTargetRequest",
+    "type": "object"
+  },
+  "company.compact": {
+    "$defs": {
+      "ForceMode": {
+        "description": "Whether a compact/reset was requested in force mode. A mode change\nmid-flight is refused; an unresolved same-kind action is reused only when\nthe force mode matches.",
+        "oneOf": [
+          {
+            "const": "normal",
+            "description": "Ordinary request.",
+            "type": "string"
+          },
+          {
+            "const": "force",
+            "description": "Force mode.",
+            "type": "string"
+          }
+        ]
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`company.compact` / `company.reset`.",
+    "properties": {
+      "force": {
+        "$ref": "#/$defs/ForceMode",
+        "default": "normal",
+        "description": "Force mode. A target the company cannot maintain aborts the whole queue\nregardless."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "CompanyMaintenanceRequest",
+    "type": "object"
+  },
+  "company.create": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`company.create` — create-once; a duplicate request is refused.\n\nThe slug regex is checked before any path use. `requestedBy` is injected,\nnot carried here.\n\n# The directory is REQUIRED, and it is what makes the request unique\n\nThis carried `dataRoot: Option<PathBuf>` — \"absent means the launcher\ndefault\" — beside a slug that was expected to identify the company on its\nown. Neither half survives: there is no launcher default and no data root,\nand a slug names nothing, because two directories may hold companies with\nthe same name. The DIRECTORY is the company, so it is required and it is\nthe whole of the identity.\n\nA non-normalized path is refused rather than normalized — normalizing would\nmake two different requests claim the same directory.",
+    "properties": {
+      "dir": {
+        "description": "The canonical absolute directory the new company will occupy.",
+        "type": "string"
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The new company's slug — its display name, not its identity."
+      },
+      "template": {
+        "description": "Organization template name.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "dir",
+      "slug"
+    ],
+    "title": "CompanyCreateRequest",
+    "type": "object"
+  },
+  "company.list": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`company.list` — pure read, no request fields.",
+    "title": "CompanyListRequest",
+    "type": "object"
+  },
+  "company.reset": {
+    "$defs": {
+      "ForceMode": {
+        "description": "Whether a compact/reset was requested in force mode. A mode change\nmid-flight is refused; an unresolved same-kind action is reused only when\nthe force mode matches.",
+        "oneOf": [
+          {
+            "const": "normal",
+            "description": "Ordinary request.",
+            "type": "string"
+          },
+          {
+            "const": "force",
+            "description": "Force mode.",
+            "type": "string"
+          }
+        ]
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`company.compact` / `company.reset`.",
+    "properties": {
+      "force": {
+        "$ref": "#/$defs/ForceMode",
+        "default": "normal",
+        "description": "Force mode. A target the company cannot maintain aborts the whole queue\nregardless."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "CompanyMaintenanceRequest",
+    "type": "object"
+  },
+  "company.resume": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "A request that names only a company. Every company-scoped read and simple\nverb uses it, so the disk-authority check (§1) has exactly one shape.",
+    "properties": {
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "CompanyRef",
+    "type": "object"
+  },
+  "company.show": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "A request that names only a company. Every company-scoped read and simple\nverb uses it, so the disk-authority check (§1) has exactly one shape.",
+    "properties": {
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "CompanyRef",
+    "type": "object"
+  },
+  "company.stop": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "A request that names only a company. Every company-scoped read and simple\nverb uses it, so the disk-authority check (§1) has exactly one shape.",
+    "properties": {
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "CompanyRef",
+    "type": "object"
+  },
+  "company.tree": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "A request that names only a company. Every company-scoped read and simple\nverb uses it, so the disk-authority check (§1) has exactly one shape.",
+    "properties": {
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "CompanyRef",
+    "type": "object"
+  },
+  "events.emit": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`events.emit`.",
+    "properties": {
+      "id": {
+        "description": "Caller-chosen event id. Exactly-once is keyed on its sha256.",
+        "type": "string"
+      },
+      "kind": {
+        "description": "Event kind.",
+        "type": "string"
+      },
+      "payload": {
+        "description": "Event payload."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "id",
+      "kind",
+      "payload"
+    ],
+    "title": "EventEmitRequest",
+    "type": "object"
+  },
+  "health.record": {
+    "$defs": {
+      "IncidentSeverity": {
+        "description": "Severity of a health incident.",
+        "oneOf": [
+          {
+            "const": "info",
+            "description": "Recorded, not paging.",
+            "type": "string"
+          },
+          {
+            "const": "warn",
+            "description": "Degraded.",
+            "type": "string"
+          },
+          {
+            "const": "critical",
+            "description": "Paging after an independent second sample ≥ 15 s later.",
+            "type": "string"
+          }
+        ]
+      },
+      "PersonId": {
+        "description": "A person's stable identifier. Never a display name.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`health.record`.",
+    "properties": {
+      "detail": {
+        "description": "Detail; redacted server-side before storage.",
+        "type": "string"
+      },
+      "personId": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/PersonId"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Who or what it concerns."
+      },
+      "severity": {
+        "$ref": "#/$defs/IncidentSeverity",
+        "description": "Severity."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "severity",
+      "detail"
+    ],
+    "title": "HealthRecordRequest",
+    "type": "object"
+  },
+  "health.resolve": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`health.resolve`.",
+    "properties": {
+      "incidentId": {
+        "description": "The incident to resolve.",
+        "type": "string"
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "incidentId"
+    ],
+    "title": "HealthResolveRequest",
+    "type": "object"
+  },
+  "health.status": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`health.status`.",
+    "properties": {
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "HealthStatusRequest",
+    "type": "object"
+  },
+  "maint.apply": {
+    "$defs": {
+      "MaintClaim": {
+        "additionalProperties": false,
+        "description": "The claim triple, minted **inside the running Pi** and validated by chiefd,\nwhich can never mint one (plan §4).\n\nEvery fenced maintenance verb carries it. Re-presenting the same triple to\n`maint.start` returns the already-claimed request.",
+        "properties": {
+          "claimToken": {
+            "description": "The claim token.",
+            "type": "string"
+          },
+          "processId": {
+            "description": "The Pi process id that minted the claim.",
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "The Pi session id.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processId",
+          "sessionId",
+          "claimToken"
+        ],
+        "type": "object"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "The fenced maintenance verbs that need only the claim and the request id:\n`interrupt`, `defer`, `recover`, `finish`, `apply`, `complete`.\n\nTOMBSTONE: `complete_native` was a seventh. It completed a company-scoped\nrequest whose only producer was `org_maintain_session`, so with that verb\ngone nothing can reach it.",
+    "properties": {
+      "claim": {
+        "$ref": "#/$defs/MaintClaim",
+        "description": "The claim triple that owns the request."
+      },
+      "requestId": {
+        "description": "The request being acted on.",
+        "type": "string"
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "claim",
+      "requestId"
+    ],
+    "title": "MaintFencedRequest",
+    "type": "object"
+  },
+  "maint.auto_compact": {
+    "$defs": {
+      "MaintKind": {
+        "description": "What kind of session maintenance is being asked for.",
+        "oneOf": [
+          {
+            "const": "compact",
+            "description": "Context compaction.",
+            "type": "string"
+          }
+        ]
+      },
+      "PersonId": {
+        "description": "A person's stable identifier. Never a display name.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`maint.queue` / `maint.auto_compact`.\n\n`force` ⇔ `companyActionId` coupling (D6): forcing requires a live company\naction, and a company action without force is equally refused. The types\nkeep them separate fields because the refusal must name which half is\nmissing; the pairing is checked in `validate()` and surfaces as\n[`FORCE_COMPANY_ACTION_UNPAIRED`].",
+    "properties": {
+      "companyActionId": {
+        "description": "The live `companyActions` entry backing a forced request.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "force": {
+        "default": false,
+        "description": "Force the request even when one is already unresolved.",
+        "type": "boolean"
+      },
+      "kind": {
+        "$ref": "#/$defs/MaintKind",
+        "description": "What to do."
+      },
+      "personId": {
+        "$ref": "#/$defs/PersonId",
+        "description": "Whose session."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "personId",
+      "kind"
+    ],
+    "title": "MaintQueueRequest",
+    "type": "object"
+  },
+  "maint.complete": {
+    "$defs": {
+      "MaintClaim": {
+        "additionalProperties": false,
+        "description": "The claim triple, minted **inside the running Pi** and validated by chiefd,\nwhich can never mint one (plan §4).\n\nEvery fenced maintenance verb carries it. Re-presenting the same triple to\n`maint.start` returns the already-claimed request.",
+        "properties": {
+          "claimToken": {
+            "description": "The claim token.",
+            "type": "string"
+          },
+          "processId": {
+            "description": "The Pi process id that minted the claim.",
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "The Pi session id.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processId",
+          "sessionId",
+          "claimToken"
+        ],
+        "type": "object"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "The fenced maintenance verbs that need only the claim and the request id:\n`interrupt`, `defer`, `recover`, `finish`, `apply`, `complete`.\n\nTOMBSTONE: `complete_native` was a seventh. It completed a company-scoped\nrequest whose only producer was `org_maintain_session`, so with that verb\ngone nothing can reach it.",
+    "properties": {
+      "claim": {
+        "$ref": "#/$defs/MaintClaim",
+        "description": "The claim triple that owns the request."
+      },
+      "requestId": {
+        "description": "The request being acted on.",
+        "type": "string"
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "claim",
+      "requestId"
+    ],
+    "title": "MaintFencedRequest",
+    "type": "object"
+  },
+  "maint.defer": {
+    "$defs": {
+      "MaintClaim": {
+        "additionalProperties": false,
+        "description": "The claim triple, minted **inside the running Pi** and validated by chiefd,\nwhich can never mint one (plan §4).\n\nEvery fenced maintenance verb carries it. Re-presenting the same triple to\n`maint.start` returns the already-claimed request.",
+        "properties": {
+          "claimToken": {
+            "description": "The claim token.",
+            "type": "string"
+          },
+          "processId": {
+            "description": "The Pi process id that minted the claim.",
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "The Pi session id.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processId",
+          "sessionId",
+          "claimToken"
+        ],
+        "type": "object"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "The fenced maintenance verbs that need only the claim and the request id:\n`interrupt`, `defer`, `recover`, `finish`, `apply`, `complete`.\n\nTOMBSTONE: `complete_native` was a seventh. It completed a company-scoped\nrequest whose only producer was `org_maintain_session`, so with that verb\ngone nothing can reach it.",
+    "properties": {
+      "claim": {
+        "$ref": "#/$defs/MaintClaim",
+        "description": "The claim triple that owns the request."
+      },
+      "requestId": {
+        "description": "The request being acted on.",
+        "type": "string"
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "claim",
+      "requestId"
+    ],
+    "title": "MaintFencedRequest",
+    "type": "object"
+  },
+  "maint.finish": {
+    "$defs": {
+      "MaintClaim": {
+        "additionalProperties": false,
+        "description": "The claim triple, minted **inside the running Pi** and validated by chiefd,\nwhich can never mint one (plan §4).\n\nEvery fenced maintenance verb carries it. Re-presenting the same triple to\n`maint.start` returns the already-claimed request.",
+        "properties": {
+          "claimToken": {
+            "description": "The claim token.",
+            "type": "string"
+          },
+          "processId": {
+            "description": "The Pi process id that minted the claim.",
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "The Pi session id.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processId",
+          "sessionId",
+          "claimToken"
+        ],
+        "type": "object"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "The fenced maintenance verbs that need only the claim and the request id:\n`interrupt`, `defer`, `recover`, `finish`, `apply`, `complete`.\n\nTOMBSTONE: `complete_native` was a seventh. It completed a company-scoped\nrequest whose only producer was `org_maintain_session`, so with that verb\ngone nothing can reach it.",
+    "properties": {
+      "claim": {
+        "$ref": "#/$defs/MaintClaim",
+        "description": "The claim triple that owns the request."
+      },
+      "requestId": {
+        "description": "The request being acted on.",
+        "type": "string"
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "claim",
+      "requestId"
+    ],
+    "title": "MaintFencedRequest",
+    "type": "object"
+  },
+  "maint.interrupt": {
+    "$defs": {
+      "MaintClaim": {
+        "additionalProperties": false,
+        "description": "The claim triple, minted **inside the running Pi** and validated by chiefd,\nwhich can never mint one (plan §4).\n\nEvery fenced maintenance verb carries it. Re-presenting the same triple to\n`maint.start` returns the already-claimed request.",
+        "properties": {
+          "claimToken": {
+            "description": "The claim token.",
+            "type": "string"
+          },
+          "processId": {
+            "description": "The Pi process id that minted the claim.",
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "The Pi session id.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processId",
+          "sessionId",
+          "claimToken"
+        ],
+        "type": "object"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "The fenced maintenance verbs that need only the claim and the request id:\n`interrupt`, `defer`, `recover`, `finish`, `apply`, `complete`.\n\nTOMBSTONE: `complete_native` was a seventh. It completed a company-scoped\nrequest whose only producer was `org_maintain_session`, so with that verb\ngone nothing can reach it.",
+    "properties": {
+      "claim": {
+        "$ref": "#/$defs/MaintClaim",
+        "description": "The claim triple that owns the request."
+      },
+      "requestId": {
+        "description": "The request being acted on.",
+        "type": "string"
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "claim",
+      "requestId"
+    ],
+    "title": "MaintFencedRequest",
+    "type": "object"
+  },
+  "maint.queue": {
+    "$defs": {
+      "MaintKind": {
+        "description": "What kind of session maintenance is being asked for.",
+        "oneOf": [
+          {
+            "const": "compact",
+            "description": "Context compaction.",
+            "type": "string"
+          }
+        ]
+      },
+      "PersonId": {
+        "description": "A person's stable identifier. Never a display name.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`maint.queue` / `maint.auto_compact`.\n\n`force` ⇔ `companyActionId` coupling (D6): forcing requires a live company\naction, and a company action without force is equally refused. The types\nkeep them separate fields because the refusal must name which half is\nmissing; the pairing is checked in `validate()` and surfaces as\n[`FORCE_COMPANY_ACTION_UNPAIRED`].",
+    "properties": {
+      "companyActionId": {
+        "description": "The live `companyActions` entry backing a forced request.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "force": {
+        "default": false,
+        "description": "Force the request even when one is already unresolved.",
+        "type": "boolean"
+      },
+      "kind": {
+        "$ref": "#/$defs/MaintKind",
+        "description": "What to do."
+      },
+      "personId": {
+        "$ref": "#/$defs/PersonId",
+        "description": "Whose session."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "personId",
+      "kind"
+    ],
+    "title": "MaintQueueRequest",
+    "type": "object"
+  },
+  "maint.recover": {
+    "$defs": {
+      "MaintClaim": {
+        "additionalProperties": false,
+        "description": "The claim triple, minted **inside the running Pi** and validated by chiefd,\nwhich can never mint one (plan §4).\n\nEvery fenced maintenance verb carries it. Re-presenting the same triple to\n`maint.start` returns the already-claimed request.",
+        "properties": {
+          "claimToken": {
+            "description": "The claim token.",
+            "type": "string"
+          },
+          "processId": {
+            "description": "The Pi process id that minted the claim.",
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "The Pi session id.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processId",
+          "sessionId",
+          "claimToken"
+        ],
+        "type": "object"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "The fenced maintenance verbs that need only the claim and the request id:\n`interrupt`, `defer`, `recover`, `finish`, `apply`, `complete`.\n\nTOMBSTONE: `complete_native` was a seventh. It completed a company-scoped\nrequest whose only producer was `org_maintain_session`, so with that verb\ngone nothing can reach it.",
+    "properties": {
+      "claim": {
+        "$ref": "#/$defs/MaintClaim",
+        "description": "The claim triple that owns the request."
+      },
+      "requestId": {
+        "description": "The request being acted on.",
+        "type": "string"
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "claim",
+      "requestId"
+    ],
+    "title": "MaintFencedRequest",
+    "type": "object"
+  },
+  "maint.start": {
+    "$defs": {
+      "MaintClaim": {
+        "additionalProperties": false,
+        "description": "The claim triple, minted **inside the running Pi** and validated by chiefd,\nwhich can never mint one (plan §4).\n\nEvery fenced maintenance verb carries it. Re-presenting the same triple to\n`maint.start` returns the already-claimed request.",
+        "properties": {
+          "claimToken": {
+            "description": "The claim token.",
+            "type": "string"
+          },
+          "processId": {
+            "description": "The Pi process id that minted the claim.",
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "The Pi session id.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processId",
+          "sessionId",
+          "claimToken"
+        ],
+        "type": "object"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`maint.start`.",
+    "properties": {
+      "claim": {
+        "$ref": "#/$defs/MaintClaim",
+        "description": "The claim triple."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "claim"
+    ],
+    "title": "MaintStartRequest",
+    "type": "object"
+  },
+  "msg.drain": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`msg.drain`.",
+    "properties": {
+      "max": {
+        "description": "Maximum envelopes to return.",
+        "format": "uint32",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "MsgDrainRequest",
+    "type": "object"
+  },
+  "msg.send": {
+    "$defs": {
+      "PersonId": {
+        "description": "A person's stable identifier. Never a display name.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`msg.send`.\n\n`\"launcher\"` is never a recipient — that behavioral debt lives in the shim's\nseparately versioned description catalog, and an unknown recipient is\nrefused here.",
+    "properties": {
+      "body": {
+        "description": "The message. Never omitted.",
+        "type": "string"
+      },
+      "completeAssignment": {
+        "description": "Complete this assignment with the message body as its result — the\n**only** route to `assignment.result` for a worker (plan §3.4). The id\nmust be the exact one from the active ASSIGNMENT header.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      },
+      "to": {
+        "description": "Recipients. Empty is refused: the repeated-empty-send loop is exactly\nwhat the shim's circuit breaker exists for.",
+        "items": {
+          "$ref": "#/$defs/PersonId"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "slug",
+      "to",
+      "body"
+    ],
+    "title": "MsgSendRequest",
+    "type": "object"
+  },
+  "org.bench": {
+    "$defs": {
+      "PersonId": {
+        "description": "A person's stable identifier. Never a display name.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.bench`.\n\nTwo-phase: the readiness check runs **after**\n`beginGracefulStaffingTransition` (inv 19 — the ordering is guarded by a\ncomment and a call-order test).",
+    "properties": {
+      "personId": {
+        "$ref": "#/$defs/PersonId",
+        "description": "The person to bench."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "personId"
+    ],
+    "title": "BenchRequest",
+    "type": "object"
+  },
+  "org.contract.close": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.contract.close`.",
+    "properties": {
+      "contractId": {
+        "description": "The contract to close.",
+        "type": "string"
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "contractId"
+    ],
+    "title": "ContractCloseRequest",
+    "type": "object"
+  },
+  "org.contract.open": {
+    "$defs": {
+      "PersonId": {
+        "description": "A person's stable identifier. Never a display name.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.contract.open` — contracts require an engagement and an expiry; both\nare non-optional so an unbounded contract is unrepresentable.",
+    "properties": {
+      "engagement": {
+        "description": "The engagement this contract exists for.",
+        "type": "string"
+      },
+      "expiresAt": {
+        "description": "Expiry, epoch millis.",
+        "format": "int64",
+        "type": "integer"
+      },
+      "personId": {
+        "$ref": "#/$defs/PersonId",
+        "description": "The person the contract covers."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "personId",
+      "engagement",
+      "expiresAt"
+    ],
+    "title": "ContractOpenRequest",
+    "type": "object"
+  },
+  "org.department.add": {
+    "$defs": {
+      "DepartmentId": {
+        "description": "A department's identifier within one company's manifest.",
+        "type": "string"
+      },
+      "DepartmentSpec": {
+        "additionalProperties": false,
+        "description": "A department as the manifest describes it.",
+        "properties": {
+          "charter": {
+            "description": "Charter prose handed to the department's people.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "$ref": "#/$defs/DepartmentId",
+            "description": "Department id."
+          },
+          "name": {
+            "description": "Human-facing name.",
+            "type": "string"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DepartmentId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parent department; absent only for the executive root."
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.department.add`.",
+    "properties": {
+      "department": {
+        "$ref": "#/$defs/DepartmentSpec",
+        "description": "The department to add."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "department"
+    ],
+    "title": "DepartmentAddRequest",
+    "type": "object"
+  },
+  "org.department.launch": {
+    "$defs": {
+      "DepartmentId": {
+        "description": "A department's identifier within one company's manifest.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.department.launch`.\n\nFleet suppression is checked **early**; the op opens a launch intent for\nexactly these people, which is the sole authority for pane admission (D7).",
+    "properties": {
+      "department": {
+        "$ref": "#/$defs/DepartmentId",
+        "description": "The department to launch."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "department"
+    ],
+    "title": "DepartmentLaunchRequest",
+    "type": "object"
+  },
+  "org.department.move": {
+    "$defs": {
+      "DepartmentId": {
+        "description": "A department's identifier within one company's manifest.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.department.move`.",
+    "properties": {
+      "department": {
+        "$ref": "#/$defs/DepartmentId",
+        "description": "The department being moved."
+      },
+      "newParent": {
+        "$ref": "#/$defs/DepartmentId",
+        "description": "Its new parent."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "department",
+      "newParent"
+    ],
+    "title": "DepartmentMoveRequest",
+    "type": "object"
+  },
+  "org.department.pause": {
+    "$defs": {
+      "DepartmentId": {
+        "description": "A department's identifier within one company's manifest.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.department.pause` / `org.department.resume`.",
+    "properties": {
+      "department": {
+        "$ref": "#/$defs/DepartmentId",
+        "description": "The department."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "department"
+    ],
+    "title": "DepartmentPauseRequest",
+    "type": "object"
+  },
+  "org.department.remove": {
+    "$defs": {
+      "DepartmentId": {
+        "description": "A department's identifier within one company's manifest.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.department.remove`.\n\nThe normalized removal operation validates the current company state inside\nits transaction; retry identity is an operation/journal concern, not a\ncaller-provided organization revision.",
+    "properties": {
+      "department": {
+        "$ref": "#/$defs/DepartmentId",
+        "description": "The department."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "department"
+    ],
+    "title": "DepartmentRemoveRequest",
+    "type": "object"
+  },
+  "org.department.resume": {
+    "$defs": {
+      "DepartmentId": {
+        "description": "A department's identifier within one company's manifest.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.department.pause` / `org.department.resume`.",
+    "properties": {
+      "department": {
+        "$ref": "#/$defs/DepartmentId",
+        "description": "The department."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "department"
+    ],
+    "title": "DepartmentPauseRequest",
+    "type": "object"
+  },
+  "org.department.stop": {
+    "$defs": {
+      "DepartmentId": {
+        "description": "A department's identifier within one company's manifest.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.department.stop`.",
+    "properties": {
+      "department": {
+        "$ref": "#/$defs/DepartmentId",
+        "description": "The department."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "department"
+    ],
+    "title": "DepartmentStopRequest",
+    "type": "object"
+  },
+  "org.extension_drift": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "A request that names only a company. Every company-scoped read and simple\nverb uses it, so the disk-authority check (§1) has exactly one shape.",
+    "properties": {
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "CompanyRef",
+    "type": "object"
+  },
+  "org.hire": {
+    "$defs": {
+      "Capability": {
+        "description": "A closed capability vocabulary: an enum, with `deny_unknown_fields` plus\nenum exhaustiveness rejecting anything else at the schema boundary, so a\ncapability outside the set cannot arrive as a free-form string.",
+        "oneOf": [
+          {
+            "const": "bash",
+            "description": "Shell access. Available to every role.",
+            "type": "string"
+          },
+          {
+            "const": "read",
+            "description": "Read files in the person's workspace.",
+            "type": "string"
+          },
+          {
+            "const": "write",
+            "description": "Write files in the person's workspace.",
+            "type": "string"
+          },
+          {
+            "const": "web",
+            "description": "Web search / fetch.",
+            "type": "string"
+          },
+          {
+            "const": "org",
+            "description": "Organization tools (send, roster, …).",
+            "type": "string"
+          }
+        ]
+      },
+      "DepartmentId": {
+        "description": "A department's identifier within one company's manifest.",
+        "type": "string"
+      },
+      "IdempotencyKey": {
+        "description": "Client-supplied idempotency key for the creating ops that are not\nidempotent on their own arguments — `assignment.assign`, `org.hire`, and\n`goal.set` (plan §6.6). Backed by a unique column, or\nby a key-derived row id, so a retry after an ambiguous connection drop\ncannot double-create.\n\n`goal.set` was **not** on this list until plan §10 Q6 was closed, and its\nabsence was the whole of the durability regression the operator overruled: the store\nhas been idempotent on the goal id since M15, but the wire carried no key to\nderive that id from, so `shim/client.ts` classified the op non-idempotent\nand refused to retry the one failure shape a crash-loop produces. If a\ncreating op is ever added without a key, that is the failure it inherits.",
+        "type": "string"
+      },
+      "PersonRole": {
+        "description": "Role of a person within a department.",
+        "oneOf": [
+          {
+            "const": "worker",
+            "description": "Individual contributor.",
+            "type": "string"
+          },
+          {
+            "const": "manager",
+            "description": "Manages a department.",
+            "type": "string"
+          },
+          {
+            "const": "executive",
+            "description": "The company executive.",
+            "type": "string"
+          }
+        ]
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.hire`.\n\nThe complete candidate is materialized in a tmpdir **first** (inv 37): a\npreflight failure advances nothing. Create-once via `idempotencyKey`\n(plan §6.6).",
+    "properties": {
+      "capabilities": {
+        "description": "Capabilities to grant. Every capability is available to every role.",
+        "items": {
+          "$ref": "#/$defs/Capability"
+        },
+        "type": "array"
+      },
+      "department": {
+        "$ref": "#/$defs/DepartmentId",
+        "description": "Department to hire into."
+      },
+      "idempotencyKey": {
+        "$ref": "#/$defs/IdempotencyKey",
+        "description": "Client-supplied create-once key."
+      },
+      "model": {
+        "description": "Model to run the person on. Model selection is free at hire time and\nforever after (`model-switch-freedom`).",
+        "type": "string"
+      },
+      "role": {
+        "$ref": "#/$defs/PersonRole",
+        "description": "Role for the new person."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "department",
+      "role",
+      "capabilities",
+      "model",
+      "idempotencyKey"
+    ],
+    "title": "HireRequest",
+    "type": "object"
+  },
+  "org.lifecycle_status": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "A request that names only a company. Every company-scoped read and simple\nverb uses it, so the disk-authority check (§1) has exactly one shape.",
+    "properties": {
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "CompanyRef",
+    "type": "object"
+  },
+  "org.list": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "A request that names only a company. Every company-scoped read and simple\nverb uses it, so the disk-authority check (§1) has exactly one shape.",
+    "properties": {
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "CompanyRef",
+    "type": "object"
+  },
+  "org.offboard": {
+    "$defs": {
+      "PersonId": {
+        "description": "A person's stable identifier. Never a display name.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.recall` / `org.offboard` — verbs that name one person.",
+    "properties": {
+      "personId": {
+        "$ref": "#/$defs/PersonId",
+        "description": "The person."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "personId"
+    ],
+    "title": "PersonVerbRequest",
+    "type": "object"
+  },
+  "org.recall": {
+    "$defs": {
+      "PersonId": {
+        "description": "A person's stable identifier. Never a display name.",
+        "type": "string"
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.recall` / `org.offboard` — verbs that name one person.",
+    "properties": {
+      "personId": {
+        "$ref": "#/$defs/PersonId",
+        "description": "The person."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug",
+      "personId"
+    ],
+    "title": "PersonVerbRequest",
+    "type": "object"
+  },
+  "org.roster": {
+    "$defs": {
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "A request that names only a company. Every company-scoped read and simple\nverb uses it, so the disk-authority check (§1) has exactly one shape.",
+    "properties": {
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "title": "CompanyRef",
+    "type": "object"
+  },
+  "org.transfer": {
+    "$defs": {
+      "DepartmentId": {
+        "description": "A department's identifier within one company's manifest.",
+        "type": "string"
+      },
+      "PersonId": {
+        "description": "A person's stable identifier. Never a display name.",
+        "type": "string"
+      },
+      "PersonRole": {
+        "description": "Role of a person within a department.",
+        "oneOf": [
+          {
+            "const": "worker",
+            "description": "Individual contributor.",
+            "type": "string"
+          },
+          {
+            "const": "manager",
+            "description": "Manages a department.",
+            "type": "string"
+          },
+          {
+            "const": "executive",
+            "description": "The company executive.",
+            "type": "string"
+          }
+        ]
+      },
+      "Slug": {
+        "description": "Company slug. Validated against `^[a-z0-9]+(?:-[a-z0-9]+)*$` **before any\npath use** (plan §2.1) — a slug reaches the filesystem only after\n[`Slug::parse`] has accepted it.",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`org.transfer` — a permanent move.\n\nEffective on the very next call: authorization is checked per call against\na freshly loaded manifest, never derived from the registered toolset\n(plan §3.2).",
+    "properties": {
+      "personId": {
+        "$ref": "#/$defs/PersonId",
+        "description": "The person to transfer."
+      },
+      "role": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/PersonRole"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "New role, when the transfer is also a promotion or demotion."
+      },
+      "slug": {
+        "$ref": "#/$defs/Slug",
+        "description": "The company."
+      },
+      "toDepartment": {
+        "$ref": "#/$defs/DepartmentId",
+        "description": "Destination department."
+      }
+    },
+    "required": [
+      "slug",
+      "personId",
+      "toDepartment"
+    ],
+    "title": "TransferRequest",
+    "type": "object"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "name": "org-create-reminder-arms-a-durable-recurring-reminder-for-yourself",
+  "family": "tools",
+  "description": "The happy path: one `POST /v1/reminders/arm` carrying the exact prompt and intervalMs. `personId` defaults to the caller and `recurring` defaults server-side, so neither is forced into the payload, and `createdByPersonId` is absent from the body because chiefd credits the reminder to the person whose enrolled key authenticated the pane (DECISIONS.md 2026-08-10) — it is on the ANSWER, not the request. chiefd allocates the id and nextDueAt, and its response body is the tool's `details` unchanged. Replayed against the real route by apps/chiefd/crates/chiefd-api/tests/conformance_reminders.rs.",
+  "invariants": [],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "tools.call",
+  "caller": {
+    "personId": "chief",
+    "role": "executive"
+  },
+  "in": {
+    "tool": "org_create_reminder",
+    "params": {
+      "prompt": "Re-check the release checklist.",
+      "intervalMs": 3600000
+    }
+  },
+  "expect": {
+    "ok": {
+      "details": {
+        "reminder": {
+          "createdAt": "2026-07-15T12:00:00.000Z",
+          "createdByPersonId": "chief",
+          "fireCount": 0,
+          "id": "reminder:chief:1",
+          "intervalMs": 3600000,
+          "nextDueAt": "2026-07-15T13:00:00.000Z",
+          "personId": "chief",
+          "prompt": "Re-check the release checklist.",
+          "recurring": true,
+          "status": "active"
+        }
+      },
+      "message": "Scheduled reminder reminder:chief:1 — every 1 hour, first due 2026-07-15T13:00:00.000Z."
+    }
+  },
+  "expectState": [
+    {
+      "read": "tools.chiefd_calls",
+      "args": {
+        "personId": "chief"
+      },
+      "equals": [
+        {
+          "body": {
+            "intervalMs": 3600000,
+            "personId": "chief",
+            "prompt": "Re-check the release checklist.",
+            "slug": "northstar-conformance@<ROOT_DIGEST>"
+          },
+          "path": "/v1/reminders/arm"
+        }
+      ]
+    }
+  ]
+}

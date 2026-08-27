@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "organization": "acme",
+  "contracts": {
+    "person-1": { "text": "Be excellent.", "md5": "0123456789abcdef0123456789abcdef" }
+  }
+}

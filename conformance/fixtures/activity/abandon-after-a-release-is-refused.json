@@ -1,0 +1,91 @@
+{
+  "name": "abandon-after-a-release-is-refused",
+  "family": "activity",
+  "description": "A transition its owner already released is never retroactively declared unreachable.",
+  "invariants": [
+    "inv 18"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    },
+    {
+      "op": "activity.begin_transition",
+      "in": {
+        "personId": "signal-researcher",
+        "action": "park",
+        "reason": "Conformance park."
+      }
+    },
+    {
+      "op": "activity.release",
+      "caller": {
+        "personId": "signal-researcher",
+        "role": "worker"
+      },
+      "in": {
+        "transitionId": "transition:1:signal-researcher:park"
+      }
+    }
+  ],
+  "op": "activity.abandon_transition",
+  "in": {
+    "transitionId": "transition:1:signal-researcher:park",
+    "personId": "signal-researcher",
+    "reason": "Trying to skip the handoff."
+  },
+  "expect": {
+    "error": {
+      "type": "Refused",
+      "code": "transition-released",
+      "message": "Graceful transition 'transition:1:signal-researcher:park' has been released and cannot be abandoned"
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.transition",
+      "args": {
+        "transitionId": "transition:1:signal-researcher:park"
+      },
+      "equals": {
+        "abandoned": false,
+        "action": "park",
+        "id": "transition:1:signal-researcher:park",
+        "personId": "signal-researcher",
+        "status": "ready"
+      }
+    },
+    {
+      "read": "activity.person",
+      "args": {
+        "personId": "signal-researcher"
+      },
+      "equals": {
+        "activeTransitionId": "transition:1:signal-researcher:park",
+        "idleSince": null,
+        "lastDesiredActive": false,
+        "lastEmploymentState": "active",
+        "lastOperational": true,
+        "personId": "signal-researcher"
+      }
+    },
+    {
+      "read": "activity.summary",
+      "equals": {
+        "nextTransitionSequence": 2,
+        "personOrder": [
+          "chief",
+          "quant-head",
+          "signal-researcher",
+          "it-head"
+        ],
+        "transitionOrder": [
+          "transition:1:signal-researcher:park"
+        ]
+      }
+    }
+  ]
+}

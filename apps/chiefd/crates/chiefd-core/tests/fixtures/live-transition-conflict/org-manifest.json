@@ -1,0 +1,1310 @@
+{
+  "schemaVersion": 1,
+  "kind": "organization",
+  "slug": "tribes-capital",
+  "name": "Tribes Capital",
+  "purpose": "Operate an autonomous, proprietary multi-agent quantitative trading firm that trades perpetual futures on external venue under strict, code-enforced risk limits. Agents provide judgment; deterministic code provides rules. The thing that finds an edge is never the thing that approves, sizes, or grades it.",
+  "rootDepartmentId": "executive",
+  "runtimeSession": "org-tribes-capital",
+  "policy": {
+    "supervisionIntervalMs": 900000,
+    "acknowledgementTimeoutMs": 90000,
+    "acknowledgementRetryLimit": 1,
+    "replacementLimit": 1
+  },
+  "departmentOrder": [
+    "executive",
+    "portfolio-management",
+    "engineering",
+    "market-intelligence",
+    "execution-desk"
+  ],
+  "peopleOrder": [
+    "ceo",
+    "portfolio-management-head",
+    "portfolio-management-marcus",
+    "engineering-head",
+    "engineering-elena",
+    "engineering-marcus",
+    "engineering-senior-execution-systems-engineer",
+    "engineering-senior-data-platform-engineer",
+    "engineering-integration-feed-engineer",
+    "engineering-tooling-automation-engineer",
+    "engineering-devops-reliability-engineer",
+    "engineering-qa-release-engineer",
+    "market-intel-head",
+    "validator-3",
+    "validator-2",
+    "strategy-validation-vera",
+    "market-intel-coder",
+    "market-intel-builder",
+    "alpha-scout-analyst",
+    "mi-data-analyst",
+    "mi-data-analyst-2",
+    "mi-data-tech",
+    "execution-head",
+    "execution-operator",
+    "execution-runner"
+  ],
+  "departments": {
+    "engineering": {
+      "id": "engineering",
+      "name": "Engineering",
+      "purpose": "Build and operate the deterministic Data Platform, Risk Engine, and Execution systems as typed, tested, point-in-time-correct code with code-enforced hard limits and audit logs.",
+      "kind": "department",
+      "parentDepartmentId": "executive",
+      "headPersonId": "engineering-head",
+      "state": "active",
+      "createdAt": "2026-07-16T18:39:39.224Z"
+    },
+    "execution-desk": {
+      "id": "execution-desk",
+      "name": "Execution Desk",
+      "purpose": "Dedicated trade execution team. Owns order placement, signing, error handling, trade logging, and execution documentation. Learns from every execution error. Documents every trade decision for retrospective analysis.",
+      "kind": "department",
+      "parentDepartmentId": "executive",
+      "headPersonId": "execution-head",
+      "state": "active",
+      "createdAt": "2026-07-17T00:17:19.892Z"
+    },
+    "executive": {
+      "id": "executive",
+      "name": "Tribes Capital",
+      "purpose": "Operate an autonomous, proprietary multi-agent quantitative trading firm that trades perpetual futures on external venue under strict, code-enforced risk limits. Agents provide judgment; deterministic code provides rules. The thing that finds an edge is never the thing that approves, sizes, or grades it.",
+      "kind": "company",
+      "headPersonId": "ceo",
+      "state": "active",
+      "createdAt": "2026-07-16T18:39:39.224Z"
+    },
+    "market-intelligence": {
+      "id": "market-intelligence",
+      "name": "Market Intelligence",
+      "purpose": "Centralized market data access layer. Eliminates redundant data fetching, reduces LLM cost, returns raw data fast to any agent.",
+      "kind": "department",
+      "parentDepartmentId": "executive",
+      "headPersonId": "market-intel-head",
+      "state": "active",
+      "createdAt": "2026-07-16T22:36:57.084Z"
+    },
+    "portfolio-management": {
+      "id": "portfolio-management",
+      "name": "Portfolio Management",
+      "purpose": "Run the decision loop and allocate capital across approved strategies. Own the when-not-to-trade call.",
+      "kind": "department",
+      "parentDepartmentId": "executive",
+      "headPersonId": "portfolio-management-head",
+      "state": "active",
+      "createdAt": "2026-07-16T18:39:39.224Z"
+    }
+  },
+  "people": {
+    "alpha-scout-analyst": {
+      "id": "alpha-scout-analyst",
+      "name": "Discovery Analyst",
+      "title": "Discovery Analyst",
+      "mandate": "Read fresh market data JSON dumps from shared/departments/market-intelligence/snapshots/ and analyze for extreme readings: RSI <25 or >75, funding rate extremes (annualized >100% or <-100%), volume spikes (>5x normal), unusual OI changes. Write flagged extremes to shared/departments/alpha-scout/extreme-flags-{timestamp}.md. Report all flagged signals to alpha-scout-head via org_send for escalation to Quant Research. Run on a recurring basis whenever fresh data arrives.",
+      "kind": "worker",
+      "departmentId": "market-intelligence",
+      "employmentState": "departed",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "kimi-k3",
+      "modelReason": "Z.AI GLM-5.2 is the temporary all-company subscription route while Kimi quota is unavailable.",
+      "taskClass": "monitoring",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-16T23:27:26.577Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-16T23:27:26.577Z",
+          "toDepartmentId": "alpha-scout"
+        },
+        {
+          "action": "transferred",
+          "at": "2026-07-17T14:22:19.876Z",
+          "fromDepartmentId": "alpha-scout",
+          "reason": "Human-directed restructure: move Alpha Scout discovery analyst under Market Intelligence for integrated market/discovery operations.",
+          "toDepartmentId": "market-intelligence"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T04:39:43.138Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T05:09:15.997Z"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T10:16:08.224Z",
+          "fromDepartmentId": "market-intelligence",
+          "reason": "Clean house: non-functional entire session. ACK tracking broken on GLM-5.2, never produced a pane, zero output. MI Head handles all discovery scanning directly. Role redundant. Handoff abandoned: 'alpha-scout-analyst' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    },
+    "ceo": {
+      "id": "ceo",
+      "name": "Sloane",
+      "title": "Chief Executive",
+      "mandate": "Set capital, risk appetite, and firm direction for Tribes Capital. Delegate through department heads and enforce separation of duties at all times. Approve deployment-stage transitions (historical simulation -> paper -> shadow -> minimal live -> scaling) only against verified evidence. Begin the first wave by delegating: Engineering builds the Data Platform and Risk Engine before any strategy work; Quant Research develops several independent candidate strategies; Validation gates every one and rejects any that fail. Preserve capital before maximizing returns; under uncertainty, reduce risk, never increase it. Never trade, validate, size positions, or approve your own work directly.",
+      "kind": "executive",
+      "departmentId": "executive",
+      "employmentState": "active",
+      "activation": "resident",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Selected explicitly with Pi model selection; keep this model across launcher restarts.",
+      "taskClass": "general",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [
+        "browser",
+        "wallet",
+        "external-venue",
+        "transaction"
+      ],
+      "extensions": [
+        "external-venue",
+        "tribes"
+      ],
+      "packages": [],
+      "prompts": [
+        "prompts/tribes/login.md"
+      ],
+      "createdAt": "2026-07-16T18:39:39.224Z"
+    },
+    "engineering-devops-reliability-engineer": {
+      "id": "engineering-devops-reliability-engineer",
+      "name": "DevOps Reliability Engineer",
+      "title": "DevOps / Reliability Engineer",
+      "mandate": "Own monitor daemons, health checks, log rotation, resource bounds, and incident response for Engineering-owned infrastructure.",
+      "kind": "worker",
+      "departmentId": "engineering",
+      "employmentState": "departed",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy",
+      "taskClass": "general",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-18T05:03:52.653Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-18T05:03:52.653Z",
+          "toDepartmentId": "engineering"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T06:05:42.301Z"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T10:15:19.369Z",
+          "fromDepartmentId": "engineering",
+          "reason": "Clean house: benched entire session, zero contribution. No DevOps infrastructure issues requiring this role. Handoff abandoned: 'engineering-devops-reliability-engineer' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    },
+    "engineering-elena": {
+      "id": "engineering-elena",
+      "name": "Elena",
+      "title": "Staff Engineer",
+      "mandate": "Build and maintain the deterministic Data Platform, Risk Engine, and Execution systems as typed, tested code with point-in-time correctness, data-quality checks, hard-limit enforcement, idempotent ordering, reconciliation, and audit logs. Implement the risk limits defined in RISK_POLICY.md exactly as specified; never weaken them. Run the Tribes auth bootstrap (tribes-login) when the firm is ready for live data. You implement systems; you never set risk limits, decide what to trade, or sign trades outside the approved deterministic Execution path. Output artifact: tested systems plus an Engineering handoff report.",
+      "kind": "worker",
+      "departmentId": "engineering",
+      "employmentState": "active",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "kimi-k3",
+      "modelReason": "Z.AI GLM-5.2 is the temporary all-company subscription route while Kimi quota is unavailable.",
+      "taskClass": "coding-staff",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [
+        "external-venue",
+        "market-data"
+      ],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-16T18:39:39.224Z",
+      "staffingHistory": [
+        {
+          "action": "recalled",
+          "at": "2026-07-16T19:01:39.665Z"
+        }
+      ]
+    },
+    "engineering-head": {
+      "id": "engineering-head",
+      "name": "Theo",
+      "title": "Head of Engineering",
+      "mandate": "Lead engineering and delegate system ownership. Supervise implementation, tests, and handoff to IT for release. Report decision-ready systems to the CEO. Never set risk limits or trade; risk limits are CEO/firm-policy authority, Engineering only implements and tests them.",
+      "kind": "head",
+      "departmentId": "engineering",
+      "employmentState": "active",
+      "activation": "resident",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy. Supersedes prior kimi-k3 fallback.",
+      "taskClass": "operator",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-16T18:39:39.224Z"
+    },
+    "engineering-integration-feed-engineer": {
+      "id": "engineering-integration-feed-engineer",
+      "name": "Integration Feed Engineer",
+      "title": "Integration / Feed Engineer",
+      "mandate": "Maintain and extend exchange and market-data feeds (external venue, CoinGecko, xyz-dex, news APIs), fix feed-specific bugs, and keep capture-health monitors green.",
+      "kind": "worker",
+      "departmentId": "engineering",
+      "employmentState": "departed",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "kimi-k3",
+      "modelReason": "Z.AI GLM-5.2 is the temporary all-company subscription route while Kimi quota is unavailable.",
+      "taskClass": "coding-staff",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-18T05:03:26.443Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-18T05:03:26.443Z",
+          "toDepartmentId": "engineering"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T04:38:47.844Z"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T14:04:17.393Z",
+          "fromDepartmentId": "engineering",
+          "reason": "Snoozing \u2014 benched entire session, no active feed engineering work. Human directive to shut down snoozing departments. Handoff abandoned: 'engineering-integration-feed-engineer' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    },
+    "engineering-marcus": {
+      "id": "engineering-marcus",
+      "name": "Marcus",
+      "title": "Marcus",
+      "mandate": "Build and maintain the Risk Engine as typed, tested code with hard-limit enforcement, position-size enforcement, max-drawdown gates, leverage ceilings, correlation limits, idempotency, nonce tracking, and reconciliation. Implement risk limits exactly as specified in RISK_POLICY.md; never weaken them. Output: tested Risk Engine with pre-trade check runner.",
+      "kind": "worker",
+      "departmentId": "engineering",
+      "employmentState": "departed",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy",
+      "taskClass": "general",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [
+        "external-venue"
+      ],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-16T21:39:04.282Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-16T21:39:04.282Z",
+          "toDepartmentId": "engineering"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T06:03:28.100Z"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T10:14:16.185Z",
+          "fromDepartmentId": "engineering",
+          "reason": "Clean house: benched entire session, zero contribution. Engineering work handled by Theo and Elena. Generic role redundant with active staff. Handoff abandoned: 'engineering-marcus' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    },
+    "engineering-qa-release-engineer": {
+      "id": "engineering-qa-release-engineer",
+      "name": "QA Release Engineer",
+      "title": "QA / Release Engineer",
+      "mandate": "Own test suites, integration tests, release verification, and cross-department artifact validation.",
+      "kind": "worker",
+      "departmentId": "engineering",
+      "employmentState": "departed",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "kimi-k3",
+      "modelReason": "Z.AI GLM-5.2 is the temporary all-company subscription route while Kimi quota is unavailable.",
+      "taskClass": "coding-staff",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-18T05:04:04.914Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-18T05:04:04.914Z",
+          "toDepartmentId": "engineering"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T06:06:52.375Z"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T10:14:57.599Z",
+          "fromDepartmentId": "engineering",
+          "reason": "Clean house: benched entire session, zero contribution. No software releases being produced. Handoff abandoned: 'engineering-qa-release-engineer' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    },
+    "engineering-senior-data-platform-engineer": {
+      "id": "engineering-senior-data-platform-engineer",
+      "name": "Senior Data Platform Engineer",
+      "title": "Senior Data Platform Engineer",
+      "mandate": "Own the Engineering Data Platform (OHLCV/funding capture, indicator regeneration, snapshot freshness, deterministic price/snapshot policy) and mentor data-focused staff.",
+      "kind": "worker",
+      "departmentId": "engineering",
+      "employmentState": "departed",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "kimi-k3",
+      "modelReason": "Z.AI GLM-5.2 is the temporary all-company subscription route while Kimi quota is unavailable.",
+      "taskClass": "coding-senior",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-18T05:03:14.143Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-18T05:03:14.143Z",
+          "toDepartmentId": "engineering"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T04:38:26.773Z"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T14:04:12.657Z",
+          "fromDepartmentId": "engineering",
+          "reason": "Snoozing \u2014 benched entire session, no active data platform work. Human directive to shut down snoozing departments. Handoff abandoned: 'engineering-senior-data-platform-engineer' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    },
+    "engineering-senior-execution-systems-engineer": {
+      "id": "engineering-senior-execution-systems-engineer",
+      "name": "Senior Execution Systems Engineer",
+      "title": "Senior Execution Systems Engineer",
+      "mandate": "Own the signed-execution path, external venue CLI, order/position safety checks, and integration with Execution Desk.",
+      "kind": "worker",
+      "departmentId": "engineering",
+      "employmentState": "departed",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy",
+      "taskClass": "general",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-18T05:02:54.076Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-18T05:02:54.076Z",
+          "toDepartmentId": "engineering"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T06:04:11.779Z"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T10:15:30.002Z",
+          "fromDepartmentId": "engineering",
+          "reason": "Clean house: benched entire session, zero contribution. Execution systems handled by dedicated Execution Desk. Role structurally redundant. Handoff abandoned: 'engineering-senior-execution-systems-engineer' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    },
+    "engineering-tooling-automation-engineer": {
+      "id": "engineering-tooling-automation-engineer",
+      "name": "Tooling Automation Engineer",
+      "title": "Tooling / Automation Engineer",
+      "mandate": "Build and maintain CLI tooling, linters, deterministic rounding/snapshot policy enforcement, and cross-department automation.",
+      "kind": "worker",
+      "departmentId": "engineering",
+      "employmentState": "departed",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "kimi-k3",
+      "modelReason": "Z.AI GLM-5.2 is the temporary all-company subscription route while Kimi quota is unavailable.",
+      "taskClass": "coding-staff",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-18T05:03:39.508Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-18T05:03:39.508Z",
+          "toDepartmentId": "engineering"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T04:39:07.072Z"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T10:15:09.390Z",
+          "fromDepartmentId": "engineering",
+          "reason": "Clean house: benched entire session, zero contribution. No automation tooling being built or needed. Handoff abandoned: 'engineering-tooling-automation-engineer' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    },
+    "execution-head": {
+      "id": "execution-head",
+      "name": "Execution Desk Lead",
+      "title": "Head of Execution Desk",
+      "mandate": "Execute trades on external venue with precision. Own order placement, signing, wallet, execution mechanics. Log every trade with reason, decision rationale, and outcome for retrospective analysis. Learn from execution errors \u2014 wrong signatures, sizing issues, dex parameters, failed orders. Build repeatable execution skills. Execute trades that Portfolio Management proposes and CEO approves. Never decide WHAT to trade \u2014 only HOW to execute cleanly. Document everything for future retrospectives.",
+      "kind": "head",
+      "departmentId": "execution-desk",
+      "employmentState": "active",
+      "activation": "resident",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy",
+      "taskClass": "general",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [
+        "external-venue",
+        "wallet",
+        "transaction"
+      ],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-17T00:17:19.892Z",
+      "staffingHistory": [
+        {
+          "action": "benched",
+          "at": "2026-07-21T09:44:25.812Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T09:44:35.691Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T10:21:09.855Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T10:21:23.315Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T11:01:37.023Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T11:01:48.162Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T11:11:08.428Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T11:11:18.208Z"
+        }
+      ]
+    },
+    "execution-operator": {
+      "id": "execution-operator",
+      "name": "Trade Execution Operator",
+      "title": "Trade Execution Operator",
+      "mandate": "Execute external venue perp trades with precision. Place orders, verify fills, report results. Follow exact trade parameters from the Execution Desk Lead. Never decide WHAT to trade \u2014 only execute cleanly and verify.",
+      "kind": "worker",
+      "departmentId": "execution-desk",
+      "employmentState": "departed",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy",
+      "taskClass": "operator",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [
+        "external-venue",
+        "wallet",
+        "transaction"
+      ],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-17T00:38:26.086Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-17T00:38:26.086Z",
+          "toDepartmentId": "execution-desk"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-20T21:00:14.175Z"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T10:14:44.308Z",
+          "fromDepartmentId": "execution-desk",
+          "reason": "Clean house: benched entire session, zero contribution. Execution Runner handles all trade execution. Role structurally redundant. Handoff abandoned: 'execution-operator' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    },
+    "execution-runner": {
+      "id": "execution-runner",
+      "name": "Execution Runner",
+      "title": "Execution Runner",
+      "mandate": "Execute CEO-directed external venue perp trades with TP/SL brackets. Run CLI commands for asset verification, order placement, and position verification. Report fill prices, order IDs, and position status.",
+      "kind": "worker",
+      "departmentId": "execution-desk",
+      "employmentState": "active",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy",
+      "taskClass": "operator",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [
+        "external-venue",
+        "wallet"
+      ],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-17T00:50:16.257Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-17T00:50:16.257Z",
+          "toDepartmentId": "execution-desk"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T04:40:00.096Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T04:48:11.798Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T09:43:52.893Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T09:44:11.298Z"
+        }
+      ]
+    },
+    "market-intel-builder": {
+      "id": "market-intel-builder",
+      "name": "MI Builder",
+      "title": "MI Builder",
+      "mandate": "Build caching daemon, unified query interface, news/sentiment scripts, and documentation for the Market Intelligence data access layer. All scripts output raw JSON to stdout without LLM processing.",
+      "kind": "worker",
+      "departmentId": "market-intelligence",
+      "employmentState": "departed",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy",
+      "taskClass": "general",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-16T23:23:56.816Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-16T23:23:56.816Z",
+          "toDepartmentId": "market-intelligence"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T06:07:58.628Z"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T10:15:49.698Z",
+          "fromDepartmentId": "market-intelligence",
+          "reason": "Clean house: benched entire session, zero contribution. No MI infrastructure being built. Handoff abandoned: 'market-intel-builder' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    },
+    "market-intel-coder": {
+      "id": "market-intel-coder",
+      "name": "MI Coder",
+      "title": "MI Coder",
+      "mandate": "Build standalone CLI scripts on top of the Engineering data-platform external venueAdapter that output raw market data as JSON to stdout. Scripts must be runnable with bun and require no LLM processing.",
+      "kind": "worker",
+      "departmentId": "market-intelligence",
+      "employmentState": "departed",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy",
+      "taskClass": "coding",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-16T23:21:49.799Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-16T23:21:49.799Z",
+          "toDepartmentId": "market-intelligence"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T04:39:25.117Z"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T10:15:40.275Z",
+          "fromDepartmentId": "market-intelligence",
+          "reason": "Clean house: benched entire session, zero contribution. MI Head handles scanning and validation directly. Handoff abandoned: 'market-intel-coder' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    },
+    "market-intel-head": {
+      "id": "market-intel-head",
+      "name": "Market Intelligence Lead",
+      "title": "Head of Market Intelligence",
+      "mandate": "Build and maintain a centralized market data access layer. Any agent can request candles, prices, technical indicators, news, X sentiment, on-chain data, and external venue market state through standardized scripts that return raw data fast without LLM processing. Create repeatable skills and tools. You build systems, not strategies.",
+      "kind": "head",
+      "departmentId": "market-intelligence",
+      "employmentState": "active",
+      "activation": "resident",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive via CEO: GLM-5.2 is the standing company model on zipproxy, effective immediately",
+      "taskClass": "general",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-16T22:36:57.084Z"
+    },
+    "mi-data-analyst": {
+      "id": "mi-data-analyst",
+      "name": "MI Data Analyst",
+      "title": "Market Data Analyst",
+      "mandate": "Execute bash-dependent MI data tasks: query SQLite news DB for sentiment data, compute Wilder RSI(14) from candle tables, pull fresh venue prices via Bun scripts, and run the MI collector scripts. Write all results as markdown artifacts for market-intel-head to read and route. TypeScript, Bun, SQLite, SQL. Must be able to run: bun -e scripts, bun run scripts/collectors/*.ts, sqlite3 queries on data/mi.db.",
+      "kind": "worker",
+      "departmentId": "market-intelligence",
+      "employmentState": "active",
+      "activation": "resident",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy. Lowest-cost capable choice for bash execution and data query tasks.",
+      "taskClass": "coding",
+      "thinking": "low",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-21T16:15:56.071Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-21T16:15:56.071Z",
+          "toDepartmentId": "market-intelligence"
+        }
+      ]
+    },
+    "mi-data-analyst-2": {
+      "id": "mi-data-analyst-2",
+      "name": "MI Data Analyst",
+      "title": "MI Data Analyst",
+      "mandate": "Bash/exec data extraction for Market Intelligence: SQLite news DB queries, Wilder RSI computation from candle tables, fresh external venue venue price pulls via wallet runtime, and running MI collector scripts. Reports to market-intel-head.",
+      "kind": "worker",
+      "departmentId": "market-intelligence",
+      "employmentState": "departed",
+      "activation": "resident",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Lowest-cost capable model with reliable provider. GLM-5.2/zipproxy is critically broken for workers \u2014 gpt-5-mini/openai is proven stable.",
+      "taskClass": "coding-junior",
+      "thinking": "low",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-21T16:29:31.034Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-21T16:29:31.034Z",
+          "toDepartmentId": "market-intelligence"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T16:30:53.383Z",
+          "fromDepartmentId": "market-intelligence",
+          "reason": "Redundant duplicate hire \u2014 CEO and I both hired a gpt-5-mini data analyst simultaneously. mi-data-tech (my hire) is already running on pane %75 with the infra audit assignment. Keeping mi-data-tech, offboarding mi-data-analyst-2 to avoid duplicate idle compute. Handoff abandoned: 'mi-data-analyst-2' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    },
+    "mi-data-tech": {
+      "id": "mi-data-tech",
+      "name": "MI Data Tech",
+      "title": "Data Technician",
+      "mandate": "Execute bash-dependent data tasks for Market Intelligence: SQLite news DB queries against shared/departments/market-intelligence/data/mi.db, Wilder RSI(14) computation from candle tables, fresh venue price pulls from external venue API, and running MI collector scripts (bun scripts/*.ts). Write all results to markdown files in shared/departments/market-intelligence/. Report results to market-intel-head via org_send.",
+      "kind": "worker",
+      "departmentId": "market-intelligence",
+      "employmentState": "active",
+      "activation": "resident",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "GLM-5.2 on zipproxy is critically broken for new workers (6+ consecutive provider errors, zero output). gpt-5-mini is the lowest-cost capable model with reliable provider access for bash/exec tasks.",
+      "taskClass": "coding",
+      "thinking": "low",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-21T16:29:55.849Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-21T16:29:55.849Z",
+          "toDepartmentId": "market-intelligence"
+        }
+      ]
+    },
+    "portfolio-management-head": {
+      "id": "portfolio-management-head",
+      "name": "Priya",
+      "title": "Head of Portfolio Management",
+      "mandate": "Lead portfolio allocation and delegate sizing decisions. Report Trade Proposals to the CEO. Never override risk limits, validate strategies, or control execution mechanics.",
+      "kind": "head",
+      "departmentId": "portfolio-management",
+      "employmentState": "active",
+      "activation": "resident",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy. Supersedes all prior model assignments.",
+      "taskClass": "general",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-16T18:39:39.224Z",
+      "staffingHistory": [
+        {
+          "action": "benched",
+          "at": "2026-07-21T06:28:26.343Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T06:31:06.777Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T09:51:22.974Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T09:51:32.822Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T10:36:10.997Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T10:36:19.983Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T10:51:11.266Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T10:51:18.615Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T11:06:04.038Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T11:06:10.878Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T11:41:05.028Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T11:41:12.652Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T11:51:07.200Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T11:51:14.633Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T12:21:12.971Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T12:21:19.458Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T12:31:17.702Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T12:31:29.130Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T14:36:29.438Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T14:36:43.795Z"
+        }
+      ]
+    },
+    "portfolio-management-marcus": {
+      "id": "portfolio-management-marcus",
+      "name": "Marcus",
+      "title": "Portfolio Manager",
+      "mandate": "Run the decision loop and allocate capital across approved strategies. Consider expected return, drawdown, volatility, correlation, liquidity, capacity, regime fit, recent live performance, and tail risk. Own the when-not-to-trade call. Propose target positions; size, scale, pause, or retire strategies by consuming Position Reports and Performance Reviews from shared artifacts. You may NOT override risk limits, validate strategies, or control execution mechanics. Output artifact: Trade Proposal with target position per strategy and rationale.",
+      "kind": "worker",
+      "departmentId": "portfolio-management",
+      "employmentState": "active",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy",
+      "taskClass": "general",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [
+        "market-data"
+      ],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-16T18:39:39.224Z",
+      "staffingHistory": [
+        {
+          "action": "recalled",
+          "at": "2026-07-16T22:42:40.055Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-20T21:00:00.189Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T06:51:54.619Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T07:26:15.700Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T07:31:16.861Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T13:46:28.326Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T13:46:48.869Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T13:48:32.578Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T13:48:44.063Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T14:36:59.405Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T14:37:09.418Z"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-21T15:11:19.991Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T15:11:28.384Z"
+        }
+      ]
+    },
+    "strategy-validation-vera": {
+      "id": "strategy-validation-vera",
+      "name": "Vera",
+      "title": "Strategy Validator",
+      "mandate": "Adversarially try to break every proposed strategy before it gets capital. Check lookahead bias, data leakage, overfitting, cherry-picked periods, unrealistic fills, and ignored fees/funding/slippage/liquidity. Run train/validation/test splits, walk-forward, out-of-sample, sensitivity, parameter-stability, and Monte Carlo. Approve or reject against the fixed acceptance criteria in BACKTESTING_STANDARDS.md. You are a separate model instance with no shared memory with Research. You may NOT propose or modify strategies, or trade. Output artifact: Validation Report with pass/fail and evidence.",
+      "kind": "worker",
+      "departmentId": "market-intelligence",
+      "employmentState": "active",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "kimi-k3",
+      "modelReason": "Z.AI GLM-5.2 is the temporary all-company subscription route while Kimi quota is unavailable.",
+      "taskClass": "coding-review",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [
+        "external-venue",
+        "market-data"
+      ],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-16T18:39:39.224Z",
+      "staffingHistory": [
+        {
+          "action": "recalled",
+          "at": "2026-07-16T21:41:31.840Z"
+        },
+        {
+          "action": "transferred",
+          "at": "2026-07-17T14:17:49.700Z",
+          "fromDepartmentId": "strategy-validation",
+          "reason": "Human-directed restructure after Strategy Validation handoff and MI ingestion: move validation capability under Market Intelligence while preserving independent validation/firewall policy.",
+          "toDepartmentId": "market-intelligence"
+        }
+      ]
+    },
+    "validator-2": {
+      "id": "validator-2",
+      "name": "Validator 2",
+      "title": "Strategy Validator",
+      "mandate": "Adversarially validate strategy candidates against the 10-criterion pipeline in BACKTESTING_STANDARDS.md. Independent from Quant Research. May NOT propose or modify strategies.",
+      "kind": "worker",
+      "departmentId": "market-intelligence",
+      "employmentState": "active",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "kimi-k3",
+      "modelReason": "Z.AI GLM-5.2 is the temporary all-company subscription route while Kimi quota is unavailable.",
+      "taskClass": "coding-review",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [
+        "external-venue",
+        "market-data"
+      ],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-16T23:36:46.042Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-16T23:36:46.042Z",
+          "toDepartmentId": "strategy-validation"
+        },
+        {
+          "action": "transferred",
+          "at": "2026-07-17T14:42:42.887Z",
+          "fromDepartmentId": "strategy-validation",
+          "reason": "Human-directed restructure: move remaining validation staff under Market Intelligence after handoff, preserving independent validation/firewall policy.",
+          "toDepartmentId": "market-intelligence"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-20T19:43:00.381Z"
+        },
+        {
+          "action": "recalled",
+          "at": "2026-07-21T13:28:15.141Z"
+        }
+      ]
+    },
+    "validator-3": {
+      "id": "validator-3",
+      "name": "Validator 3",
+      "title": "Strategy Validator",
+      "mandate": "Adversarially validate strategy candidates against the 10-criterion pipeline in BACKTESTING_STANDARDS.md. Independent from Quant Research. May NOT propose or modify strategies.",
+      "kind": "worker",
+      "departmentId": "market-intelligence",
+      "employmentState": "departed",
+      "activation": "on-demand",
+      "provider": "zipproxy",
+      "model": "glm-5.2",
+      "modelReason": "Chairman directive: GLM-5.2 is the standing company model on zipproxy",
+      "taskClass": "general",
+      "thinking": "high",
+      "tools": [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "skills": [
+        "external-venue",
+        "market-data"
+      ],
+      "extensions": [],
+      "packages": [],
+      "createdAt": "2026-07-16T23:36:58.359Z",
+      "staffingHistory": [
+        {
+          "action": "hired",
+          "at": "2026-07-16T23:36:58.359Z",
+          "toDepartmentId": "strategy-validation"
+        },
+        {
+          "action": "transferred",
+          "at": "2026-07-17T14:42:48.106Z",
+          "fromDepartmentId": "strategy-validation",
+          "reason": "Human-directed restructure: move remaining validation staff under Market Intelligence after handoff, preserving independent validation/firewall policy.",
+          "toDepartmentId": "market-intelligence"
+        },
+        {
+          "action": "benched",
+          "at": "2026-07-20T21:00:39.019Z"
+        },
+        {
+          "action": "offboarded",
+          "at": "2026-07-21T16:15:17.017Z",
+          "fromDepartmentId": "market-intelligence",
+          "reason": "Zero output this session. Benched entire time, never activated, never contributed. Dead weight on the roster. Handoff abandoned: 'validator-3' is outside the launch-intent fence and cannot run to reflect."
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-07-16T18:39:39.224Z",
+  "updatedAt": "2026-07-21T16:30:53.383Z"
+}

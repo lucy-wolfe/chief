@@ -1,0 +1,34 @@
+{
+  "name": "queue-for-an-unknown-person-is-refused",
+  "family": "session-maintenance",
+  "description": "Queueing maintenance for someone outside the manifest is refused.",
+  "invariants": [],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "maint.queue",
+  "in": {
+    "action": "compact",
+    "personId": "nobody",
+    "requestedBy": "signal-researcher",
+    "reason": "Context is nearly full."
+  },
+  "expect": {
+    "error": {
+      "type": "Refused",
+      "code": "unknown-person",
+      "message": "Session maintenance person is unknown"
+    }
+  },
+  "expectState": [
+    {
+      "read": "maint.summary",
+      "equals": null
+    }
+  ]
+}

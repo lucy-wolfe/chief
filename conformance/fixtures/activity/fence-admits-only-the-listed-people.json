@@ -1,0 +1,88 @@
+{
+  "name": "fence-admits-only-the-listed-people",
+  "family": "activity",
+  "description": "A person named in the launch intent may be projected active; an unnamed person may not, whatever demand exists. Note that quant-head is REQUESTED and still inactive - the fence gates last. The root is both admitted by the fence and separately leased, which is why it is active while naming nothing: admission and demand are different facts, and only demand starts anybody.",
+  "invariants": [
+    "inv c-1"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "activity.reconcile",
+  "in": {
+    "launchIntentPersonIds": [
+      "signal-researcher"
+    ],
+    "requestedPersonIds": [
+      "signal-researcher",
+      "quant-head"
+    ]
+  },
+  "expect": {
+    "ok": {
+      "people": {
+        "chief": {
+          "active": true,
+          "reasons": [
+            "organization-root"
+          ],
+          "transitionId": null
+        },
+        "it-head": {
+          "active": false,
+          "reasons": [],
+          "transitionId": null
+        },
+        "quant-head": {
+          "active": false,
+          "reasons": [
+            "requested"
+          ],
+          "transitionId": null
+        },
+        "signal-researcher": {
+          "active": true,
+          "reasons": [
+            "requested"
+          ],
+          "transitionId": null
+        }
+      }
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.person",
+      "args": {
+        "personId": "signal-researcher"
+      },
+      "equals": {
+        "activeTransitionId": null,
+        "idleSince": null,
+        "lastDesiredActive": true,
+        "lastEmploymentState": "active",
+        "lastOperational": true,
+        "personId": "signal-researcher"
+      }
+    },
+    {
+      "read": "activity.person",
+      "args": {
+        "personId": "quant-head"
+      },
+      "equals": {
+        "activeTransitionId": null,
+        "idleSince": null,
+        "lastDesiredActive": false,
+        "lastEmploymentState": "active",
+        "lastOperational": true,
+        "personId": "quant-head"
+      }
+    }
+  ]
+}

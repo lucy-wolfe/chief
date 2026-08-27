@@ -1,0 +1,62 @@
+{
+  "name": "fence-omitted-is-chief-only-not-unfenced",
+  "family": "activity",
+  "description": "OMITTING launchIntentPersonIds is an empty allow-list, never an off switch - the highest-ranked fail-safe in the plan. It denies every non-root person and leaves the root running, and those are two different mechanisms rather than one: the fence ADMITS the root (LaunchFence::admits short-circuits on the root head) and the root separately holds an unconditional organization-root lease, which is what actually keeps it desired. Admission and demand are different facts.",
+  "invariants": [
+    "inv c-1",
+    "\u00a75.5 FailSafeValue"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "activity.reconcile",
+  "in": {},
+  "expect": {
+    "ok": {
+      "people": {
+        "chief": {
+          "active": true,
+          "reasons": [
+            "organization-root"
+          ],
+          "transitionId": null
+        },
+        "it-head": {
+          "active": false,
+          "reasons": [],
+          "transitionId": null
+        },
+        "quant-head": {
+          "active": false,
+          "reasons": [],
+          "transitionId": null
+        },
+        "signal-researcher": {
+          "active": false,
+          "reasons": [],
+          "transitionId": null
+        }
+      }
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.summary",
+      "equals": {
+        "nextTransitionSequence": 1,
+        "personOrder": [
+          "chief",
+          "quant-head",
+          "signal-researcher",
+          "it-head"
+        ],
+        "transitionOrder": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+[test]
+# #962: this indirection (not the two setup files directly) exists so a
+# `bun test` invocation naming only files OUTSIDE tests/ (e.g.
+# scripts/test/*.test.mjs) does not pay tests/'s workspace-build +
+# chiefd-binary requirement. See tests/setup-conditional-preload.ts's own
+# header for why that decision cannot live inside the two files it wraps.
+preload = ["./tests/setup-conditional-preload.ts"]

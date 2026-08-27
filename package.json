@@ -1,0 +1,55 @@
+{
+  "name": "chief",
+  "license": "Apache-2.0",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.10",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "TURBO_UI=0 node_modules/.bin/turbo run build --filter='./packages/*' --output-logs=new-only",
+    "release": "bun scripts/release-chiefd.ts",
+    "release:fast": "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_INCREMENTAL=true bun scripts/release-chiefd.ts",
+    "web:dev": "node scripts/dev-web.mjs",
+    "test": "bash scripts/with-private-tmux.sh env TURBO_UI=0 node_modules/.bin/turbo run test:unit --continue --output-logs=full",
+    "typecheck": "bash scripts/typecheck.sh",
+    "lint": "TURBO_UI=0 node_modules/.bin/turbo run lint --continue --output-logs=full -- --cache --cache-strategy content --cache-location .eslintcache",
+    "lint:fix": "TURBO_UI=0 node_modules/.bin/turbo run lint:fix --output-logs=full && node_modules/.bin/prettier --cache --write \"**/*.{ts,tsx,md,json,jsonc,yml,yaml}\"",
+    "knip": "node_modules/.bin/knip --dependencies --files",
+    "lint:reactive": "bun scripts/reactive-scan.ts",
+    "test:pre-push-guards": "node scripts/gate-matrix-legs.mjs --explicit-shell-gate scripts/cargo-test-workspace.sh --explicit-shell-gate scripts/typecheck.sh --explicit-shell-gate scripts/cargo-check-macos.sh --explicit-shell-gate scripts/clean-install-smoke.sh"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.80.10",
+    "@playwright/cli": "0.1.18"
+  },
+  "devDependencies": {
+    "@chief/chiefing": "workspace:*",
+    "@chief/eslinter": "workspace:*",
+    "@chief/piing": "workspace:*",
+    "@chief/testing": "workspace:*",
+    "@earendil-works/pi-agent-core": "0.80.10",
+    "@earendil-works/pi-coding-agent": "0.80.10",
+    "@earendil-works/pi-tui": "0.80.10",
+    "@types/bun": "1.4.0",
+    "@types/node": "22.20.1",
+    "@typescript-eslint/eslint-plugin": "8.67.0",
+    "@vitest/coverage-v8": "4.1.11",
+    "eslint": "10.9.0",
+    "eslint-plugin-jasmine": "4.2.2",
+    "eslint-plugin-simple-import-sort": "12.1.1",
+    "eslint-plugin-unused-imports": "4.4.1",
+    "jsonc-eslint-parser": "3.3.0",
+    "knip": "6.32.2",
+    "prettier": "3.9.6",
+    "turbo": "2.10.11",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  },
+  "peerDependencies": {
+    "typebox": "*"
+  }
+}

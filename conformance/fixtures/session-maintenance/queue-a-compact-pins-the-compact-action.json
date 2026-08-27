@@ -1,0 +1,57 @@
+{
+  "name": "queue-a-compact-pins-the-compact-action",
+  "family": "session-maintenance",
+  "description": "N5 4-action DTO parity: queuing a compact mints a compact request (no value payload). Pins the compact arm of the maintenance action vocabulary on rows.",
+  "invariants": [
+    "§2.5 queue",
+    "N5 4-action DTO parity"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "maint.queue",
+  "in": {
+    "action": "compact",
+    "personId": "signal-researcher",
+    "requestedBy": "signal-researcher",
+    "reason": "Context is nearly full."
+  },
+  "expect": {
+    "ok": {
+      "action": "compact",
+      "attempt": 1,
+      "automatic": false,
+      "claimToken": null,
+      "claimedProcessId": null,
+      "claimedSessionId": null,
+      "compactAnchorEntryId": null,
+      "compactSessionId": null,
+      "completedCompactionEntryId": null,
+      "completedSessionId": null,
+      "error": null,
+      "force": false,
+      "id": "session-maintenance:1:signal-researcher:compact",
+      "interruptedSessionId": null,
+      "personId": "signal-researcher",
+      "recoveredFromRequestId": null,
+      "requestedBy": "signal-researcher",
+      "retryNotBefore": null,
+      "status": "queued"
+    }
+  },
+  "expectState": [
+    {
+      "read": "maint.summary",
+      "equals": {
+        "requestOrder": [
+          "session-maintenance:1:signal-researcher:compact"
+        ]
+      }
+    }
+  ]
+}

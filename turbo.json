@@ -1,0 +1,397 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "globalDependencies": ["tsconfig.base.json"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "*.tsbuildinfo"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!test/**",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!**/*.md",
+        "!.env.example",
+        "!eslint.config.mjs",
+        "!tsconfig.vitest.json",
+        "!vitest.config.*"
+      ]
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true,
+      // Turbo's default envMode is STRICT: any env var a task needs but does
+      // not declare in `env`/`passThroughEnv` is silently STRIPPED before the
+      // child process even starts. terminal's turbo.json (tribes-protocol/
+      // terminal) documents two real incidents caused by this: (1) a
+      // `BUILD_SHA` refusal — next.config.ts refused to boot without a valid
+      // BUILD_SHA, and the var was invisible to the task because it wasn't
+      // declared here; (2) a `SANDBOX_HOSTING_MODE` override no-op — an
+      // explicit override on the outer shell was a silent no-op until the var
+      // was declared in this task's `env` array. Both were only fixable by
+      // declaring the var — chief has no such vars yet, so this array starts
+      // empty, but the next engineer who hits "my env var isn't reaching the
+      // child process" should declare it here instead of debugging silent
+      // stripping from scratch.
+      //
+      // That engineer arrived: these are the vars the dev server reads at
+      // boot, each a genuine ambient dependency of the running process.
+      //
+      // `HOME` and `PI_SOURCE_AGENT_DIR` joined with web Founder Mode. They
+      // are not decoration: `common/Env.operatorPiAgentDir` resolves the
+      // operator's registry as `$PI_SOURCE_AGENT_DIR` or `$HOME/.pi/agent` —
+      // the same two tiers `chief-cli`'s `root_pi_agent_dir` uses — and under
+      // strict envMode a stripped `HOME` makes that path `/.pi/agent` on every
+      // box, so Founder would refuse its own route everywhere with a message
+      // naming a file nobody has.
+      "env": [
+        "OPENROUTER_API_KEY",
+        "CHIEF_DATA_ROOT",
+        "CHIEFD_HOST_URL",
+        "CHIEF_PI_PACKAGE_DIR",
+        "BEACOND_URL",
+        "HOME",
+        "PI_SOURCE_AGENT_DIR"
+      ]
+    },
+    "start": {
+      "cache": false,
+      "persistent": true,
+      // Same strict-envMode stripping as `dev` above, and the same list.
+      "env": [
+        "OPENROUTER_API_KEY",
+        "CHIEF_DATA_ROOT",
+        "CHIEFD_HOST_URL",
+        "CHIEF_PI_PACKAGE_DIR",
+        "BEACOND_URL",
+        "HOME",
+        "PI_SOURCE_AGENT_DIR"
+      ]
+    },
+    "lint": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/eslint.config.mjs",
+        "$TURBO_ROOT$/prettier.config.mjs",
+        "$TURBO_ROOT$/packages/eslinter/*.js",
+        "$TURBO_ROOT$/packages/eslinter/rules/**",
+        "$TURBO_ROOT$/packages/eslinter/package.json"
+      ]
+    },
+    "lint:fix": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "format": {
+      "cache": false
+    },
+    "test:unit": {
+      "dependsOn": ["^build"],
+      // Turbo's strict environment mode otherwise removes DEBUG_891 before
+      // the eslinter Vitest worker can emit the branch-local diagnostics.
+      // Declaring it also makes an instrumented test result cache-distinct.
+      //
+      // #939: this whole array is DERIVED, not transcribed from the one
+      // incident that surfaced it -- `scripts/turbo-env-audit.mjs` walks
+      // every package's src/**/*.ts (never test/**, which manufactures its
+      // own scoped env objects rather than reading the inherited one) for
+      // `process.env.X` (including bracket-notation reads resolved to their
+      // literal names, and the transitive Rust side of the one `...process.
+      // env` spread this tree has -- packages/testing/src/DocstoreDaemon.ts
+      // spawning `chiefd docstore-only`), and asserts every hit is declared
+      // here with NO allowlist or exception list: a hand-maintained carve-
+      // out is the exact artifact that has failed on this program before
+      // (#925's stale exception, the triage-map row that outlived its
+      // file). Declaring a var that happens not to be set costs nothing --
+      // it is simply not passed; the risk is only ever in NOT declaring one
+      // that is.
+      //
+      // Two of these were found live, from a real incident (a segfault
+      // chasing a missing CARGO_TARGET_DIR): CARGO_TARGET_DIR
+      // (packages/testing/src/ChiefdBinary.ts) and PI_SOURCE_AGENT_DIR
+      // (apps/cli/src/legacy/foundation/paths.ts's `sourcePiHome`, a
+      // module-load-time `const` -- an engineer's own ambient override
+      // would silently stop reaching it once `test:unit` ran through turbo
+      // instead of directly). Every other var below was found only by
+      // finishing the derivation the same incident should have prompted
+      // from the start.
+      //
+      // TMPDIR is the one worth remembering on its own: `CI`, `HOME`,
+      // `PATH` and `LANG` all pass through by default with nothing declared
+      // (confirmed with a probe test logging each under real `turbo run
+      // test:unit`) -- TMPDIR, despite looking exactly as OS-standard as
+      // those four, does NOT. Looks-standard is not a substitute for
+      // checking.
+      //
+      // Split between `env` and `passThroughEnv`: turbo hashes every `env`
+      // value into the task's cache key. The deciding question is NOT "does
+      // this vary between runs" -- it is "does a DIFFERENT value mean a
+      // DIFFERENT correct RESULT". The two failure modes are not symmetric:
+      // a result-affecting var wrongly left in `passThroughEnv` produces a
+      // cache HIT on a key that ignored an input that changed the answer --
+      // silent, fast, and certifies a green computed under different
+      // inputs. A non-result-affecting var wrongly left in `env` only
+      // produces an unnecessary MISS -- loud, wasteful, never wrong. When
+      // genuinely unsure, `env` is the safe default for exactly that
+      // reason. Per-variable reasoning, not a bucket count:
+      //
+      //   CARGO_TARGET_DIR       env -- a different resolved binary IS a
+      //                                 different build/test context.
+      //   PI_SOURCE_AGENT_DIR    env -- captured into `sourcePiHome`, a
+      //                                 module-load-time const; changes
+      //                                 what path materialization uses.
+      //   PI_CODING_AGENT_SESSION_DIR env -- forwarded into a spawned pane's
+      //                                 command; changes the constructed argv.
+      //                                 (Replaced PI_CODING_AGENT_DIR in #1307:
+      //                                 chief redirects transcripts only, never
+      //                                 Pi's config scope.)
+      //   TOMBSTONE: TEAM_LAUNCHER_PI, listed here for the same forwarding
+      //   site and the same reason. Its only reader was
+      //   `resolvePiBinary`, deleted with the whole `PiBinary` module.
+      //   TEAM_LAUNCHER_SUPERVISION_INTERVAL_MS
+      //                          env -- a numeric config knob that changes
+      //                                 timing behavior directly.
+      //   ORGANIZATION_RUNTIME_GENERATION / ORG_LAUNCHER_ORGANIZATION /
+      //   ORG_LAUNCHER_ORG_DIR / ORG_LAUNCHER_PERSON / ORG_LAUNCHER_ROOT /
+      //   ORG_LAUNCHER_RUNTIME_SESSION / ORG_LAUNCHER_RUNTIME_SOCKET
+      //                          env -- each feeds a computed, potentially
+      //                                 asserted-on value (trustedSocket,
+      //                                 trustedSession, trustedOrgDir,
+      //                                 launcherRoot, identity validation
+      //                                 branching in cli.ts). A different
+      //                                 value is a different question, even
+      //                                 though these also happen to vary
+      //                                 per real launched pane -- the miss
+      //                                 this causes is the cache being
+      //                                 honest, not the cache being slow
+      //                                 for no reason.
+      //   ORG_LOG_LEVEL / ORG_LOG_MAX_BYTES / ORG_LOG_HEARTBEAT_MS /
+      //   ORG_WRITE_DB_TIMEOUT_MS / ORG_SSE_DISABLED /
+      //   CHIEFD_STORE_READ_POOL /
+      //   CHIEFD_STORE_MAX_BODY_BYTES / CHIEFD_STORE_PORT_WALK
+      //                          env -- deliberate config/feature-flag
+      //                                 knobs; a changed value is a changed
+      //                                 question by construction.
+      //   CHIEF_API_URL / NEXT_PUBLIC_CHIEF_API_URL
+      //                          env -- endpoint/identity config the code
+      //                                 under test branches on.
+      //   CHIEF_WEB_OPERATOR_PRIVATE_KEY / CHIEF_WEB_OPERATOR_IDENTITY_ID
+      //                          DELETED (A2). The key is DERIVED now --
+      //                                 `<data-root>/keys/operator.key`,
+      //                                 the same file the daemon mints and
+      //                                 the `chiefd` CLI signs with -- and
+      //                                 the identity id is the literal
+      //                                 `operator` the daemon hardcodes.
+      //                                 Both variables were set by nothing
+      //                                 in the tree, so apps/web
+      //                                 authenticated as nobody in every
+      //                                 deployment this repository can
+      //                                 produce: a trust anchor that is
+      //                                 unset by default is an off switch
+      //                                 wearing a configuration flag's
+      //                                 clothes, the same one
+      //                                 `CHIEFD_OPERATOR_KEY_PATH` was.
+      //   TMUX                    env, revised -- `cli.ts`'s presence check
+      //                                 (`process.env.TMUX ? "switch-client"
+      //                                 : "attach-session"`) selects a
+      //                                 different command outright; a
+      //                                 permanent miss because the value
+      //                                 differs every session is the cache
+      //                                 telling the truth about a variable
+      //                                 that changes what runs, not an
+      //                                 optimization opportunity.
+      //   TMUX_PANE                env, revised -- falls back into a
+      //                                 computed `paneId` in
+      //                                 launcher-wiring.ts whenever no
+      //                                 explicit session is given; that
+      //                                 value can reach an assertion, so a
+      //                                 hit that reused a stale pane id
+      //                                 would be the wrong-but-fast
+      //                                 failure, not a savings.
+      //
+      //   TMPDIR                 passThroughEnv -- read only to choose a
+      //                                 scratch directory for lock-guard
+      //                                 files (org-store.ts); the test's
+      //                                 correct PASS/FAIL never depends on
+      //                                 which directory was used, only
+      //                                 that it is writable and private.
+      //
+      // #943: these fifteen were invisible to every prior run of this
+      // derivation -- not because they are read dynamically, but because
+      // every one of them is read off a PARAMETER ALIASED to `process.env`
+      // (`environment: T = process.env`, or `const environment = options.
+      // environment ?? process.env`) rather than off `process.env` itself.
+      // `scripts/turbo-env-audit.mjs`'s alias-resolution pass (added
+      // alongside this batch) now follows that binding within its own
+      // function scope and credits the read exactly like a literal one.
+      // All fifteen are genuine ambient dependencies of `src/` code
+      // `test:unit` actually executes. Each was checked at its OWN read
+      // site (not classified by name) against the real question: does a
+      // DIFFERENT value produce a DIFFERENT correct result, per the
+      // asymmetry principle at the top of this file:
+      //   CHIEF_API_AUTH / CHIEF_API_BIND / CHIEF_API_OPERATOR_PUBKEYS /
+      //   CHIEFD_HOST_URL / CHIEF_DATA_ROOT / CHIEF_PI_PACKAGE_DIR
+      //                          env -- each parses into `Env.ts`'s
+      //                                 config object, which branches
+      //                                 validation (`CHIEF_API_BIND`'s
+      //                                 host:port parse, `CHIEFD_HOST_URL`'s
+      //                                 http(s)-or-default parse) and
+      //                                 selects a real service address
+      //                                 (`CHIEFD_HOST_URL` is the chiefd
+      //                                 lifecycle surface
+      //                                 `CompanyLifecycleService` calls) --
+      //                                 a changed value is a changed
+      //                                 constructed result.
+      //   CHIEF_API_JWT_SECRET
+      //                          env, explicit judgement call -- same
+      //                                 reasoning as CHIEF_WEB_OPERATOR_
+      //                                 PRIVATE_KEY above: a rotated
+      //                                 credential should invalidate a
+      //                                 cached result of code that
+      //                                 authenticates with it.
+      //   CHIEFD_START_TIMEOUT_MS
+      //                          env -- a numeric timing knob feeding
+      //                                 `parsePositiveInt(...) ??
+      //                                 DEFAULT_START_TIMEOUT_MS` directly,
+      //                                 same reasoning as TEAM_LAUNCHER_
+      //                                 SUPERVISION_INTERVAL_MS above.
+      //   LC_ALL                 env -- read at the IDENTICAL site as the
+      //                                 already-`env` LANG (org-tmux.ts's
+      //                                 `environment.LC_ALL || environment.
+      //                                 LANG` fallback into a constructed,
+      //                                 spawned-child locale environment):
+      //                                 no principled reason to classify a
+      //                                 same-function, same-purpose sibling
+      //                                 read differently from LANG itself.
+      //   TEAM_LAUNCHER_INTERCOM_LIFECYCLE / TEAM_LAUNCHER_ROLE
+      //                          env -- each branches dispatch outright
+      //                                 (`cli.ts`'s `TEAM_LAUNCHER_ROLE`
+      //                                 read selects a code path).
+      //   TEAM_LAUNCHER_TEAM_DIR  env -- read ONLY via `Boolean(...)`
+      //                                 (cli.ts) to select
+      //                                 `managedLegacyRole` -- presence,
+      //                                 not content, still branches: unset
+      //                                 vs set-to-anything is a different
+      //                                 correct result.
+      //   TEAM_LAUNCHER_TMUX_SOCKET
+      //                          env -- read as an "explicit override" in
+      //                                 socket-identity resolution
+      //                                 (attach-wiring.ts, launcher-
+      //                                 wiring.ts, cli.ts, preflight.ts) --
+      //                                 the SAME shape as the already-`env`
+      //                                 ORG_LAUNCHER_RUNTIME_SOCKET above
+      //                                 ("feeds... identity validation
+      //                                 branching"), not a passthrough
+      //                                 value.
+      //
+      // #945: `CI`, `HOME`, `PATH`, `LANG` are declared here too, and this
+      // is a correction, not an addition -- a prior version of this file
+      // omitted all four on the strength of a probe that showed them still
+      // VISIBLE to the child process with nothing declared. That probe
+      // proved visibility, not that turbo's cache key HASHES the value --
+      // and demonstrated live, it does not. `CI` unset and `CI=1` against
+      // an unchanged tree produced the IDENTICAL cache entry: a run where
+      // `ChiefdBinary.ts`'s `isRunningInCI()` made `chiefdBinaryTestGate`
+      // skip rather than throw was replayed as the answer for `CI=1`, and
+      // the tests that should have executed under the stricter flag never
+      // ran a second time. `HOME` is a real literal read
+      // (`org-runtime.ts`'s forwarded pane environment) with the identical
+      // undeclared-hit behavior confirmed the same way. `PATH` and `LANG`
+      // have no literal `process.env.X` read in this tree but are declared
+      // anyway: `PATH` can change which binary a spawned child resolves
+      // (`pi`, `tmux`), and `LANG` can change `Intl`/`toLocaleString`
+      // output this program's tests import code that uses -- both
+      // "ambiguous", and ambiguous goes in `env` for the same reason as
+      // the launcher-identity vars above: a cache MISS is the safe
+      // direction to be wrong in.
+      "env": [
+        "DEBUG_891",
+        "CI",
+        "HOME",
+        "PATH",
+        "LANG",
+        "CARGO_TARGET_DIR",
+        "PI_SOURCE_AGENT_DIR",
+        "PI_CODING_AGENT_SESSION_DIR",
+        "TEAM_LAUNCHER_SUPERVISION_INTERVAL_MS",
+        "ORGANIZATION_RUNTIME_GENERATION",
+        "ORG_LAUNCHER_ORGANIZATION",
+        "ORG_LAUNCHER_ORG_DIR",
+        "ORG_LAUNCHER_PERSON",
+        "ORG_LAUNCHER_ROOT",
+        "ORG_LAUNCHER_RUNTIME_SESSION",
+        "ORG_LAUNCHER_RUNTIME_SOCKET",
+        "ORG_LOG_LEVEL",
+        "ORG_LOG_MAX_BYTES",
+        "ORG_LOG_HEARTBEAT_MS",
+        "ORG_WRITE_DB_TIMEOUT_MS",
+        "ORG_SSE_DISABLED",
+        "CHIEFD_STORE_READ_POOL",
+        "CHIEFD_STORE_MAX_BODY_BYTES",
+        "CHIEFD_STORE_PORT_WALK",
+        "TMUX",
+        "TMUX_PANE",
+        "OPENROUTER_API_KEY",
+        "CHIEFD_HOST_URL",
+        "CHIEF_DATA_ROOT",
+        "CHIEF_PI_PACKAGE_DIR",
+        "CHIEFD_START_TIMEOUT_MS",
+        "LC_ALL",
+        "TEAM_LAUNCHER_INTERCOM_LIFECYCLE",
+        "TEAM_LAUNCHER_ROLE",
+        "TEAM_LAUNCHER_TEAM_DIR",
+        "TEAM_LAUNCHER_TMUX_SOCKET",
+        "BEACOND_URL",
+        // apps/web's `common/Env.ts` reads it for the one place a hosted
+        // agent's SHELL environment needs it: Next's own type augmentation
+        // makes `NODE_ENV` required on the shell-environment type, so the
+        // per-person overlay chiefd supplies has to carry it.
+        "NODE_ENV"
+      ],
+      "passThroughEnv": ["TMPDIR"]
+    },
+    "@chief/chiefing#test:unit": {
+      // #939: a package-specific task key REPLACES the generic "test:unit"
+      // entry above for this package rather than merging with it -- this
+      // override's own missing `env` array is why `@chief/chiefing`'s
+      // CARGO_TARGET_DIR-dependent contract tests (packages/chiefing/test/
+      // contract/*) were stripped independently of the generic task ever
+      // being fixed. Verified empirically (a probe test logging
+      // `process.env.CARGO_TARGET_DIR` under `turbo run test:unit
+      // --filter=@chief/chiefing`), not assumed from turbo's docs.
+      // `CHIEFD_STORE_*` are here for the same reason as the generic task's
+      // copy: chiefing's own contract tests spawn `chiefd docstore-only`
+      // through the identical `@chief/testing` helper. `CI`/`HOME`/`PATH`/
+      // `LANG` (#945) are here for the same cross-package reason as
+      // `CARGO_TARGET_DIR`: chiefing's contract tests import
+      // `chiefdBinaryTestGate` from `@chief/testing`, which reads `CI`
+      // in-process during THIS package's test:unit run, not the generic
+      // one -- this override does not inherit the generic task's copy.
+      "dependsOn": ["build", "^build"],
+      "env": [
+        "CARGO_TARGET_DIR",
+        "CI",
+        "HOME",
+        "PATH",
+        "LANG",
+        "CHIEFD_STORE_READ_POOL",
+        "CHIEFD_STORE_MAX_BODY_BYTES",
+        "CHIEFD_STORE_PORT_WALK"
+      ]
+    },
+    "test:unit:coverage": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    },
+    // Next.js emits to .next/, not dist/ — the generic "build" task's outputs
+    // above don't cover it. .next/cache/** is excluded: it is Next's local
+    // build cache, not a build artifact turbo should fingerprint or restore.
+    "@chief/web#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    }
+  }
+}

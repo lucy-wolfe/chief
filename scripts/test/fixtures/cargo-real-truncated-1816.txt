@@ -1,0 +1,2148 @@
+   Compiling chiefd-core v0.1.0 (/workspace/builds/merger/apps/chiefd/crates/chiefd-core)
+   Compiling chiefd-host v0.1.0 (/workspace/builds/merger/apps/chiefd/crates/chiefd-host)
+   Compiling chiefd-api v0.1.0 (/workspace/builds/merger/apps/chiefd/crates/chiefd-api)
+   Compiling chiefd-e2e v0.1.0 (/workspace/builds/merger/apps/chiefd/tests/e2e)
+   Compiling chiefd-locktest v0.1.0 (/workspace/builds/merger/apps/chiefd/crates/chiefd-locktest)
+   Compiling chiefd v0.1.0 (/workspace/builds/merger/apps/chiefd/crates/chiefd)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 47.08s
+     Running unittests src/lib.rs (target/debug/deps/beacond-dd658ce59a2766b3)
+
+running 50 tests
+test config::tests::neither_db_path_nor_home_is_missing_home ... ok
+test liveness::tests::pid_zero_and_negative_are_never_alive ... ok
+test config::tests::explicit_bind_and_db_path_win ... ok
+test liveness::tests::this_process_is_alive ... ok
+test config::tests::defaults_fill_in_from_home ... ok
+test liveness::tests::an_exited_child_is_not_alive ... ok
+test router::tests::deregister_on_an_unknown_slug_is_200_deregistered_false ... ok
+test router::tests::create_rejects_empty_slug_and_empty_orgs_root ... ok
+test router::tests::create_same_orgs_root_twice_is_200_created_false_not_409 ... ok
+test router::tests::create_a_different_orgs_root_is_409_naming_the_recorded_root ... ok
+test router::tests::deregister_pid_mismatch_is_409 ... ok
+test router::tests::delete_is_idempotent ... ok
+test router::tests::every_error_body_parses_as_code_message ... ok
+test router::tests::health_is_ok_once_the_schema_exists ... ok
+test router::tests::heartbeat_on_an_unknown_slug_is_404 ... ok
+test router::tests::list_reflects_created_companies ... ok
+test router::tests::lookup_rejects_an_empty_slug ... ok
+test router::tests::heartbeat_pid_mismatch_is_409 ... ok
+test router::tests::register_conflict_names_the_incumbent_pid_hostname_and_last_seen_at ... ok
+test router::tests::lookup_on_a_never_registered_company_has_no_location_keys_at_all ... ok
+test store::tests::a_second_open_on_the_same_file_is_a_no_op ... ok
+test store::tests::create_inserts_a_new_row_with_no_location ... ok
+test router::tests::register_on_an_unknown_slug_is_404 ... ok
+test router::tests::register_rejects_port_zero_pid_zero_and_a_bad_url_scheme ... ok
+test store::tests::create_twice_with_the_same_orgs_root_is_idempotent_and_preserves_the_first_timestamp ... ok
+test store::tests::create_twice_with_the_same_timestamp_is_still_correctly_not_created ... ok
+test store::tests::create_with_a_different_orgs_root_is_refused_and_the_first_row_is_untouched ... ok
+test store::tests::create_with_a_different_slug_still_works ... ok
+test store::tests::create_twice_after_a_register_preserves_the_location ... ok
+test store::tests::delete_removes_an_existing_company_and_is_idempotent ... ok
+test store::tests::deregister_on_an_unknown_slug_is_false_not_an_error ... ok
+test store::tests::delete_succeeds_even_when_a_location_is_filled ... ok
+test store::tests::deregister_clears_the_location_and_keeps_the_row ... ok
+test store::tests::heartbeat_on_an_unknown_slug_is_none ... ok
+test store::tests::deregister_leaves_other_slugs_untouched ... ok
+test store::tests::deregister_with_a_mismatched_pid_is_refused_and_clears_nothing ... ok
+test store::tests::deregister_twice_is_idempotent ... ok
+test store::tests::heartbeat_with_the_right_pid_only_changes_last_seen_at ... ok
+test store::tests::heartbeat_with_a_mismatched_pid_is_refused ... ok
+test store::tests::register_on_a_vacant_company_admits_and_fills_every_location_column ... ok
+test store::tests::list_is_empty_on_a_fresh_store ... ok
+test store::tests::only_the_store_file_and_its_wal_shm_siblings_ever_exist_on_disk ... ok
+test store::tests::list_is_ordered_by_slug_and_includes_a_never_registered_company ... ok
+test wire::tests::pinned_format_for_a_fixed_epoch_millisecond ... ok
+test wire::tests::preserves_milliseconds ... ok
+test store::tests::register_refuses_a_live_incumbent_and_changes_nothing ... ok
+test store::tests::register_on_an_unknown_slug_is_refused_and_creates_no_row ... ok
+test store::tests::the_registry_owns_exactly_one_table_with_exactly_these_columns ... ok
+test store::tests::register_with_the_same_pid_re_admits ... ok
+test store::tests::register_takes_over_a_dead_pid ... ok
+
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/main.rs (target/debug/deps/beacond-c3fac72ce01f4e9d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/crash_mid_transaction.rs (target/debug/deps/crash_mid_transaction-e075dc072d5a9ecd)
+
+running 3 tests
+test a_crash_mid_create_leaves_no_row ... ok
+test a_crash_mid_register_leaves_the_previous_location_intact ... ok
+test a_crash_mid_deregister_leaves_the_location_intact ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/http_lifecycle.rs (target/debug/deps/http_lifecycle-3791a0de7103f7ce)
+
+running 1 test
+test the_full_lifecycle_over_real_http ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/main.rs (target/debug/deps/chiefd-e0748bf28c1fcae5)
+
+running 96 tests
+test company_db_target::tests::private_database_keeps_its_bare_company_scope ... ok
+test bootstrap::tests::set_actuation_config_rejects_an_unparseable_flag_value ... ok
+test bootstrap::tests::set_actuation_config_without_any_field_is_a_usage_error_that_writes_nothing ... ok
+test docstore_only::tests::composite_document_key_maps_only_to_a_bare_company_label ... ok
+test company_db_target::tests::shared_database_switches_path_and_label_to_the_composite_scope_together ... ok
+test docstore_only::tests::the_watch_pid_watchdog_is_inert_without_the_opt_in_env ... ok
+test docstore_only::tests::the_watch_pid_watchdog_stays_inert_while_the_named_pid_is_alive ... ok
+test docstore_only::tests::the_watchdog_is_inert_without_the_opt_in_env ... ok
+test memory_worker::tests::a_child_that_exits_is_reaped_by_exactly_one_blocking_wait ... ok
+test memory_worker::tests::a_child_that_outlives_the_budget_is_killed_and_reaped ... ok
+test bootstrap::tests::bootstrap_store_returns_projection_counts_not_a_document_version ... ok
+test docstore_only::tests::lazy_company_mailbox_delta_publishes_on_the_docstore_only_feed ... ok
+test bootstrap::tests::shared_store_operator_and_worker_open_the_full_daemons_composite_rows ... ok
+test memory_worker::tests::a_non_zero_exit_is_reported_as_such_from_one_wait ... ok
+test memory_worker::tests::a_generation_mismatch_is_retired_as_stale_and_exits_success ... ok
+test memory_worker::tests::a_learning_worthy_review_completes_and_appends_a_memory_record ... ok
+test memory_worker::tests::a_lost_lease_exits_success_and_writes_nothing ... ok
+test bootstrap::tests::set_actuation_config_updates_only_the_named_fields ... ok
+test memory_worker::tests::a_not_learning_worthy_review_is_skipped_not_retired_and_writes_nothing_durable ... ok
+test memory_worker::tests::a_wait_failure_is_surfaced_rather_than_retried ... ok
+test memory_worker::tests::a_pi_failure_is_recorded_as_failed_and_exits_failure ... ok
+test memory_worker::tests::parse_requires_all_three_positional_args ... ok
+test memory_worker::tests::skill_extraction_config_resolves_only_against_the_real_relocated_script ... ok
+test docstore_only::tests::restart_resolves_only_the_retained_removal_lifecycle_and_closes_its_actor ... ok
+test memory_worker::tests::a_replayed_review_of_the_same_snapshot_never_double_records ... ok
+test memory_worker::tests::valid_reviewer_requires_both_a_nonempty_provider_and_model ... ok
+test operator::tests::prefers_the_stamped_bun_over_the_recorded_one_over_path ... ok
+test operator::tests::preserves_explicit_daemon_modes_in_the_rust_binary ... ok
+test operator::tests::probes_the_host_launcher_prerequisite_with_its_supported_version_flag ... ok
+test operator::tests::reads_the_bun_record_release_chiefd_publishes_next_to_launcher_root ... ok
+test operator::tests::resolves_pi_from_the_installed_launcher_not_path ... ok
+test operator::tests::routes_human_commands_without_a_second_binary ... ok
+test operator::tests::treats_a_blank_bun_record_as_absent_rather_than_execing_nothing ... ok
+test run::tests::a_floor_blocked_reconcile_request_schedules_one_delayed_nudge ... ok
+test memory_worker::tests::a_review_with_a_reusable_process_invokes_the_extractor_before_committing ... ok
+test run::tests::a_panicking_pass_is_logged_and_the_duty_keeps_running ... ok
+test memory_worker::tests::a_review_without_a_reusable_process_never_invokes_the_extractor ... ok
+test memory_worker::tests::an_extractor_failure_never_fails_the_review_or_its_commit ... ok
+test memory_worker::tests::the_custom_providers_projection_reaches_the_review_turn_verbatim ... ok
+test memory_worker::tests::three_consecutive_failures_append_an_exceptions_log_line ... ok
+test run::tests::a_polled_message_reaches_the_ceo_inbox_goal_cursor_and_wake ... ok
+test run::tests::a_wired_trigger_suppresses_the_fast_interval_until_the_slow_floor ... ok
+test run::tests::actuator_ramp_reads_bounded_operator_values_and_falls_back_closed ... ok
+test run::tests::a_single_reconcile_signal_fans_out_to_every_reactive_duty ... ok
+test run::tests::an_explicit_socket_contradicting_a_live_claim_refuses_to_start ... ok
+test run::tests::an_explicit_socket_that_agrees_is_simply_used ... ok
+test run::tests::a_real_deadline_evaluation_pass_publishes_to_the_wired_change_feed ... ok
+test run::tests::a_replayed_poll_is_a_noop_end_to_end ... ok
+test run::tests::an_unstated_socket_is_adopted_from_the_live_runtime_ownership_claim ... ok
+test run::tests::an_empty_poll_still_marks_the_gateway_alive ... ok
+test run::tests::an_unwired_delivery_stalls_without_advancing_the_cursor ... ok
+test run::tests::an_unclearable_overdue_deadline_backs_off_to_the_floor ... ok
+test run::tests::an_overdue_deadline_evaluates_promptly_then_waits_instead_of_spinning ... ok
+test run::tests::bench_completion_is_acknowledged_only_by_a_post_actuation_gather ... ok
+test run::tests::boot_never_adopts_manifest_from_stale_artifact_projection ... ok
+test run::tests::a_memory_review_write_wakes_background_memory_through_the_change_feed ... ok
+test run::tests::deadline_evaluation_next_interval_never_sleeps_zero_on_an_overdue_deadline ... ok
+test run::tests::boot_seeds_initial_native_ledgers_when_there_is_nothing_to_adopt ... ok
+test run::tests::drive_cancels_an_in_flight_pass_the_instant_shutdown_is_signalled ... ok
+test run::tests::drive_fires_a_duty_once_per_interval ... ok
+test run::tests::drive_runs_a_pass_immediately_when_its_trigger_fires_with_no_clock_advance ... ok
+test run::tests::drive_with_no_trigger_wired_never_runs_early ... ok
+test run::tests::docstore_mount_releases_its_port_on_the_shutdown_signal ... ok
+test run::tests::deadline_evaluation_next_interval_rests_at_the_floor_when_nothing_is_near ... ok
+test run::tests::launcher_root_default::a_non_root_home_derives_its_own_root ... ok
+test run::tests::launcher_root_default::an_absent_or_empty_home_keeps_the_historical_fallback ... ok
+test run::tests::launcher_root_default::linux_as_root_is_byte_for_byte_what_it_always_was ... ok
+test run::tests::many_floor_blocked_requests_arm_one_delayed_retry ... ok
+test run::tests::a_supervision_write_wakes_reactive_duties_through_the_change_feed ... ok
+test run::tests::nobody_claiming_leaves_the_previous_behaviour_untouched ... ok
+test run::tests::deadline_evaluation_next_interval_sleeps_until_a_near_deadline ... ok
+test run::tests::one_store_resolution::falls_back_to_the_per_company_chief_db_when_unset ... ok
+test run::tests::one_store_resolution::is_independent_of_the_company_slug_and_data_root ... ok
+test run::tests::one_store_resolution::uses_the_shared_org_sqlite_when_chiefd_store_db_path_is_set ... ok
+test run::tests::parse_config_accepts_serve_only_and_refuses_combining_it_with_once ... ok
+test run::tests::parse_config_reads_the_launcher_root_and_defaults_it ... ok
+test run::tests::parse_config_reads_the_tmux_socket_and_pi_binary_and_defaults_them ... ok
+test run::tests::parse_config_requires_a_company_and_data_root ... ok
+test run::tests::deadline_evaluation_records_success_in_one_commit ... ok
+test run::tests::mounted_docstore_round_trips_and_is_the_single_source_of_truth ... ok
+test run::tests::due_manager_goal_watch_wakes_supervision_reconcile_after_deadline_evaluation ... ok
+test run::tests::foreign_runtime_owner_after_boot_requests_fatal_restart_without_a_cycle_commit ... ok
+test run::tests::production_wiring::boot_actuation_preserves_a_stored_budget_override ... ok
+test run::tests::normalized_mailbox_delta_publishes_the_composite_slug_and_person_store ... ok
+test run::tests::reactive_fallback_defaults_to_three_minutes_and_only_accepts_a_one_minute_or_longer_override ... ok
+test run::tests::production_wiring::a_mailbox_delivery_nudges_the_exact_trigger_the_scheduler_drive_loop_awaits ... ok
+test run::tests::production_wiring::the_background_memory_duty_claims_from_normalized_rows ... ok
+test run::tests::production_wiring::the_supervision_reconcile_duty_actuates_a_fake_pane_end_to_end ... ok
+test run::tests::production_wiring::the_wired_memory_dispatcher_spawns_a_real_detached_process_for_a_claim ... ok
+test run::tests::the_real_telegram_poller_keeps_polling_across_multiple_intervals_through_drive ... ok
+test shutdown_attribution::imp::tests::a_self_sent_sigterm_is_attributed_to_this_process ... ok
+test run::tests::startup_self_audit_runs_before_the_first_interval_tick ... ok
+test telegram_delivery::tests::another_recipient_enqueues_from_current_rows_without_a_fence ... ok
+test telegram_delivery::tests::fresh_message_lands_in_normalized_rows ... ok
+test run::tests::production_wiring::the_wired_actuator_actuates_a_fake_pane_live ... ok
+test telegram_delivery::tests::replay_is_a_noop ... ok
+
+test result: ok. 96 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+
+     Running tests/docstore_only_schema_ready.rs (target/debug/deps/docstore_only_schema_ready-5ab53d2cc78afb76)
+
+running 1 test
+test fresh_docstore_only_initializes_schema_before_reporting_health ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/log_file_sink_is_plain_text.rs (target/debug/deps/log_file_sink_is_plain_text-4a89db7859ff3b80)
+
+running 1 test
+test a_file_sink_receives_no_ansi_escapes_and_no_nul_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/parent_death_watchdog.rs (target/debug/deps/parent_death_watchdog-d51a08d4f4ca35ab)
+
+running 2 tests
+test parent_death_via_pdeathsig_exits_the_reparented_grandchild ... ok
+test watch_pid_self_exits_once_the_named_pid_dies_even_when_not_the_os_parent ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+
+     Running tests/sigterm_grace.rs (target/debug/deps/sigterm_grace-ceb24e78b5c9d318)
+
+running 1 test
+test sigterm_drains_within_the_supervisor_grace_across_repeated_restarts ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/single_writer_admission.rs (target/debug/deps/single_writer_admission-2fd229875c3c2874)
+
+running 1 test
+test second_run_refuses_loudly_and_stale_marker_is_reclaimed_and_companies_coexist ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running unittests src/lib.rs (target/debug/deps/chiefd_api-be468f04ea73aca7)
+
+running 247 tests
+test auth::tests::a_human_chiefctl_caller_has_no_pane_and_is_bound_by_uid_instead ... ok
+test auth::tests::a_company_the_registry_does_not_know_is_refused_not_created ... ok
+test auth::tests::a_non_normalized_spelling_of_the_registrys_directory_still_authenticates ... ok
+test auth::tests::a_caller_rooted_elsewhere_is_refused_even_with_a_valid_token_and_ancestry ... ok
+test auth::tests::a_person_the_manifest_never_had_is_refused_the_same_way ... ok
+test auth::tests::a_promotion_takes_effect_on_the_very_next_call ... ok
+test auth::tests::a_respawned_pane_re_authenticates_at_its_new_generation ... ok
+test auth::tests::a_stale_checkout_cannot_echo_a_generation_the_pane_has_rolled_past ... ok
+test auth::tests::an_unknown_operation_is_refused_before_any_authorization_decision ... ok
+test auth::tests::a_worker_cannot_reach_a_manager_only_verb_and_the_refusal_names_a_route ... ok
+test auth::tests::a_worker_reaches_every_worker_exempt_verb ... ok
+test auth::tests::an_offboarded_person_whose_pane_is_still_alive_has_no_authority ... ok
+test auth::tests::an_unreadable_tmux_is_unavailable_so_the_shim_retries_instead_of_giving_up ... ok
+test auth::tests::the_disk_authority_floor_is_covered_by_what_chiefd_actually_enforces ... ok
+test auth::tests::moving_the_company_in_the_registry_refuses_the_pane_that_is_still_on_the_old_root ... ok
+test auth::tests::the_model_cannot_issue_a_runtime_attested_verb_even_as_a_manager ... ok
+test auth::tests::the_echo_matrix_accepts_only_an_exact_identity_match ... ok
+test authn::boot::tests::mode_flag_parses_the_three_stages ... ok
+test auth::tests::the_same_slug_under_the_registrys_root_authenticates ... ok
+test authn::jwt::tests::a_non_three_segment_token_is_malformed ... ok
+test authn::boot::tests::provisioned_secret_is_read_stably_and_absent_falls_back_to_ephemeral ... ok
+test authn::jwt::tests::a_different_secret_does_not_verify ... ok
+test authn::jwt::tests::a_tampered_payload_does_not_verify ... ok
+test authn::jwt::tests::a_token_has_no_exp_claim ... ok
+test authn::middleware::tests::a_manually_forged_claims_still_needs_the_secret ... ok
+test authn::jwt::tests::mint_then_verify_roundtrips_the_claims ... ok
+test authn::middleware::tests::a_missing_bearer_is_401_on_a_gated_route ... ok
+test authn::middleware::tests::a_revoked_identity_is_403 ... ok
+test authn::middleware::tests::a_valid_token_reaches_the_handler ... ok
+test authn::middleware::tests::a_forged_token_is_401 ... ok
+test authn::nonce::tests::a_nonce_is_single_use ... ok
+test authn::nonce::tests::an_expired_nonce_is_rejected_and_removed ... ok
+test authn::nonce::tests::expired_entries_are_pruned_lazily_on_next_issue ... ok
+test authn::nonce::tests::issue_then_consume_returns_the_bound_identity_and_nonce ... ok
+test authn::nonce::tests::an_unknown_nonce_id_is_none ... ok
+test authn::middleware::tests::a_rotated_key_makes_the_old_token_403 ... ok
+test authn::nonce::tests::the_cap_is_per_identity_not_global ... ok
+test authn::nonce::tests::the_per_identity_cap_evicts_the_oldest ... ok
+test authn::middleware::tests::exempt_routes_bypass_verification ... ok
+test authn::middleware::tests::an_unknown_identity_is_403 ... ok
+test authn::runtime::tests::channel_mint_uses_the_same_issuance_and_respects_active ... ok
+test authn::runtime::tests::bootstrap_operator_self_enrol_is_idempotent_then_mints ... ok
+test authn::runtime::tests::challenge_for_unknown_identity_is_refused ... ok
+test authn::boot::tests::build_runtime_opens_registry_and_enrolls_operator_from_disk ... ok
+test authn::runtime::tests::revoked_identity_cannot_challenge_or_redeem ... ok
+test authn::runtime::tests::enroll_identity_is_idempotent_on_key_and_conflicts_on_rekey ... ok
+test authn::sig::tests::message_layout_is_tag_id_nonce ... ok
+test authn::runtime::tests::a_replayed_nonce_is_rejected ... ok
+test authn::runtime::tests::a_wrong_key_signature_is_rejected ... ok
+test authn::sig::tests::malformed_inputs_are_false_not_panic ... ok
+test authn::runtime::tests::full_challenge_redeem_mints_a_verifiable_token ... ok
+test authn::tests::an_inactive_identity_gets_no_token ... ok
+test authn::tests::issue_token_anchors_kid_on_the_current_fingerprint ... ok
+test authn::tests::random_token_is_fixed_width_43_chars ... ok
+test docstore::bench_completion::tests::a_live_tagged_person_never_resolves_until_a_later_absence ... ok
+test docstore::bench_completion::tests::empty_suppressed_foreign_and_unavailable_audits_are_not_proof ... ok
+test docstore::bench_completion::tests::exact_operation_generation_keys_do_not_overwrite_each_other ... ok
+test authn::sig::tests::signature_is_64_byte_p1363 ... ok
+test authn::sig::tests::a_valid_signature_verifies ... ok
+test docstore::feed::tests::generation_hint_never_panics_on_a_negative_column_value ... ok
+test docstore::feed::tests::publish_assigns_a_strictly_monotonic_seq_starting_at_one ... ok
+test authn::sig::tests::other_key_fails ... ok
+test docstore::feed::tests::concurrent_writers_never_duplicate_or_skip_a_seq ... ok
+test docstore::feed::tests::publish_with_a_lagging_subscriber_does_not_block_the_writer ... ok
+test docstore::feed::tests::replay_from_a_seq_already_caught_up_returns_empty_not_a_gap ... ok
+test docstore::feed::tests::replay_from_a_seq_never_reached_this_epoch_reports_a_gap ... ok
+test docstore::feed::tests::replay_from_a_seq_still_in_the_ring_returns_only_the_newer_events ... ok
+test docstore::feed::tests::replay_from_a_seq_whose_evicted_successor_is_gone_reports_a_gap ... ok
+test docstore::feed::tests::replay_from_a_seq_whose_evicted_successor_is_still_present_is_not_a_gap ... ok
+test docstore::feed::tests::ring_evicts_oldest_once_over_capacity ... ok
+test docstore::feed::tests::replay_from_zero_returns_everything_retained_never_a_gap ... ok
+test docstore::feed::tests::subscribe_receives_events_published_after_it_but_not_before ... ok
+test docstore::feed::tests::concurrent_publishers_never_broadcast_or_ring_out_of_seq_order ... ok
+test docstore::feed::tests::publish_with_zero_subscribers_does_not_block_or_panic ... ok
+test authn::sig::tests::wrong_identity_fails ... ok
+test docstore::router::wake_enumeration_tests::macro_publish_arm_wakes_by_default ... ok
+test docstore::router::wake_enumeration_tests::every_macro_row_wakes ... ok
+test authn::sig::tests::wrong_nonce_fails ... ok
+test docstore::router::wake_enumeration_tests::opt_outs_stay_opted_out_with_reasons ... ok
+test docstore::router::watch_tests::a_watcher_that_lags_the_broadcast_channel_mid_stream_gets_reorg_not_silence ... ok
+test docstore::router::watch_tests::after_an_evicted_seq_yields_reorg_then_resumes_live ... ok
+test docstore::router::watch_tests::atomic_staffing_requests_reject_legacy_revision_fields ... ok
+test docstore::router::watch_tests::company_remove_requires_operator_when_auth_is_enforced ... ok
+test docstore::router::watch_tests::direct_atomic_staffing_is_attributed_to_operator ... ok
+test docstore::router::watch_tests::event_matches_named_filter_accepts_the_wildcard_removed_store ... ok
+test docstore::router::watch_tests::event_matches_prefix_and_exact_selectors_without_leaking_similar_names ... ok
+test docstore::router::watch_tests::event_matches_requires_the_exact_slug ... ok
+test docstore::router::wake_enumeration_tests::wired_and_opted_out_sets_are_disjoint_and_complete_against_clear_handlers ... ok
+test docstore::router::watch_tests::model_aware_manifest_genesis_rejects_legacy_revision_protocol_fields ... ok
+test docstore::router::watch_tests::parse_store_filter_treats_star_and_empty_as_all ... ok
+test docstore::router::watch_tests::parse_store_filter_trims_dedupes_and_separates_exact_from_prefix_selectors ... ok
+test docstore::router::watch_tests::resolve_after_seq_falls_back_to_the_query_param_then_zero ... ok
+test docstore::router::watch_tests::resolve_after_seq_ignores_an_unparseable_header_and_falls_back ... ok
+test docstore::router::watch_tests::resolve_after_seq_prefers_the_last_event_id_header_over_the_query_param ... ok
+test docstore::router::watch_tests::singleton_row_publishes_reject_retired_sequence_inputs ... ok
+test docstore::router::watch_tests::after_a_seq_still_in_the_ring_replays_only_the_newer_matching_events ... ok
+test docstore::router::watch_tests::a_fresh_subscriber_with_no_after_replays_the_current_ring_for_its_slug_then_goes_live ... ok
+test docstore::router::watch_tests::a_removed_wildcard_event_is_forwarded_with_the_documented_removal_shape ... ok
+test docstore::router::wake_enumeration_tests::every_reconcile_input_publish_wakes ... ok
+test docstore::router::watch_tests::mailbox_prefix_selector_filters_replay_and_live_events_server_side ... ok
+test docstore::router::watch_tests::unmatched_stores_are_skipped_never_yielded ... ok
+test docstore::store::tests::a_live_same_host_holder_is_never_reclaimed_early ... ok
+test docstore::store::tests::health_probe_is_ok_only_once_the_schema_exists ... ok
+test docstore::store::tests::a_legacy_row_without_a_recorded_start_stays_ttl_only ... ok
+test docstore::store::tests::a_provably_dead_holder_is_reclaimed_before_its_ttl_expires ... ok
+test docstore::store::tests::lock_acquire_is_exclusive_until_it_expires ... ok
+test docstore::store::tests::lock_release_is_owner_fenced_and_break_is_not ... ok
+test docstore::store::tests::lock_renew_is_owner_fenced ... ok
+test docstore::store::tests::migration_adds_supervision_columns_to_a_legacy_tasks_table ... ok
+test docstore::store::tests::migration_adds_the_liveness_column_to_a_legacy_org_locks_table ... ok
+test docstore::store::tests::migration_adds_terminal_ack_identity_columns_to_legacy_event_markers ... ok
+test docstore::tasks::tests::a_terminal_task_refuses_further_status_changes_and_assignment ... ok
+test docstore::store::tests::notification_payload_migration_preserves_outbox_identity_and_delivery ... ok
+test docstore::tasks::tests::a_cascaded_parent_derivation_still_publishes_exactly_one_event_for_the_triggering_call ... ok
+test docstore::tasks::tests::all_children_cancelled_derives_parent_cancelled ... ok
+test docstore::store::tests::migration_survives_a_real_reboot_on_a_legacy_database_with_data ... ok
+test docstore::tasks::tests::any_blocked_child_blocks_the_parent ... ok
+test docstore::tasks::tests::any_non_terminal_status_can_be_blocked_and_resumed_via_explicit_target ... ok
+test docstore::tasks::tests::any_non_terminal_status_can_be_cancelled ... ok
+test docstore::tasks::tests::all_children_done_derives_parent_done_stamps_completed_at_and_notifies ... ok
+test docstore::tasks::tests::assign_publishes_one_event_but_a_terminal_refusal_publishes_nothing ... ok
+test docstore::tasks::tests::blocked_notification_carries_the_typed_reason ... ok
+test docstore::tasks::tests::close_publishes_one_event_but_a_non_terminal_refusal_publishes_nothing ... ok
+test docstore::tasks::tests::create_refused_for_an_unknown_parent_publishes_nothing ... ok
+test docstore::tasks::tests::create_refuses_a_parent_that_exists_only_in_another_company ... ok
+test docstore::tasks::tests::close_requires_a_terminal_task_and_is_an_audit_action_not_a_status_change ... ok
+test docstore::tasks::tests::create_refuses_an_unknown_parent ... ok
+test docstore::tasks::tests::blocked_requires_a_reason ... ok
+test docstore::tasks::tests::create_starts_assigned_writes_audit_and_notifies_the_assignee ... ok
+test docstore::tasks::tests::create_task_publishes_exactly_one_tasks_event ... ok
+test docstore::tasks::tests::ensure_schema_is_idempotent_with_existing_task_data ... ok
+test docstore::tasks::tests::ensure_task_supervision_columns_is_idempotent ... ok
+test docstore::tasks::tests::derived_blocked_parent_carries_a_reason_referencing_the_child ... ok
+test docstore::tasks::tests::every_legal_transition_passes ... ok
+test docstore::tasks::tests::ids_are_isolated_per_slug_too ... ok
+test docstore::tasks::tests::every_mutation_writes_exactly_its_audit_rows_and_derived_changes_are_actor_system ... ok
+test docstore::tasks::tests::illegal_transitions_are_refused ... ok
+test docstore::tasks::tests::ids_are_sequential_per_department_and_never_reused ... ok
+test docstore::tasks::tests::list_filters_match_the_design_docs_semantics ... ok
+test docstore::tasks::tests::in_review_child_moves_parent_to_in_progress ... ok
+test docstore::tasks::tests::notifications_written_in_the_creating_transaction_and_mark_delivered_round_trips ... ok
+test docstore::tasks::tests::reads_and_notification_bookkeeping_publish_nothing ... ok
+test docstore::tasks::tests::mixed_children_keep_the_parents_explicit_status ... ok
+test docstore::tasks::tests::multi_level_propagation_reaches_the_grandparent ... ok
+test docstore::tasks::tests::set_task_supervision_refuses_an_unknown_task ... ok
+test docstore::tasks::tests::request_unblock_publishes_one_event_but_a_not_blocked_refusal_publishes_nothing ... ok
+test docstore::tasks::tests::request_unblock_requires_a_blocked_task_and_notifies_creator_and_manager ... ok
+test docstore::tasks::tests::set_task_supervision_writes_through_and_full_replaces ... ok
+test docstore::tasks::tests::slug_a_never_reads_or_mutates_slug_bs_rows ... ok
+test docstore::tests::a_missing_db_path_is_a_startup_failure_not_a_new_empty_file ... ok
+test docstore::tests::an_unparseable_numeric_setting_falls_back_instead_of_failing ... ok
+test docstore::tests::defaults_fill_in_around_a_db_path ... ok
+test docstore::tasks::tests::task_events_interleave_monotonically_with_row_events_under_one_seq ... ok
+test docstore::tasks::tests::task_events_are_filterable_by_slug_and_store_the_same_way_row_events_are ... ok
+test socket::tests::both_halves_present_resolves_explicitly ... ok
+test socket::tests::empty_socket_env_is_treated_as_unset ... ok
+test socket::tests::explicit_socket_env_wins_over_home ... ok
+test socket::tests::half_specified_targets_are_errors_in_both_directions ... ok
+test socket::tests::neither_half_present_falls_back_to_durable_ownership ... ok
+test socket::tests::no_socket_and_no_home_is_an_error_not_a_relative_path ... ok
+test wire::activity::tests::activity_status_defaults_the_person_to_the_caller ... ok
+test wire::activity::tests::budgets_are_the_documented_numbers ... ok
+test wire::activity::tests::reflect_accepts_no_whole_company_counter ... ok
+test wire::activity::tests::reflect_accepts_the_documented_body ... ok
+test wire::activity::tests::reflect_rejects_a_claimed_person_id ... ok
+test wire::common::tests::bounded_capped_sets_the_truncated_flag ... ok
+test wire::common::tests::generation_zero_is_unrepresentable ... ok
+test wire::common::tests::slug_pattern_accepts_the_documented_shape ... ok
+test wire::common::tests::slug_pattern_rejects_everything_that_could_reach_a_path ... ok
+test wire::common::tests::tmux_target_cannot_be_half_specified_on_the_wire ... ok
+test docstore::tasks::tests::subtask_resolves_parent_within_the_callers_own_company ... ok
+test wire::comms::tests::events_emit_reports_a_failed_journal_append_as_success ... ok
+test wire::comms::tests::health_caps_are_the_documented_numbers ... ok
+test wire::comms::tests::health_record_rejects_stripped_cli_fields ... ok
+test wire::comms::tests::msg_send_carries_the_only_route_to_assignment_result ... ok
+test wire::comms::tests::msg_send_rejects_a_claimed_sender ... ok
+test wire::company::tests::boot_target_cannot_be_half_specified ... ok
+test wire::company::tests::compact_defaults_to_normal_mode ... ok
+test wire::company::tests::create_accepts_the_minimal_documented_body ... ok
+test wire::company::tests::create_refuses_a_slug_that_could_escape_the_data_root ... ok
+test wire::company::tests::create_rejects_a_stripped_field_loudly_instead_of_ignoring_it ... ok
+test docstore::tasks::tests::task_origin_row_reads_supervision_columns_as_none ... ok
+test wire::company::tests::create_rejects_the_injected_requested_by_field ... ok
+test wire::company::tests::remove_plan_accepts_only_raw_progress_and_rejects_caller_paths ... ok
+test wire::error::tests::busy_serializes_with_the_wait_it_is_proof_of ... ok
+test wire::daemon::tests::health_response_round_trips_with_camel_case_keys ... ok
+test wire::error::tests::core_errors_project_onto_the_wire_taxonomy_without_loss ... ok
+test wire::error::tests::conflict_serializes_to_its_documented_shape ... ok
+test wire::error::tests::corrupt_serializes_to_its_documented_shape ... ok
+test wire::error::tests::every_taxonomy_variant_maps_to_an_error_status_never_200 ... ok
+test wire::error::tests::refused_serializes_to_its_documented_shape ... ok
+test wire::error::tests::error_response_wraps_the_taxonomy_under_a_single_key ... ok
+test wire::error::tests::unavailable_omits_tier_unless_starting ... ok
+test wire::identity::tests::attested_echo_rejects_extra_fields ... ok
+test wire::identity::tests::disk_authority_refuses_a_caller_rooted_elsewhere_even_when_the_slug_matches ... ok
+test wire::identity::tests::echo_with_a_different_person_is_refused_with_the_documented_code ... ok
+test wire::identity::tests::echo_with_a_stale_generation_is_refused ... ok
+test wire::identity::tests::matching_echo_is_accepted ... ok
+test wire::identity::tests::model_channel_cannot_issue_a_runtime_attested_verb ... ok
+test wire::identity::tests::worker_cannot_reach_a_manager_only_verb ... ok
+test wire::maint::tests::apply_response_carries_only_the_two_generations ... ok
+test wire::maint::tests::fenced_verbs_require_the_whole_claim_triple ... ok
+test wire::maint::tests::maint_start_no_work_is_the_literal_bytes_null ... ok
+test wire::maint::tests::maint_start_response_round_trips_null ... ok
+test wire::maint::tests::queue_rejects_a_caller_supplied_requested_by ... ok
+test wire::memory::tests::d16_bounds_are_the_documented_numbers ... ok
+test wire::memory::tests::memory_complete_requires_all_three_lease_fields ... ok
+test wire::memory::tests::skill_proposal_cannot_omit_evidence ... ok
+test wire::memory::tests::skill_proposal_rejects_unknown_fields ... ok
+test docstore::tasks::tests::update_status_publishes_one_event_but_an_illegal_transition_publishes_nothing ... ok
+test wire::org::tests::hire_requires_an_idempotency_key ... ok
+test wire::org::tests::hire_rejects_stripped_cli_fields ... ok
+test wire::org::tests::hire_rejects_a_free_form_capability_string ... ok
+test wire::maint::tests::maint_start_claim_replay_returns_the_record_not_null ... ok
+test wire::org::tests::loan_cannot_be_open_ended ... ok
+test wire::org::tests::structural_ops_reject_legacy_revision_fences ... ok
+test wire::org::tests::suppression_is_a_value_on_the_read_path ... ok
+test wire::org::tests::transfer_and_move_requests_reject_legacy_revision_fields ... ok
+test wire::provider::tests::model_change_defaults_to_the_calling_person ... ok
+test wire::provider::tests::model_change_response_carries_no_revision ... ok
+test wire::provider::tests::model_list_response_preserves_absence_without_static_fallbacks ... ok
+test wire::provider::tests::model_observation_wire_owns_generation_and_closes_source_vocabulary ... ok
+test wire::provider::tests::model_observation_wire_rejects_secret_shaped_fields_at_every_level ... ok
+test docstore::tests::subscribe_store_changes_observes_a_normalized_row_hint_from_this_bound_surface ... ok
+test wire::tests::every_request_struct_denies_unknown_fields ... ok
+test wire::tests::operation_lookup_finds_registered_ops_and_rejects_others ... ok
+test wire::tests::operation_names_are_unique ... ok
+test wire::tests::runtime_attested_verbs_are_not_model_callable ... ok
+test wire::tests::assignment_fencing_does_not_reuse_the_echo_field_names ... ok
+test wire::tests::no_request_struct_accepts_a_stripped_field ... ok
+test wire::tests::tier0_is_exactly_the_ops_that_must_survive_a_restart_mid_turn ... ok
+test wire::tests::the_worker_exempt_verb_list_is_exactly_the_documented_set ... ok
+test wire::work::tests::ack_carries_no_caller_identity_fields ... ok
+test wire::work::tests::assign_rejects_the_historical_aliases_the_shim_is_responsible_for ... ok
+test wire::work::tests::assign_accepts_the_canonical_body ... ok
+test wire::work::tests::generation_zero_is_rejected_at_the_schema_boundary ... ok
+test wire::work::tests::goal_set_requires_an_idempotency_key ... ok
+test wire::work::tests::goal_set_takes_no_requested_by ... ok
+test wire::work::tests::supervision_stage_order_is_the_documented_d9_sequence ... ok
+test wire::work::tests::the_same_key_in_two_companies_is_two_goals ... ok
+test wire::work::tests::the_goal_id_is_derived_from_the_scoped_key_and_nothing_else ... ok
+test wire::work::tests::the_scope_parts_cannot_alias_across_a_boundary ... ok
+test wire::work::tests::two_managers_with_the_same_key_and_body_get_two_distinct_goals ... ok
+test wire::tests::no_request_struct_accepts_an_injected_field ... ok
+test wire::tests::no_request_struct_echoes_the_callers_own_identity ... ok
+test docstore::tests::runtime_identity_distinguishes_a_full_company_host_from_docstore_only ... ok
+test wire::tests::schemars_output_is_snapshotted_so_a_contract_change_shows_up_in_review ... ok
+
+test result: ok. 247 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/agent_auth_e2e.rs (target/debug/deps/agent_auth_e2e-7d1265401082fba6)
+
+running 7 tests
+test health_is_reachable_without_a_bearer ... ok
+test a_garbage_bearer_is_401 ... ok
+test every_gated_route_rejects_a_bearerless_request_401 ... ok
+test a_rotated_fingerprint_403s_the_old_token ... ok
+test enroll_stage_enrols_without_a_bearer_then_the_flip_lets_that_identity_authenticate ... ok
+test a_revoked_key_can_no_longer_authorize_or_mint ... ok
+test valid_keypair_authenticates_and_authorizes_a_v1_call ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/bench_lifecycle_http.rs (target/debug/deps/bench_lifecycle_http-36d5397c94e90924)
+
+running 3 tests
+test request_shape_remains_strict ... ok
+test success_waits_for_post_commit_tagged_absence_and_retry_is_422 ... ok
+test a_committed_bench_without_a_live_completion_owner_returns_typed_503 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/changefeed_seam_376.rs (target/debug/deps/changefeed_seam_376-72403960ab2b8f0b)
+
+running 1 test
+test a_companydb_supervision_write_now_reaches_the_changefeed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/docstore_ensure_schema_390.rs (target/debug/deps/docstore_ensure_schema_390-b93e7373d34f0ada)
+
+running 2 tests
+test without_startup_ensure_schema_a_fresh_store_deadlocks_the_boot_gate ... ok
+test fresh_store_reaches_ok_health_after_startup_ensure_schema_with_no_write ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/docstore_http_surface.rs (target/debug/deps/docstore_http_surface-4431d5d13c7b2c0b)
+
+running 3 tests
+test health_becomes_ready_without_creating_org_documents ... ok
+test lock_lease_family_still_round_trips ... ok
+test every_generic_document_route_is_unmounted ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/founder_model_genesis_http.rs (target/debug/deps/founder_model_genesis_http-bd02297fa4c7a6cf)
+
+running 3 tests
+test success_atomically_persists_every_genesis_ledger_and_wakes_once ... ok
+test unobserved_and_mismatched_founder_routes_refuse_without_any_rows_or_wake ... ok
+test strict_bootstrap_and_unknown_company_requests_never_create_or_wake ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/fresh_replacement_prepare_http.rs (target/debug/deps/fresh_replacement_prepare_http-78fe7e08ea3d8d45)
+
+running 2 tests
+test lifecycle_source_runs_replacement_hook_and_preserves_its_fence ... ok
+test static_source_skips_replacement_prepare_then_keeps_genesis_exclusive ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/goal_idempotency.rs (target/debug/deps/goal_idempotency-52056fb335f2b304)
+
+running 4 tests
+test a_changed_body_under_a_used_key_is_refused ... ok
+test the_same_key_replays_to_the_same_goal ... ok
+test distinct_keys_publish_distinct_goals ... ok
+test two_managers_with_the_same_key_and_body_do_not_share_a_goal ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/normalized_changefeed_http_surface.rs (target/debug/deps/normalized_changefeed_http_surface-434bd47d5aacff19)
+
+running 3 tests
+test an_operator_escalation_publish_reaches_the_watch_route ... ok
+test a_mailbox_row_delta_reaches_the_watch_route ... ok
+test a_runtime_observation_publish_reaches_the_watch_route ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/org_department_reparent_http.rs (target/debug/deps/org_department_reparent_http-fe452ec054ea0ea0)
+
+running 7 tests
+test an_unknown_department_is_a_422 ... ok
+test a_cycle_is_a_422_would_create_cycle ... ok
+test an_existing_parent_is_a_422_instead_of_a_no_op_audit_write ... ok
+test expected_seq_is_rejected_instead_of_creating_a_stale_retry_contract ... ok
+test a_foreign_slug_is_isolated_404 ... ok
+test a_valid_reparent_commits_over_http ... ok
+test reparenting_the_root_is_a_422_exec_root_protected ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/org_person_transfer_http.rs (target/debug/deps/org_person_transfer_http-4611565c9d62a2ef)
+
+running 1 test
+test direct_transfers_are_revisionless_and_concurrent_over_real_http ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/org_row_seam_b4.rs (target/debug/deps/org_row_seam_b4-37de726b1b31f438)
+
+running 16 tests
+test direct_atomic_singleton_routes_reject_retired_expected_seq_payloads ... ok
+test a_second_session_epoch_publish_uses_current_state_without_a_caller_fence ... ok
+test a_foreign_slug_reads_not_found_and_publishes_404 ... ok
+test launch_intent_clear_wakes_the_reconcile_duty ... ok
+test launch_intent_publish_wakes_the_reconcile_duty ... ok
+test launch_intent_collection_round_trips_over_the_route ... ok
+test person_contract_publish_then_immediate_read_is_durable_without_a_revision ... ok
+test runtime_owner_publish_then_read_round_trips_without_a_caller_fence ... ok
+test semantic_queue_inserts_are_atomic_idempotent_and_conflict_safe ... ok
+test memory_append_is_atomic_idempotent_and_rejects_retired_sequence_inputs ... ok
+test session_epoch_publish_then_read_round_trips_over_the_route ... ok
+test runtime_second_publish_uses_current_state_without_a_caller_fence ... ok
+test session_epoch_publish_wakes_the_reconcile_duty ... ok
+test session_epoch_unmodeled_key_is_a_422 ... ok
+test telegram_gateway_round_trips_without_a_caller_fence ... ok
+test telegram_inbound_per_person_round_trips_without_a_caller_fence ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/provider_models_http.rs (target/debug/deps/provider_models_http-db7df62969c40eb5)
+
+running 4 tests
+test provider_model_operations_are_registered_as_restricted_tier_one_requests ... ok
+test strict_secret_fields_and_unknown_company_refuse_without_creation ... ok
+test service_can_observe_replay_and_list_without_losing_cas_polarity ... ok
+test operator_is_admitted_but_person_and_channel_are_forbidden ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/reminders_http_surface.rs (target/debug/deps/reminders_http_surface-c93b4f861bcec728)
+
+running 11 tests
+test a_router_with_no_live_company_refuses_rather_than_accepting_a_dead_reminder ... ok
+test arming_over_http_wakes_the_dispatch_duty ... ok
+test a_sub_minute_interval_is_refused_legibly ... ok
+test a_foreign_company_is_refused_never_written_to_a_store_nothing_fires_from ... ok
+test arming_for_an_unknown_person_is_refused ... ok
+test a_stopped_reminder_is_retained_as_history_never_deleted ... ok
+test arming_over_http_writes_the_ledger_the_dispatch_duty_reads ... ok
+test stopping_another_persons_reminder_is_refused_without_confirming_it_exists ... ok
+test list_returns_only_the_named_persons_reminders ... ok
+test goal_clear_over_http_atomically_settles_only_the_current_target_rows ... ok
+test stopping_over_http_wakes_the_dispatch_duty ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+     Running tests/shim_schema_export.rs (target/debug/deps/shim_schema_export-ee15682e2ab731e9)
+
+running 1 test
+test the_shim_schema_export_matches_the_frozen_wire_types ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/supervision_rows_http_surface.rs (target/debug/deps/supervision_rows_http_surface-2ec9f61fdaea8883)
+
+running 13 tests
+test activity_publish_rejects_the_retired_expected_seq_payload_field ... ok
+test activity_structural_reconcile_is_data_free_and_scoped_to_the_live_company ... ok
+test a_published_ledger_round_trips_through_the_row_routes ... ok
+test a_foreign_slug_is_isolated ... ok
+test a_second_semantic_publish_uses_current_state_and_overwrites_the_prior_document ... ok
+test a_matching_audit_cursor_returns_unchanged_without_reconstructing_a_ledger_body ... ok
+test mailbox_publish_rejects_the_retired_expected_seq_payload_field ... ok
+test publish_refuses_an_allowlisted_legacy_key_too ... ok
+test publish_refuses_an_unmodeled_key_with_422 ... ok
+test ceo_only_prepare_atomically_clears_launch_fence_and_quiesces_prior_delivery ... ok
+test supervision_publish_rejects_the_retired_expected_seq_payload_field ... ok
+test session_maintenance_publish_rejects_the_retired_expected_seq_payload_field ... ok
+test wire_authored_assignments_and_effects_survive_the_http_route ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/supervision_stage_contract.rs (target/debug/deps/supervision_stage_contract-c2cb2884d5bad730)
+
+running 2 tests
+test the_core_stage_list_matches_the_frozen_wire_contract_name_for_name_and_in_order ... ok
+test the_two_orderings_that_are_invariants_hold_in_the_wire_type_too ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/task_milestone_gate.rs (target/debug/deps/task_milestone_gate-2210bbb25f2d9831)
+
+running 23 tests
+test a_terminal_task_refuses_further_status_changes_and_reassignment ... ok
+test a_blocked_child_forces_the_parent_blocked ... ok
+test a_child_in_review_forces_the_parent_in_progress ... ok
+test a_blocked_grandchild_propagates_through_two_ancestor_levels ... ok
+test a_mixed_child_state_keeps_the_parents_explicit_status ... ok
+test a_single_childs_done_notifies_child_done_even_when_the_parent_stays_open ... ok
+test an_unknown_task_id_is_404_across_every_task_scoped_mutation ... ok
+test close_is_an_audit_only_action_that_never_touches_status ... ok
+test all_children_cancelled_derives_the_parent_cancelled ... ok
+test create_emits_exactly_one_task_assigned_notification_to_the_assignee ... ok
+test blocked_then_unblock_request_then_explicit_resume ... ok
+test filters_are_slug_scoped_even_with_identical_department_names_across_companies ... ok
+test draining_notifications_is_idempotent_and_a_second_drain_marks_nothing ... ok
+test all_children_done_derives_parent_done_and_notifies_the_creator ... ok
+test reassignment_emits_task_assigned_to_the_new_assignee_not_the_old_one ... ok
+test full_lifecycle_status_progression_and_complete_audit_trail ... ok
+test the_creator_with_children_filter_is_a_union_of_assignee_and_creator_with_a_child ... ok
+test the_assignee_filter_returns_only_that_assignees_tasks ... ok
+test the_department_filter_scopes_to_one_department ... ok
+test the_parent_filter_returns_direct_children_only_not_grandchildren ... ok
+test tasks_audit_and_undelivered_notifications_survive_a_restart_mid_suite ... ok
+test the_status_filter_returns_only_matching_status ... ok
+test the_review_release_three_child_shape_derives_done_only_when_all_three_finish ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/tasks_http_surface.rs (target/debug/deps/tasks_http_surface-2ba05f4d0b632ec9)
+
+running 16 tests
+test get_on_an_unknown_task_is_404_with_a_stable_code ... ok
+test create_then_get_round_trips_over_http ... ok
+test create_refuses_a_parent_absent_from_the_callers_company ... ok
+test assign_reassigns_and_notifies_the_new_assignee ... ok
+test blocking_without_a_reason_is_422_and_with_one_notifies_the_creator ... ok
+test close_only_applies_to_a_terminal_task ... ok
+test notifications_pending_then_mark_delivered_drains_the_outbox_over_http ... ok
+test list_filters_map_one_to_one_onto_the_discriminated_union ... ok
+test supervision_write_through_on_an_unknown_task_is_404 ... ok
+test request_unblock_refuses_a_non_blocked_task_and_notifies_creator_and_manager ... ok
+test parent_status_derivation_reports_derived_ancestors_over_http ... ok
+test task_routes_refuse_before_ensure_schema_without_panicking ... ok
+test slug_isolation_holds_across_the_full_task_surface ... ok
+test status_transitions_and_illegal_transition_is_409_with_a_stable_code ... ok
+test supervision_write_through_round_trips_over_http_and_full_replaces ... ok
+test tasks_and_notifications_survive_a_process_restart ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/verb_authorization_table.rs (target/debug/deps/verb_authorization_table-419c1fc39f2d3e84)
+
+running 6 tests
+test the_executive_only_verbs_are_deliberately_outside_the_exemption ... ok
+test the_nine_worker_exempt_session_maintenance_verbs_are_exactly_the_ported_nine ... ok
+test every_mapped_operation_matches_the_typescript_verb_gate ... ok
+test every_worker_exempt_operation_is_exempt_in_typescript_too_or_is_a_recorded_exception ... ok
+test every_typescript_exempt_verb_survives_as_a_worker_exempt_chiefd_operation ... ok
+test the_fixture_is_current_with_the_operation_registry ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/watch_http_surface.rs (target/debug/deps/watch_http_surface-81dbd3616059b2de)
+
+running 8 tests
+test a_replayed_doc_change_matches_the_documented_wire_shape ... ok
+test an_after_ahead_of_the_servers_own_counter_yields_reorg_then_resumes_live ... ok
+test filtering_excludes_other_slugs_and_unsubscribed_stores ... ok
+test a_watcher_nobody_reads_never_blocks_the_writer_or_another_watcher ... ok
+test existing_routes_are_unaffected_by_the_new_watch_route ... ok
+test concurrent_watchers_each_receive_the_full_matching_stream ... ok
+test last_event_id_header_wins_over_after_query_and_replays_only_whats_newer ... ok
+test heartbeat_fires_on_schedule_during_quiet_state ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/lib.rs (target/debug/deps/chiefd_core-aeddd068cc94a8e0)
+
+running 1215 tests
+test actor::queue::tests::aging_admits_the_reconcile_after_the_interval_even_with_zero_small_ops_run ... ok
+test actor::queue::tests::busy_is_only_ever_minted_after_the_full_queue_deadline ... ok
+test actor::queue::tests::a_job_one_millisecond_short_of_the_deadline_still_runs ... ok
+test actor::queue::tests::closed_admission_rejects_queued_and_new_jobs_as_unavailable_never_busy ... ok
+test actor::queue::tests::small_ops_are_admitted_ahead_of_a_queued_reconcile ... ok
+test actor::queue::tests::aging_admits_the_reconcile_after_exactly_n_small_ops_with_no_time_passing ... ok
+test actor::queue::tests::the_first_close_reason_wins_so_a_later_shutdown_cannot_relabel_a_removal ... ok
+test actor::tests::aging_admits_after_the_interval_even_under_a_slow_small_stream ... ok
+test actor::tests::aging_admits_after_the_op_count_even_with_no_elapsed_time ... ok
+test actor::tests::small_is_the_only_priority_class ... ok
+test actor::tests::busy_proof_records_the_wait_it_is_proof_of ... ok
+test actor::tests::busy_is_mintable_from_exactly_the_two_reviewed_wait_sites ... ok
+test actor::writer::host_action_tests::an_intent_whose_plan_is_not_json_is_refused_before_it_is_journalled ... ok
+test actor::writer::host_action_tests::open_intents_are_ordered_by_creation_not_by_id ... ok
+test actor::writer::host_action_tests::a_row_with_an_unreadable_phase_refuses_the_open_instead_of_guessing ... ok
+test actor::writer::host_action_tests::a_journalled_intent_survives_a_reopen ... ok
+test actor::writer::host_action_tests::closing_an_intent_deletes_its_row_rather_than_tombstoning_it ... ok
+test actor::writer::host_action_tests::supervision_publish_preserves_wire_authored_assignments_and_effects ... ok
+test actor::writer::tests::a_commit_invokes_the_installed_sink_once_per_changed_store_after_commit ... ok
+test actor::writer::tests::a_commit_with_no_sink_installed_publishes_nothing_and_still_commits ... ok
+test actor::writer::host_action_tests::the_manifest_advance_and_the_intent_close_commit_or_roll_back_together ... ok
+test actor::writer::tests::a_crash_before_the_person_contracts_publish_leaves_no_row ... ok
+test actor::writer::tests::a_later_sink_replaces_the_earlier_one_rather_than_stacking ... ok
+test actor::writer::tests::a_duplicate_genesis_writes_no_additional_row ... ok
+test actor::writer::tests::a_mutation_after_shutdown_is_unavailable_rather_than_a_hang ... ok
+test actor::writer::tests::a_mutation_runs_exactly_once_even_when_the_caller_drops_its_future ... ok
+test actor::writer::tests::a_mutation_commits_once_and_publishes_a_snapshot ... ok
+test actor::writer::tests::a_mailbox_row_survives_a_reopen_and_its_removal_is_persisted ... ok
+test actor::writer::tests::a_post_boot_hire_refreshes_the_live_roster_and_stays_desired_off ... ok
+test actor::writer::tests::a_reconcile_that_has_waited_the_aging_interval_goes_first ... ok
+test actor::writer::tests::a_refusal_from_the_closure_rolls_the_transaction_back ... ok
+test actor::writer::tests::a_rolled_back_mutation_never_invokes_the_sink ... ok
+test actor::writer::tests::a_saturating_small_stream_cannot_starve_a_queued_reconcile ... ok
+test actor::writer::tests::activity_publish_reconciles_at_the_current_transaction_cursor ... ok
+test actor::writer::tests::a_small_op_is_admitted_ahead_of_a_reconcile_queued_before_it ... ok
+test actor::writer::tests::activity_structural_reconcile_is_a_noop_at_the_current_transaction_cursor ... ok
+test actor::writer::tests::chiefd_own_health_commit_is_visible_to_the_health_monitor_publish_route ... ok
+test actor::writer::tests::activity_reconstructs_from_rows_across_a_reopen_and_never_touches_documents ... ok
+test actor::writer::tests::chiefd_own_health_write_merges_with_route_committed_incidents ... ok
+test actor::writer::tests::clearing_a_normalized_store_invokes_the_sink_with_removed_true ... ok
+test actor::writer::tests::company_removal_quarantine_inventory_is_bounded_safe_and_deterministic ... ok
+test actor::writer::tests::clearing_a_normalized_store_is_persisted ... ok
+test actor::writer::tests::company_removal_prepare_refuses_stale_runtime_source_facts ... ok
+test actor::writer::tests::company_removal_finalize_refuses_a_different_transaction ... ok
+test actor::writer::tests::converge_safety_reconstructs_from_rows_across_a_reopen ... ok
+test actor::writer::tests::department_batch_final_fence_is_atomic_across_roster_and_observation ... ok
+test actor::writer::tests::concurrent_company_removal_prepares_return_the_same_instruction ... ok
+test actor::writer::tests::department_batch_refuses_when_requester_is_not_observed_manager ... ok
+test actor::writer::tests::department_business_refusal_does_not_persist_batch_observation ... ok
+test actor::writer::tests::every_journal_row_of_one_commit_carries_the_writers_single_wall_reading ... ok
+test actor::writer::tests::genesis_with_models_request_rejects_a_missing_new_field ... ok
+test actor::writer::tests::company_slug_is_available_for_fresh_manifest_genesis_after_finalization ... ok
+test actor::writer::tests::genesis_with_models_writes_all_five_documents_in_one_call ... ok
+test actor::writer::tests::health_monitor_rows_survive_fresh_write_and_actor_restart ... ok
+test actor::writer::tests::health_monitor_rows_without_an_event_sequence_reconstruct_at_open ... ok
+test actor::writer::tests::manifest_genesis_seeds_live_supervision_and_activity ... ok
+test actor::writer::tests::hire_model_final_fence_leaves_person_and_observation_unpersisted ... ok
+test actor::writer::tests::company_removal_prepare_reuses_one_instruction_and_finalize_is_idempotent ... ok
+test actor::writer::tests::observation_emits_exactly_one_feed_call_for_a_changed_pass ... ok
+test actor::writer::tests::normalized_state_survives_closing_and_reopening_the_actor ... ok
+test actor::writer::tests::model_aware_genesis_is_one_actor_transaction ... ok
+test actor::writer::tests::observation_emits_zero_feed_calls_for_an_unchanged_pass ... ok
+test actor::writer::tests::finalize_refuses_nonjournal_rows_without_a_valid_manifest ... ok
+test actor::writer::tests::observation_failure_leaves_the_database_unchanged ... ok
+test actor::writer::tests::finalize_racing_prepare_never_allows_a_late_journal_to_survive ... ok
+test actor::writer::tests::quiescing_resolves_queued_mutations_unavailable_and_never_hangs ... ok
+test actor::writer::tests::queue_deadline_busy_proves_the_wait_and_never_runs_the_closure ... ok
+test actor::writer::tests::reads_do_not_queue_behind_a_blocked_writer ... ok
+test actor::writer::tests::session_maintenance_publish_reconciles_at_the_current_transaction_cursor ... ok
+test actor::writer::tests::org_manifest_reconstructs_from_rows_across_a_reopen ... ok
+test actor::writer::tests::company_removal_progress_matrix_refuses_lost_ambiguous_and_mismatched_states ... ok
+test clock::tests::millis_until_is_zero_for_past_instants ... ok
+test clock::tests::monotonic_addition_saturates_instead_of_wrapping ... ok
+test clock::tests::system_clock_monotonic_never_goes_backwards ... ok
+test clock::tests::to_iso8601_renders_the_documented_millisecond_format ... ok
+test clock::tests::to_iso8601_renders_the_unix_epoch ... ok
+test diagnostics::tests::a_labelled_body_is_omitted_to_the_end_of_the_line ... ok
+test diagnostics::tests::a_labelled_secret_is_masked_whatever_the_separator ... ok
+test diagnostics::tests::a_multibyte_diagnostic_is_never_sliced_mid_character ... ok
+test diagnostics::tests::a_plain_sentence_survives_unchanged ... ok
+test diagnostics::tests::a_quoted_json_secret_key_is_masked_without_losing_the_key_name ... ok
+test diagnostics::tests::a_structured_payload_is_omitted_rather_than_truncated_into_storage ... ok
+test actor::writer::tests::stale_health_monitor_publish_deletes_an_incident_it_never_observed ... ok
+test diagnostics::tests::an_empty_or_control_only_diagnostic_still_says_something ... ok
+test diagnostics::tests::an_over_long_diagnostic_is_bounded_and_says_so ... ok
+test diagnostics::tests::control_characters_and_runs_of_whitespace_collapse_to_single_spaces ... ok
+test diagnostics::tests::bounding_is_idempotent_so_a_read_repair_never_re_truncates ... ok
+test actor::writer::tests::the_writer_thread_is_named_after_its_company ... ok
+test diagnostics::tests::only_the_first_line_is_kept_because_stdout_is_appended_after_it ... ok
+test error::tests::kind_names_match_the_closed_taxonomy ... ok
+test error::tests::refusal_carries_code_and_routes_for_the_corpus_matcher ... ok
+test error::tests::refusal_converts_into_the_taxonomy_error ... ok
+test host_action::tests::advancing_a_phase_changes_nothing_else_about_the_intent ... ok
+test host_action::tests::an_unknown_phase_does_not_parse_into_a_permissive_default ... ok
+test host_action::tests::only_closed_rows_are_ignored_by_recovery ... ok
+test host_action::tests::phase_spellings_are_stable_because_they_are_durable ... ok
+test isotime::tests::a_corrupt_deadline_is_due_once_and_a_fresh_stamp_is_readable_again ... ok
+test isotime::tests::a_readable_schedule_deadline_is_returned_exactly_as_parsed ... ok
+test isotime::tests::a_second_without_a_fraction_still_parses ... ok
+test isotime::tests::an_unreadable_schedule_deadline_reads_as_due_now_not_as_never ... ok
+test isotime::tests::every_foreign_spelling_reads_as_due_rather_than_disabling_the_schedule ... ok
+test isotime::tests::parsing_is_the_exact_inverse_of_rendering ... ok
+test isotime::tests::rendering_matches_the_javascript_to_iso_string_shape ... ok
+test isotime::tests::spellings_chiefd_does_not_write_are_unreadable_rather_than_guessed ... ok
+test isotime::tests::the_conformance_epoch_parses_to_the_value_the_fixtures_assume ... ok
+test isotime::tests::the_fractionless_twenty_character_spelling_still_parses_and_is_not_forced_due ... ok
+test diagnostics::tests::urls_bot_tokens_and_bearer_credentials_are_masked ... ok
+test ledger::tests::changed_and_removed_sets_describe_exactly_one_commits_disk_work ... ok
+test ledger::tests::every_row_of_one_commit_shares_the_writers_single_wall_reading ... ok
+test ledger::tests::put_document_marks_a_new_projection_without_a_counter ... ok
+test ledger::tests::snapshot_derefs_to_committed_ledgers_and_counts_commits ... ok
+test ledger::tests::validate_refuses_a_body_that_is_not_a_store_document ... ok
+test diagnostics::tests::output_is_byte_identical_to_the_typescript_bounded_persisted_error ... ok
+test lifecycle::tests::a_removal_marker_refuses_creation_and_a_creating_marker_does_not ... ok
+test lifecycle::tests::a_truncated_payload_fails_to_decode_rather_than_looking_complete ... ok
+test lifecycle::tests::an_opened_intent_is_readable_back_with_its_payload ... ok
+test lifecycle::tests::an_unknown_phase_blocks_the_company_and_never_guesses ... ok
+test lifecycle::tests::closing_is_idempotent_because_replaying_a_finished_transaction_closes_it_again ... ok
+test lifecycle::tests::payloads_round_trip_including_values_with_separators_in_them ... ok
+test lifecycle::tests::one_corrupt_company_does_not_hide_the_others ... ok
+test lifecycle::tests::phase_strings_are_durable_and_round_trip ... ok
+test lifecycle::tests::the_oldest_open_transaction_is_the_one_recovered ... ok
+test lifecycle::tests::reopening_the_same_transaction_preserves_the_original_row ... ok
+test model_policy::tests::department_batch_resolves_all_route_forms_and_refuses_as_one_decision ... ok
+test model_policy::tests::explicit_manifest_selection_checks_observation_not_manager_or_default_route ... ok
+test model_policy::tests::explicit_selection_requires_exact_latest_observation ... ok
+test model_policy::tests::fresh_hire_intent_has_only_inherit_model_only_or_exact_outcomes ... ok
+test model_policy::tests::manifest_binding_fences_unknown_departed_benched_and_stopped_managers ... ok
+test model_policy::tests::manifest_binding_inherits_the_exact_active_manager_route ... ok
+test model_policy::tests::omitted_hire_selection_inherits_manager_and_still_checks_availability ... ok
+test model_policy::tests::manifest_binding_uses_only_the_supplied_company_inputs ... ok
+test model_policy::tests::organizational_default_never_synthesizes_availability ... ok
+test model_policy::tests::route_bounds_and_company_inputs_are_isolated ... ok
+test model_policy::tests::operator_inference_provider_only_and_unobserved_routes_refuse ... ok
+test model_policy::tests::unobserved_route_refusal_enumerates_what_the_catalog_actually_contained ... ok
+test orglog::tests::an_unwritable_sink_drops_the_line_instead_of_panicking ... ok
+test orglog::tests::control_characters_cannot_break_the_line_framing ... ok
+test orglog::tests::derives_from_home_rather_than_naming_one_machines_root_directory ... ok
+test orglog::tests::every_line_carries_a_millisecond_timestamp ... ok
+test ledger::tests::a_commit_shares_untouched_bodies_and_copies_only_what_it_writes ... ok
+test orglog::tests::never_resolves_under_root_when_any_usable_signal_exists ... ok
+test orglog::tests::prefers_the_launcher_data_root_when_the_launcher_supplied_one ... ok
+test orglog::tests::reconstructs_the_data_root_from_the_orgs_root_the_daemon_is_always_given ... ok
+test orglog::tests::sequence_numbers_are_gapless_so_loss_is_detectable ... ok
+test orglog::tests::timestamps_match_known_civil_dates ... ok
+test orglog::tests::treats_blank_and_rootless_values_as_absent ... ok
+test orglog::tests::top_level_keys_match_the_typescript_schema ... ok
+test polarity::tests::a_parsed_body_is_never_reported_as_recovered ... ok
+test polarity::tests::fail_safe_value_decode_of_unreadable_launch_intent_denies_everyone ... ok
+test runtime::converge_intent::tests::abort_open_closes_converge_rows_and_leaves_materialize_rows ... ok
+test runtime::converge_intent::tests::open_read_close_round_trips_the_body ... ok
+test runtime::converge_intent::tests::read_ignores_a_non_converge_row_at_the_same_id ... ok
+test runtime::converge_intent::tests::the_row_is_kind_converge_and_stays_pending ... ok
+test orglog::tests::a_stream_is_bounded_by_rotation_and_keeps_one_generation ... ok
+test polarity::tests::only_the_registry_macro_implements_the_store_seal ... ok
+test runtime::pointer_sweep::tests::a_dangling_pointer_at_a_missing_transition_is_left_alone ... ok
+test runtime::pointer_sweep::tests::a_person_with_no_pointer_produces_nothing ... ok
+test runtime::pointer_sweep::tests::actions_are_in_people_order ... ok
+test runtime::pointer_sweep::tests::applied_at_current_generation_is_never_cleared ... ok
+test runtime::pointer_sweep::tests::cancelled_is_always_cleared ... ok
+test runtime::pointer_sweep::tests::cancelled_is_cleared_regardless_of_generation ... ok
+test runtime::pointer_sweep::tests::in_flight_transitions_are_left_alone ... ok
+test runtime::pointer_sweep::tests::reverify_cancelled_holds_only_while_still_cancelled ... ok
+test runtime::pointer_sweep::tests::reverify_drops_when_the_generation_re_converged ... ok
+test runtime::pointer_sweep::tests::reverify_drops_when_the_pointer_moved ... ok
+test runtime::pointer_sweep::tests::reverify_drops_when_the_pointer_was_already_cleared ... ok
+test runtime::pointer_sweep::tests::reverify_drops_when_the_status_changed_category ... ok
+test runtime::pointer_sweep::tests::reverify_holds_when_the_diverged_state_is_unchanged ... ok
+test runtime::pointer_sweep::tests::task_29_applied_at_stale_generation_is_cleared ... ok
+test runtime::project::tests::a_projected_manifest_validates_through_the_planner ... ok
+test runtime::project::tests::activity_projection_maps_fields_and_the_handoff_required_token ... ok
+test runtime::project::tests::department_and_employment_enums_map_faithfully ... ok
+test runtime::project::tests::ledger_projection_defaults_generation_to_one_without_supervision ... ok
+test runtime::project::tests::ledger_projection_marks_desired_people_active_and_round_trips ... ok
+test runtime::project::tests::ledger_projection_omits_handoff_required_for_a_terminal_transition ... ok
+test runtime::project::tests::ledger_projection_reconstructs_handoff_required_from_a_pending_transition ... ok
+test runtime::project::tests::sweep_projection_clears_a_cancelled_transition_even_without_supervision ... ok
+test runtime::project::tests::sweep_projection_clears_an_applied_transition_at_a_stale_generation ... ok
+test runtime::project::tests::sweep_projection_falls_back_to_transition_generation_when_supervision_is_missing ... ok
+test runtime::project::tests::sweep_projection_leaves_an_applied_transition_at_the_current_generation ... ok
+test runtime::reconcile_plan::tests::a_carried_offset_keeps_a_following_start_ramping_instead_of_restarting_at_zero ... ok
+test runtime::reconcile_plan::tests::a_carried_ordinal_slot_preserves_concurrency_without_a_wall_clock_residue ... ok
+test runtime::reconcile_plan::tests::a_handoff_required_decision_beats_roster_state_in_both_directions ... ok
+test runtime::reconcile_plan::tests::a_kill_re_lays_out_only_the_affected_window ... ok
+test runtime::reconcile_plan::tests::a_pane_with_wrong_window_identity_fails_closed ... ok
+test runtime::reconcile_plan::tests::a_paused_department_subtree_contributes_no_windows ... ok
+test runtime::reconcile_plan::tests::a_stray_pane_does_not_block_a_managed_pane_from_converging ... ok
+test runtime::reconcile_plan::tests::a_whole_company_start_never_admits_every_process_at_once ... ok
+test runtime::reconcile_plan::tests::admits_only_new_processes_in_deterministic_stagger_order ... ok
+test runtime::reconcile_plan::tests::an_empty_plan_against_no_session_does_nothing ... ok
+test runtime::reconcile_plan::tests::an_explicit_immediate_person_bypasses_the_carried_ramp_without_releasing_bulk_peers ... ok
+test runtime::reconcile_plan::tests::bounded_concurrency_admits_processes_in_groups ... ok
+test runtime::reconcile_plan::tests::creates_exactly_one_pane_per_active_person_binding_each ... ok
+test runtime::reconcile_plan::tests::desired_topology_places_active_people_by_disk_model ... ok
+test runtime::reconcile_plan::tests::desired_topology_rejects_a_mismatched_or_incomplete_activity_snapshot ... ok
+test runtime::reconcile_plan::tests::distributed_sizes_splits_with_a_one_cell_gap ... ok
+test runtime::reconcile_plan::tests::does_not_reap_an_untagged_pane_naming_a_still_desired_person ... ok
+test runtime::reconcile_plan::tests::does_not_reap_an_untagged_pane_naming_a_stranger ... ok
+test runtime::reconcile_plan::tests::fails_closed_for_a_partially_ownership_tagged_window ... ok
+test runtime::reconcile_plan::tests::fails_closed_when_a_pane_and_its_window_disagree_on_identity ... ok
+test runtime::reconcile_plan::tests::fails_closed_when_one_person_has_two_ownership_tagged_panes ... ok
+test runtime::reconcile_plan::tests::fails_closed_when_two_windows_claim_the_same_logical_window ... ok
+test runtime::reconcile_plan::tests::identical_topologies_never_respawn ... ok
+test runtime::reconcile_plan::tests::keeps_managed_windows_ordered_and_omits_ordering_for_a_single_window ... ok
+test runtime::reconcile_plan::tests::moves_a_stable_pane_into_a_new_window_by_move_not_respawn ... ok
+test runtime::reconcile_plan::tests::moves_a_stable_pane_into_an_existing_window ... ok
+test runtime::reconcile_plan::tests::organization_tmux_layout_fails_closed_on_bad_input ... ok
+test runtime::reconcile_plan::tests::organization_tmux_layout_uses_columns_then_two_rows ... ok
+test runtime::reconcile_plan::tests::quarantines_a_partially_ownership_tagged_pane_without_failing_the_plan ... ok
+test runtime::reconcile_plan::tests::reapplying_the_same_identity_and_generation_is_a_no_op_empty_plan ... ok
+test runtime::reconcile_plan::tests::reaps_the_untagged_orphan_of_a_departed_person ... ok
+test runtime::reconcile_plan::tests::refuses_a_session_tagged_for_a_different_organization ... ok
+test runtime::reconcile_plan::tests::removes_a_now_benched_person_while_retaining_every_other_pane ... ok
+test runtime::reconcile_plan::tests::removes_the_owned_session_when_the_disk_plan_has_no_active_people ... ok
+test actor::writer::tests::supervisor_watermark_reconstructs_from_rows_across_a_reopen ... ok
+test runtime::reconcile_plan::tests::reorders_windows_only_when_the_observed_order_drifts ... ok
+test runtime::reconcile_plan::tests::staggers_a_multi_person_generation_replacement_and_leaves_retained_panes_untouched ... ok
+test schema::tests::assignments_reserve_a_nullable_task_id_for_supervision_task_links ... ok
+test schema::tests::b2_contract_metadata_is_columns_and_transient_is_dropped ... ok
+test schema::tests::b2_people_fields_and_start_active_drop ... ok
+test schema::tests::b2_person_prompts_and_revisionless_org_settings_and_loan_started_at ... ok
+test schema::tests::b2_staffing_history_carries_the_nine_manifest_terms ... ok
+test schema::tests::candidate_ordinal_has_a_dedicated_in_txn_counter ... ok
+test schema::tests::company_pragmas_are_durable_not_fast ... ok
+test schema::tests::department_uniqueness_invariants_are_enforced ... ok
+test schema::tests::documents_and_vestigial_provider_admission_are_absent_after_final_cutover ... ok
+test schema::tests::effects_sequence_is_slug_scoped_with_a_counter_so_pruned_seqs_are_never_reused ... ok
+test schema::tests::event_once_markers_ddl_is_single_source ... ok
+test schema::tests::exactly_one_active_transition_is_a_partial_unique_index_with_a_positive_list ... ok
+test schema::tests::foreign_keys_wire_people_to_their_departments ... ok
+test schema::tests::learned_skill_versions_use_an_in_row_counter_not_autoincrement ... ok
+test schema::tests::learned_skills_enums_are_check_constrained ... ok
+test schema::tests::learned_skills_lists_are_child_tables_wired_by_foreign_key ... ok
+test schema::tests::learned_skills_slice_tables_are_present ... ok
+test schema::tests::loans_cannot_be_a_self_move ... ok
+test schema::tests::mailbox_state_is_check_constrained_to_the_six_buckets ... ok
+test schema::tests::maintenance_company_action_reference_is_a_real_fk ... ok
+test schema::tests::maintenance_flags_are_zero_or_one_check_constrained ... ok
+test schema::tests::maintenance_ledger_is_revisionless_metadata ... ok
+test schema::tests::maintenance_ordering_is_per_slug_ordinal_not_a_json_array ... ok
+test schema::tests::memory_records_carries_the_scalar_value_columns_and_a_commitments_child ... ok
+test schema::tests::memory_review_has_one_row_per_person_without_a_mutable_fence ... ok
+test schema::tests::memory_review_job_is_a_child_of_its_state_row ... ok
+test actor::writer::tests::supervision_meta_and_assignments_reconstruct_from_rows_across_a_reopen ... ok
+test schema::tests::memory_review_lease_is_coherent_or_absent ... ok
+test schema::tests::memory_review_one_active_lease_is_a_partial_unique_with_a_positive_list ... ok
+test schema::tests::model_catalog_is_normalized_company_scoped_and_secret_free ... ok
+test schema::tests::model_observations_own_generation_and_normalized_metadata ... ok
+test schema::tests::n3_goal_watches_is_per_manager_with_no_goal_fk_reopen ... ok
+test schema::tests::n3_manager_check_ins_and_delegated_goals_present ... ok
+test schema::tests::n3_manager_goals_status_is_the_three_term_vocab_reopen ... ok
+test schema::tests::n3_reminders_and_supervision_meta ... ok
+test schema::tests::n4_person_activity_and_activity_meta ... ok
+test schema::tests::n9_b3_ack_receipts_map_slice ... ok
+test schema::tests::memory_review_status_is_check_constrained_to_the_five_states ... ok
+test schema::tests::n9_b4_singleton_sweep_tables ... ok
+test schema::tests::normalized_schema_forbids_json_columns ... ok
+test schema::tests::open_transition_index_uses_a_positive_status_list ... ok
+test schema::tests::normalized_core_tables_are_present ... ok
+test schema::tests::registry_holds_lifecycle_intents_and_resolved_org_dirs ... ok
+test schema::tests::org_events_seq_is_a_per_slug_counter_not_autoincrement ... ok
+test schema::tests::retry_ceilings_are_present_as_check_assertions ... ok
+test schema::tests::registry_identities_is_daemon_wide_with_coherence_checks ... ok
+test schema::tests::sibling_ordinal_is_unique_within_a_parent ... ok
+test schema::tests::telegram_cursor_avoids_the_offset_keyword ... ok
+test schema::tests::the_provider_admission_pool_is_gone_from_the_schema_and_retired_on_open ... ok
+test schema::tests::structural_body_columns_are_absent_from_fresh_schema ... ok
+test schema::tests::transition_intent_id_is_nullable ... ok
+test schema::tests::transitions_does_not_fk_people_so_manifest_removal_never_corrupts_the_company_db ... ok
+test schema::tests::unit_removal_phase_is_constrained_to_the_r1_enum ... ok
+test runtime::delivery_sink::tests::a_restaged_effect_after_a_crash_stays_one_durable_row ... ok
+test runtime::delivery_sink::tests::deliver_durably_stages_the_envelope_and_then_wakes ... ok
+test schema::tests::both_schema_constants_apply_cleanly_to_a_real_sqlite_connection ... ok
+test store::acks_rows::tests::draining_a_receipt_deletes_its_row ... ok
+test store::acks_rows::tests::empty_queue_reconstructs_as_empty_map_not_none ... ok
+test store::acks_rows::tests::generation_check_rejects_zero ... ok
+test store::acks_rows::tests::rejects_unmodeled_keys ... ok
+test store::acks_rows::tests::round_trips_one_receipt ... ok
+test store::acks_rows::tests::semantic_insert_is_idempotent_and_never_replaces_a_conflict ... ok
+test store::acks_rows::tests::shadow_diff_zero_loss_on_live_blob ... ok
+test store::activity::rows::tests::a_whole_ledger_round_trips_through_rows ... ok
+test store::activity::rows::tests::a_second_manifest_genesis_cannot_bypass_named_person_operations ... ok
+test store::activity::rows::tests::absent_activity_meta_reconstructs_as_none ... ok
+test store::activity::rows::tests::an_idle_republish_touches_nothing ... ok
+test store::activity::rows::tests::item_d_rejects_unmodeled_keys ... ok
+test store::activity::rows::tests::live_bak_control_activity_and_reflection_zero_loss ... ignored
+test store::activity::rows::tests::backfill_tolerates_the_337_legacy_leaf_but_live_publish_stays_strict ... ok
+test store::activity::rows::tests::changing_one_transition_touches_only_that_entity ... ok
+test store::activity::rows::tests::direct_apply_over_write_rows_advances_the_feed_once_per_entity ... ok
+test store::activity::rows::tests::insert_terminal_transition_writes_an_applied_row_outside_the_active_index ... ok
+test store::activity::rows::tests::read_projects_a_desired_off_row_for_a_manifest_person_missing_from_activity_rows ... ok
+test store::activity::rows::tests::reflection_durability_is_field_for_field_and_folds_memory_with_dedup ... ok
+test store::activity::rows::tests::shadow_diff_activity_surfaces_an_unmodeled_key_as_loud ... ok
+test store::activity::rows::tests::shadow_diff_activity_reports_zero_loss_on_a_full_ledger ... ok
+test store::activity::rows::tests::number_501_terminal_history_is_deleted_row_by_row_not_kept_in_a_growing_blob ... ok
+test store::activity::rows::tests::shadow_diff_reflection_surfaces_an_unmodeled_record_key_as_loud ... ok
+test store::activity::rows::tests::shadow_diff_reflection_overwrites_a_divergent_record_no_loss ... ok
+test store::activity::rows::tests::shadow_diff_reflection_folds_a_person_blob_zero_loss ... ok
+test store::activity::tests::a_conflicting_transition_for_the_same_person_is_refused ... ok
+test store::activity::tests::a_different_action_explicit_intent_supersedes_a_stale_stop_park ... ok
+test store::activity::tests::a_direct_transfer_does_not_start_a_stopped_admitted_worker ... ok
+test store::activity::tests::a_different_handoff_for_the_same_transition_is_refused ... ok
+test store::activity::tests::a_direct_transfer_retains_the_running_worker_and_advances_pane_placement_without_a_handoff ... ok
+test store::activity::tests::a_forced_transition_is_terminal_for_reflect_and_abandon ... ok
+test store::activity::tests::a_forced_transition_decodes_and_validates_from_the_wire ... ok
+test store::activity::tests::a_mutation_refuses_an_absent_document_instead_of_reseeding_it ... ok
+test store::activity::tests::a_fully_overdue_routine_park_is_forced_terminal_and_never_retried ... ok
+test store::activity::tests::a_paused_department_derives_a_forced_park_for_everyone_under_it ... ok
+test store::activity::tests::a_reflection_from_a_stale_generation_conflicts_and_publishes_nothing ... ok
+test store::activity::rows::tests::supersede_open_transition_cancels_the_open_row_and_is_noop_when_none ... ok
+test store::activity::tests::a_ready_structural_handoff_applies_and_advances_the_persisted_placement ... ok
+test store::activity::tests::a_reflection_replay_keeps_the_original_stamp_so_durable_bytes_converge ... ok
+test store::activity::rows::tests::the_transitions_counter_reconstructs_next_sequence ... ok
+test store::activity::tests::a_reflection_writes_its_durable_memory_row_in_the_same_commit ... ok
+test store::activity::tests::an_absent_document_reads_as_absent_and_damaged_bytes_still_read_as_corrupt ... ok
+test store::activity::tests::a_routine_idle_park_waits_for_the_settled_lease_and_is_capped_in_flight ... ok
+test store::activity::tests::activity_read_has_no_whole_company_fence ... ok
+test store::activity::tests::a_structural_handoff_is_abandoned_when_the_fence_excludes_its_person ... ok
+test store::activity::tests::an_absent_person_is_not_recreated_for_a_bounded_idle_lease ... ok
+test store::activity::tests::an_already_active_person_finishes_the_bounded_idle_lease_after_its_launch_intent_withdraws ... ok
+test store::activity::tests::an_applied_intent_bound_handoff_starts_fresh_for_a_different_intent ... ok
+test store::activity::tests::an_applied_intent_bound_handoff_still_serves_its_own_retry ... ok
+test store::activity::tests::an_applied_intent_bound_park_starts_fresh_on_a_structural_change ... ok
+test store::activity::tests::an_explicit_intent_supersedes_a_stale_intent_bound_transition ... ok
+test store::activity::tests::an_applied_unowned_park_starts_fresh_on_a_structural_change ... ok
+test store::activity::tests::an_explicit_intent_supersedes_an_unowned_routine_park ... ok
+test store::activity::tests::an_escalated_own_goal_stays_visible_but_does_not_lease_its_blocked_owner ... ok
+test store::activity::tests::an_open_handoff_for_a_fenced_out_person_is_cancelled_and_stamped_abandoned ... ok
+test store::activity::rows::tests::upsert_person_activity_desired_sets_flag_and_pointer_preserving_other_columns ... ok
+test store::activity::tests::apply_pointer_clears_clears_an_applied_pointer_at_a_diverged_generation ... ok
+test store::activity::tests::forced_holds_no_reflection ... ok
+test store::activity::tests::inv17_a_commitment_is_ellipsis_truncated_only_as_a_last_resort ... ok
+test store::activity::tests::inv17_the_budget_pops_whole_artifacts_before_truncating_commitments ... ok
+test store::activity::tests::apply_pointer_clears_drops_an_action_whose_pointer_has_moved ... ok
+test store::activity::tests::arriving_work_cancels_a_routine_park_but_never_an_intent_bound_one ... ok
+test store::activity::tests::apply_pointer_clears_leaves_a_claimable_applied_pointer_alone ... ok
+test store::activity::tests::issue452_clamp_fits_even_when_prose_alone_exceeds_the_budget ... ok
+test store::activity::tests::benching_derives_a_park_and_departure_derives_an_offboard ... ok
+test store::activity::tests::item_d_read_tolerates_the_allowlisted_legacy_key_but_fails_any_other_unknown ... ok
+test store::activity::tests::issue452_a_normal_reflection_is_untouched_by_the_heal_pass ... ok
+test store::activity::tests::issue452_a_mutation_clamps_an_over_budget_reflection_to_disk ... ok
+test store::activity::tests::read_still_corrupts_on_non_counter_validation_failure ... ok
+test store::activity::tests::issue452_an_over_budget_park_reflection_is_quarantined_not_corrupt ... ok
+test store::activity::tests::issue452_structural_reflection_corruption_is_still_fatal ... ok
+test store::activity::tests::structural_reconcile_refuses_a_candidate_invalid_after_reconciliation ... ok
+test store::activity::tests::reconcile_applies_a_committed_ready_transition ... ok
+test store::activity::tests::structural_reconcile_refuses_absent_or_malformed_activity_without_writing ... ok
+test store::activity::tests::require_ready_accepts_a_committed_ready_transition_as_durable ... ok
+test store::activity::tests::structural_reconcile_migrates_a_departed_person_and_transition ... ok
+test store::activity::tests::terminal_transition_cap_is_a_noop_under_the_limit ... ok
+test store::activity::tests::the_fence_overrides_demand_and_is_written_into_the_durable_desired_state ... ok
+test store::activity::tests::terminal_transitions_are_capped_dropping_oldest_first_keeping_live_and_referenced ... ok
+test store::activity::tests::the_ceo_runs_under_every_fence_including_the_empty_one ... ok
+test store::activity::tests::the_reconcile_pass_expires_a_stale_in_flight_transition ... ok
+test store::activity::tests::the_ceo_is_never_a_routine_park_candidate ... ok
+test store::activity::tests::validate_rejects_a_malformed_forced_transition ... ok
+test store::boot_lease_rows::tests::a_second_direct_publish_replaces_the_lease ... ok
+test store::boot_lease_rows::tests::absent_before_any_publish ... ok
+test store::boot_lease_rows::tests::rejects_unmodeled_keys ... ok
+test store::boot_lease_rows::tests::round_trips_and_derives_all_identity_fields ... ok
+test store::boot_lease_rows::tests::a_new_token_is_a_change ... ok
+test actor::writer::tests::valid_replacement_progress_and_concurrent_mutation_preserve_the_fresh_actor ... ok
+test store::boot_lease_rows::tests::shadow_diff_zero_loss_on_a_live_blob_shape ... ok
+test store::company_removal_rows::tests::absent_reconstructs_to_none ... ok
+test store::boot_lease_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::company_removal_rows::tests::clear_deletes_parent_and_children ... ok
+test store::context::tests::manifest_order_wins_over_caller_order_and_drops_the_ceo ... ok
+test store::context::tests::unknown_people_are_not_manifest_ordered_into_existence ... ok
+test store::converge_safety::tests::a_config_change_also_resumes_a_tripped_breaker ... ok
+test store::converge_safety::tests::a_converged_idle_plan_defers_nothing_and_is_unchanged ... ok
+test store::converge_safety::tests::a_durable_override_suspends_the_budget_entirely ... ok
+test store::converge_safety::tests::a_first_cycle_proceeds_and_a_concurrent_second_is_skipped_as_already_running ... ok
+test store::converge_safety::tests::a_fresh_company_defaults_to_shadow_without_a_warning ... ok
+test store::converge_safety::tests::a_large_start_backlog_drains_incrementally_over_passes ... ok
+test store::converge_safety::tests::a_new_cycle_is_skipped_until_the_floor_interval_elapses_after_the_previous_end ... ok
+test store::converge_safety::tests::a_plan_exactly_at_the_threshold_is_allowed_and_one_over_is_refused ... ok
+test store::converge_safety::tests::a_present_but_unreadable_row_reads_as_the_restrictive_value_and_warns ... ok
+test store::converge_safety::tests::a_recorded_refusal_round_trips ... ok
+test store::converge_safety::tests::a_stale_claim_from_a_crashed_cycle_is_reclaimed ... ok
+test store::converge_safety::tests::a_tripped_breaker_forces_full_shadow_including_the_sweep ... ok
+test store::converge_safety::tests::a_tripped_breaker_resumes_only_via_an_explicit_clear ... ok
+test store::converge_safety::tests::a_write_over_corrupt_bytes_cannot_inherit_an_unreadable_breaker_into_apply ... ok
+test store::converge_safety::tests::an_over_budget_respawn_plan_drains_over_successive_passes_without_livelock ... ok
+test store::converge_safety::tests::clearing_resets_to_the_shadow_default ... ok
+test store::converge_safety::tests::kills_are_exempt_from_the_budget_only_respawns_count ... ok
+test store::converge_safety::tests::mode_and_sub_flags_survive_a_round_trip_through_the_ledger ... ok
+test store::converge_safety::tests::quiet_lease_defers_only_the_newly_authorized_people_with_their_dependents ... ok
+test store::converge_safety::tests::start_budget_at_or_above_the_start_count_is_a_no_op ... ok
+test store::converge_safety::tests::start_budget_drops_dependents_of_a_deferred_window ... ok
+test store::converge_safety::tests::start_budget_keeps_only_the_first_cap_starts_and_defers_the_rest ... ok
+test store::converge_safety::tests::start_budget_never_throttles_cheap_ops ... ok
+test store::converge_safety::tests::the_budget_floor_is_two_even_for_a_tiny_or_empty_company ... ok
+test store::converge_safety::tests::the_budget_is_twenty_five_percent_once_that_beats_the_floor ... ok
+test store::converge_safety::tests::the_sweep_flag_can_apply_live_while_the_rest_stays_in_shadow ... ok
+test store::converge_safety::tests::the_third_consecutive_failure_trips_the_breaker_back_to_shadow ... ok
+test store::converge_safety::tests::trimming_at_or_above_the_full_respawn_count_is_a_no_op ... ok
+test store::converge_safety::tests::trimming_keeps_kills_and_the_first_n_respawns_dropping_the_paired_retag ... ok
+test store::converge_safety::tests::two_failures_then_a_success_never_trips_and_resets_the_count ... ok
+test store::company_removal_rows::tests::clear_on_absent_is_a_no_op ... ok
+test store::company_removal_rows::tests::progress_cas_advances_both_phases_without_creating_business_events ... ok
+test store::company_removal_rows::tests::publish_round_trips_derived_and_children ... ok
+test store::company_removal_rows::tests::rejects_unmodeled_keys ... ok
+test store::company_removal_rows::tests::two_companies_do_not_cross_leak ... ok
+test store::converge_safety_rows::tests::a_second_direct_publish_uses_current_state ... ok
+test store::converge_safety_rows::tests::backfill_round_trips_a_blob_body ... ok
+test store::converge_safety_rows::tests::clear_deletes_the_row ... ok
+test store::converge_safety_rows::tests::round_trips_full_state_and_derives_schema_version ... ok
+test store::converge_safety_rows::tests::empty_before_any_publish ... ok
+test store::converge_safety_rows::tests::slug_scoping_isolates_companies ... ok
+test store::converge_safety_rows::tests::round_trips_shadow_default_without_refusal ... ok
+test store::converge_safety_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::event_journal_rows::tests::absent_marker_reads_none ... ok
+test store::event_journal_rows::tests::insert_is_exactly_once ... ok
+test store::event_journal_rows::tests::prune_removes_only_expired_markers_for_the_named_company ... ok
+test store::event_journal_rows::tests::non_terminal_event_stores_only_id_and_type ... ok
+test store::event_journal_rows::tests::insert_then_read_round_trips_the_thr_fields ... ok
+test store::event_journal_rows::tests::slug_scoping_isolates_companies_in_a_shared_db ... ok
+test store::event_journal_rows::tests::terminal_acknowledgement_rejection_refuses_partial_receipt_identity ... ok
+test store::goal_delivery_quiesce_rows::tests::a_second_atomic_publish_replaces_the_current_singleton ... ok
+test store::event_journal_rows::tests::terminal_acknowledgement_rejection_round_trips_only_exact_receipt_identity ... ok
+test store::goal_delivery_quiesce_rows::tests::backfill_from_live_blob_shape ... ok
+test store::goal_delivery_quiesce_rows::tests::changed_publish_emits_one_event_with_the_right_detail_ref ... ok
+test store::goal_delivery_quiesce_rows::tests::clear_deletes_the_row_and_emits_a_delete ... ok
+test store::goal_delivery_quiesce_rows::tests::rejects_unmodeled_keys ... ok
+test store::goal_delivery_quiesce_rows::tests::clear_on_absent_singleton_is_a_no_op ... ok
+test store::goal_delivery_quiesce_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::goal_delivery_quiesce_rows::tests::round_trips_and_derives_session_name ... ok
+test store::goal_intents_rows::tests::a_second_atomic_publish_replaces_the_current_intent ... ok
+test store::goal_intents_rows::tests::backfill_from_blob_without_optional_fields ... ok
+test store::goal_intents_rows::tests::changing_a_field_upserts_and_emits_one_event ... ok
+test store::goal_intents_rows::tests::empty_before_any_publish ... ok
+test store::goal_intents_rows::tests::rejects_unmodeled_document_keys ... ok
+test store::goal_intents_rows::tests::rejects_unmodeled_record_keys ... ok
+test store::health::tests::a_bounded_read_yields_at_most_two_hundred_lines_and_keeps_the_newest ... ok
+test store::health::tests::a_cached_resolution_whose_marker_vanished_makes_the_incident_active_again ... ok
+test store::health::tests::a_detail_is_redacted_before_it_becomes_part_of_the_fingerprint ... ok
+test store::health::tests::a_generation_attested_resolution_without_a_generation_is_dropped ... ok
+test store::health::tests::a_legacy_archive_resolution_is_kept_precisely_because_it_has_no_generation ... ok
+test store::health::tests::a_read_that_starts_mid_line_discards_that_line ... ok
+test store::health::tests::a_repeated_incident_keeps_its_first_seen_at_and_counts_up ... ok
+test store::health::tests::a_rotated_log_resets_the_cursor_and_reads_from_the_start ... ok
+test store::health::tests::a_stale_incident_keeps_one_identity_as_its_detail_ages_so_it_alerts_once ... ok
+test store::health::tests::a_state_belonging_to_another_company_resets_instead_of_being_adopted ... ok
+test store::health::tests::a_transient_observation_needs_a_second_sample_fifteen_seconds_later ... ok
+test store::health::tests::a_truncated_log_is_a_reset_even_with_the_same_inode ... ok
+test store::health::tests::active_incidents_are_truncated_to_two_hundred ... ok
+test store::health::tests::an_absent_acceptance_reads_as_generation_attested ... ok
+test store::health::tests::an_accepted_terminal_incident_stays_active_with_an_acknowledgement_until_it_clears ... ok
+test store::health::tests::an_incident_that_stops_being_observed_is_reported_resolved_exactly_once ... ok
+test store::health::tests::an_unchanged_log_yields_no_bytes_and_no_partial_line ... ok
+test store::health::tests::an_unconfirmed_observation_is_forgotten_once_it_stops_being_seen ... ok
+test store::health::tests::log_read_budgets_are_sixty_four_kilobytes_per_file_and_two_fifty_six_in_total ... ok
+test store::health::tests::one_malformed_entry_does_not_poison_the_rest_of_the_state ... ok
+test store::health::tests::state_survives_a_round_trip_through_the_ledger ... ok
+test store::health::tests::the_impaired_mailbox_person_id_flows_from_candidate_to_incident_and_round_trips ... ok
+test store::health::tests::unreadable_bytes_reset_the_state_and_warn_rather_than_erroring ... ok
+test store::health::tests::without_an_identity_a_moving_detail_churns_the_fingerprint ... ok
+test store::goal_intents_rows::tests::round_trips_and_derives_identity ... ok
+test store::health_collect::tests::a_failed_effect_falls_back_to_last_delivery_failure_at_for_oldest ... ok
+test store::health_collect::tests::a_fresh_reconciliation_suppresses_the_activity_mismatch_it_is_resolving ... ok
+test store::health_collect::tests::a_failed_manager_effect_is_owned_and_impaired_by_the_manager ... ok
+test store::health_collect::tests::a_healthy_snapshot_produces_no_incidents ... ok
+test store::health_collect::tests::a_pending_supervision_effect_beyond_the_threshold_is_stalled ... ok
+test store::health_collect::tests::a_recent_pending_effect_is_not_yet_stalled ... ok
+test store::health_collect::tests::a_recent_telegram_poll_does_not_page ... ok
+test store::health_collect::tests::a_reconciliation_past_its_lease_is_stalled ... ok
+test store::health_collect::tests::a_stale_telegram_poll_pages_with_a_stable_identity ... ok
+test store::health_collect::tests::a_stopped_supervisor_is_not_running ... ok
+test store::health_collect::tests::a_telegram_failure_is_reported_with_its_kind_and_attempt_count ... ok
+test store::health_collect::tests::a_tmux_audit_failure_is_a_tmux_ownership_incident_carrying_raw_detail ... ok
+test store::health_collect::tests::an_absent_session_with_expected_people_is_reported_missing ... ok
+test store::health_collect::tests::an_absent_session_with_no_expected_people_is_silent ... ok
+test store::health_collect::tests::an_absent_supervisor_is_not_running ... ok
+test store::health_collect::tests::an_old_heartbeat_is_stale_and_a_last_error_is_reported ... ok
+test store::health_collect::tests::dead_tagged_panes_are_reported ... ok
+test store::health_collect::tests::an_unparseable_heartbeat_is_stale_and_reads_invalid ... ok
+test store::health_collect::tests::runtime_panes_that_differ_from_desired_activity_page_when_not_reconciling ... ok
+test store::health_collect::tests::tagged_panes_that_differ_from_runtime_are_a_mismatch ... ok
+test store::health_collect::tests::the_responsible_operator_of_an_unknown_person_is_the_ceo ... ok
+test store::health_collect::tests::the_responsible_operator_of_a_worker_is_its_operational_head ... ok
+test store::goal_intents_rows::tests::removing_an_intent_deletes_its_row_and_emits_a_delete ... ok
+test store::goal_intents_rows::tests::semantic_insert_is_idempotent_and_never_replaces_a_conflict ... ok
+test store::goal_intents_rows::tests::shadow_diff_zero_loss_on_a_live_blob_shape ... ok
+test store::goal_intents_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::health_monitor_rows::tests::a_clear_for_an_unknown_fingerprint_is_a_noop ... ok
+test store::health_monitor_rows::tests::a_clear_outranks_a_same_payload_republication ... ok
+test store::health_monitor_rows::tests::a_cleared_fingerprint_accepts_a_later_recurrence ... ok
+test store::health_monitor_rows::tests::a_cleared_fingerprint_deletes_the_incident_without_a_resolution ... ok
+test store::health_monitor_rows::tests::a_resolution_committed_by_another_writer_deletes_the_incident ... ok
+test store::health_monitor_rows::tests::a_second_direct_publish_uses_current_state ... ok
+test store::health_monitor_rows::tests::an_incident_absent_from_the_payload_is_not_deleted_without_positive_evidence ... ok
+test store::health_monitor_rows::tests::from_daemon_state_refuses_a_legacy_resolution_it_cannot_store_honestly ... ok
+test store::health_monitor_rows::tests::an_explicit_terminal_resolution_deletes_the_incident ... ok
+test store::health_monitor_rows::tests::backfill_publishes_the_daemon_duty_blob ... ok
+test store::health_monitor_rows::tests::empty_before_any_publish ... ok
+test store::health_monitor_rows::tests::clear_removes_every_health_monitor_row ... ok
+test store::health_monitor_rows::tests::empty_state_with_only_last_run_at_persists_via_meta ... ok
+test store::health_monitor_rows::tests::incident_detail_change_upserts_only_that_incident ... ok
+test store::identities::tests::channel_without_pubkey_is_allowed_keypair_without_is_not ... ok
+test store::identities::tests::duplicate_fingerprint_is_rejected ... ok
+test store::health_monitor_rows::tests::rejects_unmodeled_incident_keys ... ok
+test store::identities::tests::enroll_if_absent_is_idempotent ... ok
+test store::health_monitor_rows::tests::round_trips_full_state_and_derives_identity ... ok
+test store::identities::tests::enroll_then_get_roundtrips_active ... ok
+test store::identities::tests::get_absent_is_none ... ok
+test store::identities::tests::person_requires_a_company_slug_daemon_scoped_kinds_forbid_it ... ok
+test store::identities::tests::list_by_principal_groups_operator_identities ... ok
+test store::launch_intent::tests::a_departed_person_loses_authority_on_read_without_a_rewrite ... ok
+test store::launch_intent::tests::a_ledger_from_another_company_or_session_authorizes_nobody ... ok
+test store::launch_intent::tests::a_reconstructed_document_carrying_attributions_still_reads_as_its_fence ... ok
+test store::identities::tests::revoke_flips_active_and_is_idempotent ... ok
+test store::launch_intent::tests::add_refuses_a_person_the_manifest_does_not_know ... ok
+test store::launch_intent::tests::add_authorizes_exactly_the_named_people_and_never_the_ceo ... ok
+test store::launch_intent::tests::add_unions_rather_than_replacing_and_stores_manifest_order ... ok
+test store::launch_intent::tests::adding_over_a_corrupt_ledger_yields_only_the_newly_named_people ... ok
+test store::launch_intent::tests::an_absent_ledger_fences_everyone_but_the_ceo ... ok
+test store::launch_intent::tests::clearing_is_the_restrictive_value_so_it_never_refuses ... ok
+test store::launch_intent::tests::remove_narrows_the_callers_fresh_read_never_a_stale_cached_document ... ok
+test store::launch_intent::tests::remove_keeps_manifest_order_for_the_remainder ... ok
+test store::launch_intent::tests::remove_of_everything_is_ceo_only_and_remove_of_nothing_writes_nothing ... ok
+test store::launch_intent::tests::remove_withdraws_exactly_the_named_people_and_keeps_the_rest ... ok
+test store::launch_intent::tests::the_stored_timestamp_is_the_commits_wall_reading ... ok
+test store::launch_intent::tests::unparseable_bytes_deny_rather_than_open ... ok
+test store::identities::tests::rotate_fingerprint_changes_kid_anchor ... ok
+test store::health_monitor_rows::tests::slug_scoping_isolates_companies_in_a_shared_db ... ok
+test store::health_monitor_rows::tests::terminal_resolutions_are_append_only ... ok
+test store::launch_intent_rows::tests::operator_start_attribution_omits_absent_initiator_on_the_typescript_wire ... ok
+test store::health_monitor_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::launch_intent_rows::tests::clear_deletes_all_rows_and_emits_a_delete_per_person ... ok
+test store::launch_intent_rows::tests::clear_on_absent_doc_is_a_no_op ... ok
+test store::launch_intent_rows::tests::delete_person_fence_returns_a_touch_only_when_a_row_existed ... ok
+test store::launch_intent_rows::tests::empty_before_any_publish_is_an_empty_set_not_none ... ok
+test store::launch_intent_rows::tests::publish_creates_one_row_and_event_per_person ... ok
+test store::learned_skills::tests::a_second_atomic_publish_accepts_the_current_state ... ok
+test store::learned_skills::tests::an_absent_or_unreadable_row_decodes_to_the_empty_document ... ok
+test store::launch_intent_rows::tests::publish_reconstructs_per_person_start_attribution ... ok
+test store::learned_skills::tests::list_persons_unions_candidate_and_skill_people ... ok
+test store::learned_skills::tests::publish_maps_an_unmodeled_status_to_a_refusal_not_a_sql_500 ... ok
+test store::learned_skills::tests::publish_emits_one_person_touch_and_replace_all_is_isolated_per_person ... ok
+test store::learned_skills::tests::the_store_key_is_the_per_person_family_shape ... ok
+test store::learned_skills::tests::unknown_fields_round_trip_verbatim_on_read ... ok
+test store::learned_skills::tests::validate_rejects_unmodeled_keys_and_statuses ... ok
+test store::learned_skills::tests::validate_rejects_version_integrity_violations ... ok
+test store::learned_skills::tests::reconstruct_of_an_absent_person_is_the_empty_document ... ok
+test store::mailbox::tests::a_failed_wake_is_absent_from_woken_but_never_an_error ... ok
+test store::mailbox::tests::a_recipient_with_an_in_flight_reconcile_is_coalesced_not_re_woken ... ok
+test store::mailbox::tests::a_repeated_publish_of_the_same_envelope_is_an_idempotent_no_op ... ok
+test store::mailbox::tests::a_replay_with_a_different_created_at_is_still_one_idempotent_row ... ok
+test store::mailbox::tests::an_already_accepted_row_is_not_resurrected_by_a_replay ... ok
+test store::mailbox::tests::an_empty_mailbox_wakes_nobody_and_makes_no_host_call ... ok
+test store::mailbox::tests::archive_moves_pending_to_terminal_once_and_is_idempotent ... ok
+test store::mailbox::tests::archiving_an_absent_row_is_false_not_a_panic ... ok
+test store::mailbox::tests::enqueue_stages_one_pending_row_per_recipient ... ok
+test store::mailbox::tests::pending_for_is_ordered_by_creation_and_ignores_other_recipients ... ok
+test store::mailbox::tests::pending_recipients_deduplicates_and_drops_the_drained ... ok
+test store::mailbox::tests::running_the_wake_pass_wakes_the_pending_and_reports_the_woken ... ok
+test store::mailbox::tests::the_wake_scan_wakes_everyone_pending_by_default ... ok
+test store::launch_intent_rows::tests::removing_a_person_deletes_its_row_and_emits_a_delete ... ok
+test store::learned_skills::tests::write_then_reconstruct_round_trips_candidates_skills_versions_and_every_child ... ok
+test store::launch_intent_rows::tests::rejects_unmodeled_keys ... ok
+test store::mailbox_rows::tests::delivered_and_pane_drain_terminals_are_disjoint ... ok
+test store::launch_intent_rows::tests::shadow_diff_zero_loss_on_a_multi_person_blob ... ok
+test store::launch_intent_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::mailbox_rows::tests::a_removed_entry_is_deleted ... ok
+test store::mailbox_rows::tests::a_second_atomic_publish_replaces_the_prior_snapshot ... ok
+test store::mailbox_rows::tests::an_unknown_state_is_refused ... ok
+test store::mailbox_rows::tests::pending_delta_never_supersedes_an_explicit_stop ... ok
+test store::mailbox_rows::tests::pending_delta_rearms_the_idle_lease_and_cancels_only_an_automatic_park ... ok
+test store::mailbox_rows::tests::delta_append_is_o1_not_whole_company ... ok
+test store::mailbox_rows::tests::recipients_derived_as_sorted_sibling_set ... ok
+test store::mailbox_rows::tests::reconstruct_person_filters_and_completes_recipients ... ok
+test store::mailbox_rows::tests::round_trip_reconstruct_equals_published ... ok
+test store::memory_records::tests::a_body_missing_the_records_array_is_still_usable ... ok
+test store::memory_records::tests::a_replayed_fingerprint_appends_nothing ... ok
+test store::memory_records::tests::an_absent_or_unreadable_row_decodes_to_the_empty_document ... ok
+test store::memory_records::tests::appending_a_record_with_a_fresh_fingerprint_lands ... ok
+test store::mailbox_rows::tests::unmodeled_keys_are_refused ... ok
+test store::memory_records::tests::reconstruct_of_an_absent_person_is_the_empty_document ... ok
+test store::memory_records::tests::records_without_a_fingerprint_always_append ... ok
+test store::memory_records::tests::direct_append_preserves_distinct_records_and_deduplicates_fingerprints ... ok
+test store::memory_records::tests::the_store_key_is_the_reflection_memory_family_shape ... ok
+test store::memory_records::tests::validate_rejects_a_source_outside_the_check_enum_and_accepts_modeled_ones ... ok
+test store::memory_records::tests::unknown_fields_round_trip_verbatim ... ok
+test store::memory_records::tests::validate_rejects_unmodeled_document_and_record_keys ... ok
+test store::memory_records::tests::write_then_reconstruct_round_trips_every_scalar_and_the_commitments_child ... ok
+test store::memory_records::tests::write_is_replace_all_for_the_person_and_isolated_per_person ... ok
+test store::memory_review::tests::a_claimed_person_is_always_a_live_key_in_the_document ... ok
+test store::memory_review::tests::a_completed_terminal_state_matching_the_job_deletes_the_job_without_claiming ... ok
+test store::memory_review::tests::a_failed_terminal_state_matching_the_job_deletes_the_job ... ok
+test store::memory_records::tests::the_document_is_bounded_at_the_retention_limit ... ok
+test store::memory_review::tests::a_garbage_body_fails_open_to_the_empty_document ... ok
+test store::memory_review::tests::a_fresh_running_lease_makes_the_company_busy_and_claims_no_one ... ok
+test store::memory_review::tests::a_generation_mismatch_retires_the_job_as_skipped_and_deletes_it ... ok
+test store::memory_review::tests::a_person_with_no_job_is_skipped_entirely ... ok
+test store::memory_review::tests::a_queued_pair_matching_its_fingerprint_is_claimed_under_a_fresh_lease ... ok
+test store::memory_review::tests::a_queuedat_tie_is_broken_by_people_order_index ... ok
+test store::memory_review::tests::an_empty_company_claims_nobody_and_changes_nothing ... ok
+test store::memory_review::tests::an_expired_exact_lease_is_reclaimable ... ok
+test store::memory_review::tests::an_invalid_job_is_retired_even_when_the_generation_matches ... ok
+test store::memory_review::tests::an_unknown_producer_field_on_a_job_round_trips_unchanged ... ok
+test store::memory_review::tests::carried_counters_flow_from_a_prior_queued_state_into_the_running_lease ... ok
+test store::memory_review::tests::commit_terminal_is_a_no_op_when_the_person_has_no_entry_at_all ... ok
+test store::memory_review::tests::commit_terminal_refuses_once_a_later_dispatch_reclaimed_the_lease ... ok
+test store::memory_review::tests::commit_terminal_writes_only_while_the_lease_token_still_matches ... ok
+test store::memory_review::tests::completed_and_reviewed_skip_states_carry_the_reviewed_message_count_and_reset_failures ... ok
+test store::memory_review::tests::failed_state_continues_the_streak_on_a_matching_fingerprint ... ok
+test store::memory_review::tests::failed_state_resets_the_streak_on_a_different_fingerprint ... ok
+test store::memory_review::tests::failed_state_truncates_a_long_error_to_five_hundred_characters ... ok
+test store::memory_review::tests::parse_review_output_bounds_every_field_and_caps_open_commitments ... ok
+test store::memory_review::tests::parse_review_output_recognizes_an_explicit_skip ... ok
+test store::memory_review::tests::parse_review_output_treats_a_missing_reusable_process_as_none ... ok
+test store::memory_review::tests::parse_review_output_treats_unparseable_text_as_nothing_durable_not_a_failure ... ok
+test store::memory_review::tests::a_no_op_republish_touches_nothing_and_keeps_the_audit_cursor ... ok
+test store::memory_review::tests::a_second_atomic_publish_replaces_the_prior_document ... ok
+test store::memory_review::tests::publish_maps_an_unmodeled_status_to_a_refusal_not_a_sql_500 ... ok
+test store::memory_review::tests::publish_diffs_at_person_granularity_and_touches_only_changed_people ... ok
+test store::memory_review::tests::review_prompt_embeds_the_snapshot_and_the_skip_contract ... ok
+test store::memory_review::tests::rollback_refuses_to_disturb_a_lease_another_dispatch_took ... ok
+test store::memory_review::tests::rollback_reverts_our_own_lease_to_queued ... ok
+test store::memory_review::tests::rollback_truncates_a_long_error_to_five_hundred_characters ... ok
+test store::memory_review::tests::the_document_round_trips_through_serialization_with_camel_case_keys ... ok
+test store::memory_review::tests::the_oldest_queued_job_is_claimed_first ... ok
+test store::memory_review::tests::reconstruct_of_an_absent_company_is_the_empty_document ... ok
+test store::memory_review::tests::publish_then_reconstruct_round_trips_state_and_the_job_child ... ok
+test store::memory_review::tests::verify_lease_is_lost_when_nothing_was_ever_claimed ... ok
+test store::memory_review::tests::verify_lease_is_lost_when_the_token_does_not_match ... ok
+test store::memory_review::tests::validate_rejects_unmodeled_and_incoherent_documents ... ok
+test store::memory_review::tests::verify_lease_reports_current_for_an_exact_fresh_generation_match ... ok
+test store::memory_review::tests::verify_lease_retires_a_generation_mismatch_as_stale_and_mutates ... ok
+test store::model_catalog::tests::conflicting_duplicate_and_missing_founder_model_refuse ... ok
+test store::model_catalog::tests::normalization_trims_deduplicates_and_sorts_without_defaults ... ok
+test store::model_catalog::tests::observation_bounds_refuse_before_persistence ... ok
+test store::model_catalog_rows::tests::rejected_genesis_rolls_back_catalog_and_default_rows ... ok
+test store::mutation_journal_rows::tests::a_second_direct_publish_uses_current_rows ... ok
+test store::mutation_journal_rows::tests::empty_before_any_publish ... ok
+test store::model_catalog_rows::tests::observation_generation_cas_and_idempotency_are_rust_owned ... ok
+test store::model_change::tests::prepare_does_not_commit_and_only_successful_current_outcome_commits ... ok
+test store::mutation_journal_rows::tests::rejects_unmodeled_record_keys ... ok
+test store::mutation_journal_rows::tests::preserves_append_order_across_publishes ... ok
+test store::mutation_journal_rows::tests::retention_drop_deletes_the_oldest_row ... ok
+test store::mutation_journal_rows::tests::round_trips_and_derives_identity ... ok
+test store::memory_records::tests::direct_append_evicts_only_the_oldest_records_at_the_retention_limit ... ok
+test store::mutation_journal_rows::tests::shadow_diff_zero_loss_on_a_full_blob ... ok
+test store::mutation_journal_rows::tests::slug_scoping_isolates_companies_in_a_shared_db ... ok
+test store::mutation_journal_rows::tests::status_transition_updates_in_place_without_reorder ... ok
+test store::mutation_journal_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::operator_escalation_intents_rows::tests::draining_deletes_the_intent_row ... ok
+test store::operator_escalation_intents_rows::tests::rejects_unmodeled_keys ... ok
+test store::operator_escalation_intents_rows::tests::round_trips_intent_with_and_without_goal ... ok
+test store::operator_escalation_intents_rows::tests::shadow_diff_zero_loss_on_live_blob ... ok
+test store::operator_escalation_intents_rows::tests::semantic_insert_is_idempotent_and_never_replaces_a_conflict ... ok
+test store::operator_escalation_push_rows::tests::backfill_from_live_empty_blob ... ok
+test store::operator_escalation_push_rows::tests::clearing_pending_emits_an_event ... ok
+test store::operator_escalation_push_rows::tests::empty_doc_round_trips_with_no_pending ... ok
+test store::operator_escalation_push_rows::tests::pending_triple_round_trips_coherently ... ok
+test store::operator_escalation_push_rows::tests::rejects_unmodeled_keys ... ok
+test store::operator_escalation_push_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::org_ops::bench_tests::bench_adopts_a_ready_reflected_handoff_instead_of_superseding_it ... ok
+test store::org_ops::bench_tests::bench_benches_a_worker_retaining_row_and_placement ... ok
+test store::org_ops::bench_tests::bench_applies_against_current_rows_after_unrelated_event ... ok
+test store::org_ops::bench_tests::bench_preserves_h1_gapless_ordinal_bijection ... ok
+test store::org_ops::bench_tests::bench_refuses_a_person_on_loan ... ok
+test store::org_ops::bench_tests::bench_refuses_already_benched_and_departed ... ok
+test store::org_ops::bench_tests::bench_refuses_exec_root_and_unknown ... ok
+test store::org_ops::bench_tests::bench_still_clears_the_pointer_when_no_ready_transition_is_adopted ... ok
+test store::org_ops::bench_tests::reflected_bench_retry_refuses_before_reading_the_reaped_generation ... ok
+test store::org_ops::bench_tests::remove_department_tree_deletes_live_rows_and_launch_fences_atomically ... ok
+test store::org_ops::bench_tests::remove_department_tree_refuses_borrowed_out_person_without_writes ... ok
+test store::org_ops::bench_tests::reflected_bench_lifecycle_returns_its_internal_completion_identity ... ok
+test store::org_ops::create_department_tests::create_under_non_last_subtree_normalizes_both_manifest_orders ... ok
+test store::org_ops::create_department_tests::create_commits_complete_initial_staff_desired_off_in_the_same_transaction ... ok
+test store::org_ops::create_department_tests::create_with_existing_head_writes_dept_repoints_head_and_keeps_ordinals_bijective ... ok
+test store::org_ops::create_department_tests::duplicate_late_initial_staff_refuses_before_any_write ... ok
+test store::org_ops::create_department_tests::create_with_hire_new_inserts_head_at_people_append_ordinal ... ok
+test store::org_ops::create_department_tests::emits_department_then_person_touches_as_one_contiguous_seq_run ... ok
+test store::org_ops::create_department_tests::invalid_late_initial_staff_refuses_before_department_head_or_prior_staff_write ... ok
+test store::org_ops::create_department_tests::manager_cannot_appoint_a_head_from_an_out_of_scope_sibling ... ok
+test store::org_ops::create_department_tests::refuses_duplicate_department_id ... ok
+test store::org_ops::create_department_tests::refuses_an_active_parent_below_a_paused_ancestor ... ok
+test store::org_ops::create_department_tests::refuses_exec_root_protected_appointee ... ok
+test store::org_ops::create_department_tests::refuses_head_decision_when_appointee_absent ... ok
+test store::org_ops::create_department_tests::refuses_paused_parent ... ok
+test store::org_ops::create_department_tests::refuses_unknown_parent_and_writes_nothing ... ok
+test store::org_ops::create_department_tests::stale_manager_scope_refuses_department_create_without_writes ... ok
+test store::org_ops::hire_tests::hire_inserts_person_placement_staffing_and_takes_next_gapless_ordinal ... ok
+test store::org_ops::hire_tests::hire_into_non_last_department_normalizes_people_order ... ok
+test store::org_ops::create_department_tests::unrelated_prior_event_does_not_block_department_create ... ok
+test store::org_ops::hire_tests::hire_persists_the_complete_normalized_person_seed ... ok
+test store::org_ops::hire_tests::hire_refuses_a_duplicate_person_id_and_writes_nothing ... ok
+test store::org_ops::hire_tests::hire_refuses_an_active_destination_below_a_paused_ancestor ... ok
+test store::org_ops::hire_tests::hire_refuses_an_invalid_seed_with_the_field_path ... ok
+test store::org_ops::hire_tests::hire_refuses_unknown_and_paused_destination ... ok
+test store::org_ops::hire_tests::independent_hires_after_prior_events_both_persist_with_audit_events ... ok
+test store::org_ops::hire_tests::malformed_complete_seed_is_a_no_write_refusal ... ok
+test store::org_ops::offboard_tests::offboard_adopts_a_ready_reflected_handoff_instead_of_superseding_it ... ok
+test store::org_ops::offboard_tests::offboard_departs_a_worker_retaining_the_row ... ok
+test store::org_ops::offboard_tests::offboard_fails_the_departing_persons_open_assignments ... ok
+test store::org_ops::hire_tests::stale_manager_scope_refuses_hire_without_writes ... ok
+test store::org_ops::offboard_tests::offboard_of_a_department_head_leaves_no_department_pointing_at_a_departed_person ... ok
+test store::org_ops::offboard_tests::offboard_persists_the_callers_audit_reason_not_a_synthetic_placeholder ... ok
+test store::org_ops::offboard_tests::offboard_refuses_a_goal_owning_manager_head_needs_successor ... ok
+test store::org_ops::offboard_tests::offboard_refuses_exec_root_and_unknown ... ok
+test store::org_ops::offboard_tests::offboard_refuses_a_non_goal_owning_department_head ... ok
+test store::org_ops::offboard_tests::offboard_still_supersedes_an_open_handoff_that_was_never_reflected ... ok
+test store::org_ops::pause_tests::a_paused_department_reads_as_the_transfer_destination_paused_gate ... ok
+test store::org_ops::pause_tests::pause_already_paused_refuses_idempotent ... ok
+test store::org_ops::pause_tests::pause_applies_against_current_rows_even_after_unrelated_event ... ok
+test store::org_ops::pause_tests::pause_does_not_mask_unrelated_activity_corruption ... ok
+test store::org_ops::pause_tests::pause_refuses_the_executive_root_and_its_office ... ok
+test store::org_ops::pause_tests::pause_refuses_unknown_department_and_writes_nothing ... ok
+test store::org_ops::pause_tests::pause_repairs_the_active_heads_reconcilable_projection_and_resume_keeps_that_head ... ok
+test store::org_ops::pause_tests::pause_sets_the_flag_and_touches_the_department_only ... ok
+test store::org_ops::pause_tests::pause_sweeps_even_after_unrelated_event ... ok
+test store::org_ops::pause_tests::pause_sweeps_the_whole_subtree_clearing_launch_intent_and_superseding_transitions ... ok
+test store::org_ops::pause_tests::resume_after_pause_leaves_launch_intent_absent_and_spawns_nobody ... ok
+test store::org_ops::pause_tests::resume_clears_the_flag ... ok
+test store::org_ops::pause_tests::resume_refuses_a_department_that_is_not_paused ... ok
+test store::org_ops::tests::appoint_head_r4_demotes_outgoing_to_the_replacers_department ... ok
+test store::org_ops::tests::appoint_head_refusals ... ok
+test store::org_ops::tests::appoint_head_refuses_reappointing_the_sitting_head ... ok
+test store::org_ops::tests::appoint_head_transfers_ownership_with_stable_goal_ids_and_zero_cancelled ... ok
+test store::org_ops::tests::ceo_only_prepare_atomically_retracts_bulk_activity_intent_and_quiesces_delivery ... ok
+test store::org_ops::tests::commanded_stop_stamps_the_person_stop_intent_on_the_terminal_park ... ok
+test store::org_ops::tests::emits_row_level_touches_as_one_contiguous_seq_run ... ok
+test store::org_ops::tests::refuses_office_of_the_ceo_staff_not_just_the_root_head ... ok
+test store::org_ops::tests::reparent_commits_despite_a_prior_unrelated_event ... ok
+test store::org_ops::tests::reparent_emits_one_contiguous_seq_run_of_department_touches ... ok
+test store::org_ops::tests::reparent_refuses_a_paused_new_parent ... ok
+test store::org_ops::tests::reparent_moves_the_dept_and_keeps_a_valid_bijective_tree ... ok
+test store::org_ops::tests::reparent_refuses_a_self_parent_cycle ... ok
+test store::org_ops::tests::reparent_refuses_an_active_new_parent_below_a_paused_ancestor ... ok
+test store::org_ops::tests::reparent_refuses_an_exec_root_unit ... ok
+test store::org_ops::tests::reparent_refuses_an_unknown_department ... ok
+test store::org_ops::tests::reparent_refuses_an_unknown_new_parent ... ok
+test store::org_ops::tests::reparent_refuses_the_existing_parent_without_writing_an_audit_event ... ok
+test store::org_ops::tests::reparent_refuses_reparenting_under_own_descendant ... ok
+test store::org_ops::tests::reparent_that_shifts_preorder_touches_every_moved_dept ... ok
+test store::org_ops::tests::shutdown_refuses_the_ceo_and_writes_nothing ... ok
+test store::org_ops::tests::replace_head_and_offboard_supersedes_a_stranded_park_before_minting_its_handoff ... ok
+test store::org_ops::tests::shutdown_supersedes_an_open_transition_leaving_only_terminal_history ... ok
+test store::org_ops::tests::shutdown_writes_an_abandoned_terminal_park_clears_desired_and_intent ... ok
+test store::org_ops::tests::start_person_atomically_recalls_a_benched_person_and_starts_them ... ok
+test store::org_ops::tests::start_person_leaves_no_partial_recall_when_the_start_half_fails ... ok
+test store::org_ops::tests::start_person_is_exactly_one_person_and_idempotently_raises_durable_demand ... ok
+test store::org_ops::tests::start_person_refuses_a_departed_person ... ok
+test store::org_ops::tests::unrelated_events_do_not_block_a_shutdown ... ok
+test store::org_ops::tests::start_person_refuses_paused_people_without_opening_the_fence ... ok
+test store::org_ops::transfer_move_tests::direct_recall_and_loan_refuse_an_active_descendant_of_a_paused_ancestor ... ok
+test store::org_ops::transfer_move_tests::move_department_members_still_supersedes_a_ready_transition_unconditionally ... ok
+test store::org_ops::transfer_move_tests::move_members_moves_all_listed_and_keeps_bijection ... ok
+test store::org_ops::transfer_move_tests::move_members_is_all_or_nothing_when_one_is_not_a_member ... ok
+test store::org_ops::transfer_move_tests::move_members_refuses_listing_the_head ... ok
+test store::org_ops::transfer_move_tests::transfer_adopts_a_ready_reflected_handoff_instead_of_superseding_it ... ok
+test store::org_ops::transfer_move_tests::transfer_emits_row_level_touches_as_one_contiguous_seq_run ... ok
+test store::org_ops::transfer_move_tests::transfer_keeps_event_actor_distinct_from_staffing_audit_reason ... ok
+test store::org_ops::transfer_move_tests::transfer_moves_home_assigned_records_staffing_and_keeps_the_bijection ... ok
+test store::org_ops::transfer_move_tests::transfer_refuses_a_person_on_loan ... ok
+test store::organization::tests::a_paused_ancestor_deactivates_the_whole_subtree ... ok
+test store::organization::tests::clear_refuses_over_unreadable_bytes ... ok
+test store::organization::tests::create_is_once_only ... ok
+test store::organization::tests::d3_rejects_a_contract_expiring_before_it_launched ... ok
+test store::organization::tests::d3_rejects_a_cycle_and_a_head_who_lives_elsewhere ... ok
+test store::organization::tests::d3_rejects_a_loan_that_does_not_agree_with_placement ... ok
+test store::organization::tests::d3_rejects_contract_metadata_on_the_wrong_unit_kind ... ok
+test store::organization::tests::inv34_a_department_head_can_never_be_granted_bash ... ok
+test store::organization::tests::inv34_a_worker_may_hold_bash ... ok
+test store::org_ops::transfer_move_tests::transfer_preserves_launch_intent_and_never_touches_supervision ... ok
+test store::organization::tests::management_chains_follow_unit_ancestry ... ok
+test store::organization::tests::inv34_the_executive_may_hold_bash ... ok
+test store::organization::tests::manifest_json_round_trips_unknown_operator_fields ... ok
+test store::organization::tests::pane_ownership_follows_the_disk_model ... ok
+test store::organization::tests::manifest_writes_do_not_mint_a_document_generation_counter ... ok
+test store::organization::tests::prompt_templates_cannot_escape_the_prompts_directory ... ok
+test store::organization::tests::the_company_context_comes_from_the_manifest ... ok
+test store::organization::tests::the_northstar_template_is_a_valid_manifest ... ok
+test store::organization::tests::schema_v1_people_without_prompts_stay_readable ... ok
+test store::organization::tests::unreadable_bytes_are_corrupt_and_an_absent_row_is_not ... ok
+test store::org_ops::transfer_move_tests::transfer_refuses_an_active_destination_below_a_paused_ancestor ... ok
+test store::organization_rows::manifest_write_accessor_tests::append_staffing_history_allocates_per_slug_seq ... ok
+test store::organization_rows::manifest_write_accessor_tests::refresh_people_order_compacts_gaps_and_touches_only_moved ... ok
+test store::organization_rows::manifest_write_accessor_tests::set_department_head_repoints_and_touches ... ok
+test store::organization_rows::manifest_write_accessor_tests::set_person_kind_and_move_person_update_and_touch ... ok
+test store::organization_rows::manifest_write_accessor_tests::strip_manager_bash_tools_removes_bash_only_and_is_idempotent ... ok
+test store::org_ops::transfer_move_tests::transfer_refuses_unknown_person_destination_and_exec_root_and_head ... ok
+test store::persist_dispatch::tests::change_only_stores_are_wired ... ok
+test store::org_ops::transfer_move_tests::unrelated_prior_event_does_not_reject_a_direct_transfer ... ok
+test store::org_ops::transfer_move_tests::transfer_supersedes_an_open_transition_with_the_transfer_marker ... ok
+test store::organization_rows::move_family_accessor_tests::refresh_people_order_densifies_a_gap_to_a_gapless_bijection ... ok
+test store::organization_rows::manifest_genesis_tests::genesis_creates_once_and_never_exposes_or_overwrites_the_incumbent ... ok
+test store::organization_rows::move_family_accessor_tests::department_state_reports_active_paused_and_unknown ... ok
+test store::persist_dispatch::tests::only_the_first_manifest_persist_becomes_atomic_genesis ... ok
+test store::persist_dispatch::tests::wired_clear_removes_rows ... ok
+test store::persist_dispatch::tests::unwired_store_returns_none ... ok
+test store::persist_dispatch::tests::wired_converge_safety_persists_rows_skips_documents_and_clears ... ok
+test store::persist_dispatch::tests::wired_activity_persists_rows_and_skips_documents ... ok
+test store::persist_dispatch::tests::per_person_telegram_inbound_routes_by_prefix ... ok
+test store::persist_dispatch::tests::wired_goal_delivery_quiesce_round_trips ... ok
+test store::persist_dispatch::tests::wired_launch_intent_persists_rows_and_skips_documents ... ok
+test store::persist_dispatch::tests::wired_session_epoch_persists_rows_and_skips_documents ... ok
+test store::persist_dispatch::tests::wired_session_maintenance_persists_and_clears_its_full_row_aggregate ... ok
+test store::persist_dispatch::tests::wired_supervisor_watermark_persists_rows_and_skips_documents ... ok
+test store::person_contracts::rows::tests::live_bak_blob_publishes_into_fresh_rows_with_no_unmodeled_keys ... ok
+test store::persist_dispatch::tests::wired_supervision_meta_persists_rows_skips_documents_and_leaves_assignments_intact ... ok
+test store::person_contracts::rows::tests::a_no_op_republish_keeps_the_audit_cursor ... ok
+test store::person_contracts::rows::tests::a_second_direct_publish_replaces_the_current_contract ... ok
+test store::person_contracts::rows::tests::diff_touches_only_changed_added_and_removed_entries ... ok
+test store::person_contracts::rows::tests::one_org_event_per_touched_person_with_table_pk_detail_ref ... ok
+test store::person_contracts::rows::tests::item_d_rejects_unmodeled_keys_on_document_and_entry ... ok
+test store::person_contracts::rows::tests::publish_then_reconstruct_round_trips_and_derives_identity ... ok
+test store::person_contracts::rows::tests::reconstruct_is_none_before_any_publish ... ok
+test store::person_contracts::rows::tests::wrong_version_and_foreign_org_are_rejected ... ok
+test store::reconciler_facts::tests::a_generic_runtime_owner_blob_cannot_override_the_typed_claim ... ok
+test store::reconciler_facts::tests::a_malformed_lease_fails_open_to_not_active ... ok
+test store::reconciler_facts::tests::a_malformed_runtime_document_fails_open_to_none ... ok
+test store::reconciler_facts::tests::a_malformed_supervisor_state_fails_open_to_none ... ok
+test store::reconciler_facts::tests::a_pending_launcher_re_emission_is_never_demand ... ok
+test store::reconciler_facts::tests::a_present_launch_intent_row_decodes_its_person_set ... ok
+test store::reconciler_facts::tests::a_present_runtime_document_decodes_panes_and_reconciliation ... ok
+test store::reconciler_facts::tests::a_present_supervision_row_yields_the_positive_generations ... ok
+test store::reconciler_facts::tests::a_present_supervisor_state_decodes_the_nested_state_object ... ok
+test store::reconciler_facts::tests::a_released_claim_is_never_foreign ... ok
+test store::reconciler_facts::tests::a_runtime_owner_row_is_scoped_by_its_composite_key ... ok
+test store::reconciler_facts::tests::a_malformed_or_foreign_supervision_row_adopts_nothing ... ok
+test store::reconciler_facts::tests::an_absent_launch_intent_row_is_the_empty_fence ... ok
+test store::reconciler_facts::tests::an_absent_lease_is_not_active ... ok
+test store::reconciler_facts::tests::an_absent_mailbox_store_is_no_demand ... ok
+test store::reconciler_facts::tests::an_absent_runtime_document_is_none ... ok
+test store::reconciler_facts::tests::an_absent_runtime_owner_row_is_none_not_an_error ... ok
+test store::reconciler_facts::tests::an_absent_supervision_row_is_none_not_an_error ... ok
+test store::reconciler_facts::tests::an_absent_supervisor_state_is_none ... ok
+test store::reconciler_facts::tests::document_key_matches_the_typescript_composite_key ... ok
+test store::reconciler_facts::tests::an_active_claim_missing_its_socket_fails_closed ... ok
+test store::reconciler_facts::tests::a_malformed_or_foreign_launch_intent_row_authorizes_nobody ... ok
+test store::reconciler_facts::tests::an_active_claim_on_a_different_socket_is_foreign ... ok
+test store::reconciler_facts::tests::an_expired_lease_is_not_active ... ok
+test store::reconciler_facts::tests::an_unexpired_lease_is_active ... ok
+test store::reconciler_facts::tests::mailbox_pending_recipients_excludes_rows_at_or_before_the_reset_watermark ... ok
+test store::reconciler_facts::tests::mailbox_pending_recipients_reads_only_rows_with_pending_mail ... ok
+test store::reconciler_facts::tests::malformed_mailbox_rows_degrade_without_failing_the_read ... ok
+test store::removal_state_rows::tests::clearing_the_last_unit_reconstructs_to_none ... ok
+test store::removal_state_rows::tests::advancing_phase_upserts_one_touch ... ok
+test store::removal_state_rows::tests::empty_before_any_publish_reconstructs_to_none ... ok
+test store::rows_txn::tests::a_no_op_apply_keeps_the_audit_cursor ... ok
+test store::rows_txn::tests::allocate_seq_starts_at_one_and_increments_per_slug ... ok
+test store::removal_state_rows::tests::publish_round_trips_with_children_in_order ... ok
+test store::rows_txn::tests::apply_and_emit_advances_without_a_mutation_fence ... ok
+test store::rows_txn::tests::apply_writes_one_event_per_touched_entity_and_advances_the_audit_cursor ... ok
+test store::rows_txn::tests::current_seq_is_zero_before_any_event ... ok
+test store::removal_state_rows::tests::rejects_unmodeled_keys ... ok
+test store::removal_state_rows::tests::removing_a_unit_from_the_map_deletes_its_rows ... ok
+test store::removal_state_rows::tests::two_companies_do_not_cross_leak ... ok
+test store::removal_state_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::runtime_owner_rows::tests::released_status_round_trips ... ok
+test store::runtime_owner_rows::tests::rejects_unmodeled_keys ... ok
+test store::runtime_owner_rows::tests::round_trips_the_live_active_shape ... ok
+test store::runtime_owner_rows::tests::shadow_diff_is_zero_loss_on_live_blob ... ok
+test store::runtime_owner_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::runtime_rows::tests::a_crashed_session_carries_the_committed_status_forward_never_stopped ... ok
+test store::runtime_rows::tests::changing_only_a_pane_generation_is_a_real_change_not_a_no_op ... ok
+test store::runtime_rows::tests::a_second_direct_publish_uses_current_state_after_an_audit_cursor_advanced ... ok
+test store::runtime_rows::tests::committed_stop_survives_a_running_observation ... ok
+test store::runtime_rows::tests::empty_before_any_publish ... ok
+test store::runtime_rows::tests::observation_at_drift_alone_is_not_a_change ... ok
+test store::runtime_rows::tests::observation_is_a_no_op_when_the_topology_is_unchanged ... ok
+test store::runtime_rows::tests::observation_never_inserts_when_no_committed_row_exists ... ok
+test store::runtime_rows::tests::observation_preserves_admission_and_recovery_fields ... ok
+test store::runtime_rows::tests::observation_publishes_on_a_changed_topology ... ok
+test store::runtime_rows::tests::observation_teardown_publishes_stopped_and_empties_topology ... ok
+test store::runtime_rows::tests::rejects_unmodeled_keys ... ok
+test store::runtime_rows::tests::pane_generation_roundtrip ... ok
+test store::runtime_rows::tests::removing_a_pane_deletes_its_row ... ok
+test store::runtime_rows::tests::round_trips_base ... ok
+test store::runtime_rows::tests::round_trips_recon_recovery_and_ordered_arrays ... ok
+test store::runtime_rows::tests::slug_scoping_isolates_companies ... ok
+test store::runtime_rows::tests::scalar_only_change_is_one_touch ... ok
+test store::runtime_rows::tests::untagged_pane_generation_is_absent_not_zero ... ok
+test store::runtime_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::session_epoch_rows::tests::a_changed_publish_emits_exactly_one_event ... ok
+test store::session_epoch_rows::tests::a_second_direct_publish_replaces_the_current_row ... ok
+test store::session_maintenance::row_tests::an_unmodeled_key_is_captured_into_extra_not_dropped ... ok
+test store::session_maintenance::row_tests::launch_claims_only_the_exact_unclaimed_queued_fresh_session_request ... ok
+test store::session_maintenance::row_tests::launch_completes_only_the_exact_applying_fresh_session_request ... ok
+test store::session_epoch_rows::tests::an_unchanged_direct_publish_is_a_no_op_that_keeps_the_audit_sequence ... ok
+test store::session_epoch_rows::tests::backfill_seeds_the_row_from_the_blob_and_derives_identity ... ok
+test store::session_epoch_rows::tests::publish_then_reconstruct_round_trips_and_advances_the_feed ... ok
+test store::session_epoch_rows::tests::publish_rejects_unmodeled_keys_with_422_code ... ok
+test store::session_epoch_rows::tests::reconstruct_is_none_before_any_publish ... ok
+test store::shadow_report::tests::a_lost_field_is_loud_and_counted ... ok
+test store::shadow_report::tests::a_report_with_no_loss_is_zero_loss ... ok
+test store::shadow_report::tests::record_loud_carries_a_non_field_failure ... ok
+test store::supervision::check_ins::tests::a_check_in_retires_without_demand_and_reactivates_when_work_arrives ... ok
+test store::supervision::check_ins::tests::a_due_check_in_enqueues_one_card_with_the_exact_id_and_fields ... ok
+test store::supervision::check_ins::tests::a_due_check_in_with_goal_demand_but_no_assignments_advances_without_a_card ... ok
+test store::supervision::check_ins::tests::a_due_pass_enqueues_one_people_check_per_manager_naming_every_report ... ok
+test store::session_maintenance::row_tests::publish_accepts_a_bare_organization_under_a_composite_wire_slug ... ok
+test store::supervision::check_ins::tests::a_manager_with_no_open_work_gets_no_people_check ... ok
+test store::supervision::check_ins::tests::a_failed_assignment_is_no_longer_check_in_demand ... ok
+test store::supervision::check_ins::tests::re_presenting_the_same_window_enqueues_no_duplicate_people_check ... ok
+test store::session_maintenance::row_tests::publish_accepts_a_single_target_force_without_a_company_action_id ... ok
+test store::supervision::check_ins::tests::re_presenting_the_same_window_enqueues_no_duplicate ... ok
+test store::supervision::deadline_lifecycle::a_goal_watch_with_no_open_goals_still_re_arms_and_fires_no_card ... ok
+test store::supervision::check_ins::tests::the_advance_is_skip_aware_after_an_outage ... ok
+test store::supervision::check_ins::tests::several_open_tasks_for_one_worker_produce_one_card_for_the_top_group ... ok
+test store::session_maintenance::row_tests::reconstruct_of_a_company_that_never_needed_maintenance_is_none ... ok
+test store::supervision::deadline_lifecycle::a_protected_flag_does_not_block_either_re_arm ... ok
+test store::supervision::deadline_lifecycle::both_schedules_are_armed_with_a_parseable_deadline_from_the_first_seed ... ok
+test store::supervision::deadline_lifecycle::an_already_overdue_goal_watch_fires_once_promptly_then_re_arms_past_now ... ok
+test store::supervision::deadline_lifecycle::check_in_counts_down_fires_a_card_acts_re_arms_and_counts_down_again ... ok
+test store::supervision::deadline_lifecycle::goal_watch_counts_down_fires_a_card_acts_re_arms_and_counts_down_again ... ok
+test store::supervision::deadline_lifecycle::an_already_overdue_check_in_fires_once_promptly_then_re_arms_past_now ... ok
+test store::supervision::deadline_lifecycle::the_alarm_clock_accounts_for_the_goal_watch_and_not_only_the_check_in ... ok
+test store::supervision::deadlines::tests::a_replacement_is_refused_when_a_fresh_session_is_in_progress ... ok
+test store::supervision::deadlines::tests::an_open_assignment_past_its_work_deadline_fails_deadline_exhausted ... ok
+test store::supervision::deadlines::tests::a_stalled_acknowledged_assignment_replaces_the_generation_once ... ok
+test store::supervision::deadlines::tests::a_second_progress_stall_after_the_replacement_budget_fails_progress_exhausted ... ok
+test store::supervision::deadlines::tests::next_due_at_after_is_none_when_every_deadline_is_in_the_past ... ok
+test store::supervision::deadlines::tests::an_unacknowledged_assignment_past_its_ack_deadline_retries_once ... ok
+test store::supervision::deadlines::tests::next_due_at_does_not_fire_earlier_than_the_earliest_genuine_deadline ... ok
+test store::supervision::deadlines::tests::next_due_at_prefers_a_nearer_check_in_over_a_distant_work_deadline ... ok
+test store::supervision::deadlines::tests::next_due_at_prefers_a_nearer_goal_watch_over_the_check_in ... ok
+test store::supervision::deadlines::tests::next_due_at_only_counts_the_acknowledgement_deadline_while_awaiting_ack ... ok
+test store::supervision::deadlines::tests::next_due_at_ignores_a_terminated_assignment ... ok
+test store::supervision::deadlines::tests::next_due_at_reports_an_already_overdue_goal_watch ... ok
+test store::supervision::deadlines::tests::next_due_at_prefers_a_nearer_work_deadline_over_the_check_in ... ok
+test store::supervision::deadlines::tests::next_due_at_with_no_assignments_is_the_nearest_manager_check_in ... ok
+test store::supervision::deadlines::tests::next_due_at_still_reports_the_past_while_next_due_at_after_skips_it ... ok
+test store::session_maintenance::row_tests::round_trips_a_company_action_with_derived_request_ids ... ok
+test store::supervision::deadlines::tests::nothing_due_terminates_nothing ... ok
+test store::supervision::delivery::tests::a_delivered_fence_does_not_block ... ok
+test store::supervision::deadlines::tests::the_failed_assignments_pending_delivery_is_superseded ... ok
+test store::session_maintenance::row_tests::round_trips_all_four_action_types_with_every_column ... ok
+test store::supervision::delivery::tests::a_delivery_for_an_unacknowledged_assignment_is_never_retired ... ok
+test store::supervision::deadlines::tests::the_ack_ladder_is_retry_then_replace_then_fail ... ok
+test store::supervision::delivery::tests::a_delivery_minted_after_the_acknowledgement_is_never_retired ... ok
+test store::supervision::deadlines::tests::the_work_deadline_fires_before_the_progress_deadline ... ok
+test store::supervision::delivery::tests::a_failed_fence_blocks_until_its_generation_attests_then_reconciles ... ok
+test store::supervision::delivery::tests::a_delivery_the_acknowledgement_already_covers_is_retired_never_dispatched ... ok
+test store::supervision::delivery::tests::a_pending_fence_gates_its_generations_envelopes_and_nothing_else ... ok
+test store::supervision::delivery::tests::a_people_check_is_held_only_when_every_report_it_names_is_fenced ... ok
+test store::supervision::delivery::tests::a_stale_delivery_does_not_arm_the_ack_deadline_but_is_still_delivered ... ok
+test store::supervision::delivery::tests::only_replace_generation_is_a_fence ... ok
+test store::supervision::delivery::tests::delivering_a_check_in_stamps_the_schedule ... ok
+test store::supervision::delivery::tests::a_people_check_naming_nobody_reachable_is_released_once_the_fence_delivers ... ok
+test store::supervision::delivery::tests::delivering_an_assignment_delivery_arms_the_ack_deadline_when_it_matches ... ok
+test store::supervision::delivery::tests::acknowledging_attests_the_generation_and_reconciles_a_failed_fence ... ok
+test store::supervision::dispatch::tests::a_failed_fence_actuation_is_a_real_delivery_failure ... ok
+test store::supervision::dispatch::tests::a_failed_wake_leaves_the_envelope_delivered_and_durable ... ok
+test store::supervision::dispatch::tests::a_fence_effect_is_actuated_strictly_with_no_mailbox_and_no_wake ... ok
+test store::supervision::dispatch::tests::a_manager_check_in_reaches_the_assignee_not_the_manager ... ok
+test store::supervision::dispatch::tests::a_people_check_reaches_the_manager_with_its_renderer_marker_intact ... ok
+test store::supervision::dispatch::tests::a_mixed_batch_reports_each_id_independently ... ok
+test store::supervision::dispatch::tests::a_reminder_reaches_the_person_who_armed_it ... ok
+test store::supervision::dispatch::tests::a_restaged_effect_after_a_crash_is_delivered_again_with_no_duplicate_row ... ok
+test store::supervision::dispatch::tests::an_envelope_effect_is_durably_staged_then_the_recipient_woken ... ok
+test store::supervision::dispatch::tests::an_envelope_with_no_content_fails_loudly_rather_than_shipping_an_empty_card ... ok
+test store::supervision::dispatch::tests::an_escalation_is_routed_to_the_manager_and_marked_interrupt ... ok
+test store::supervision::dispatch::tests::an_unroutable_effect_is_failed_not_silently_dropped ... ok
+test store::supervision::delivery::tests::urgent_kinds_form_their_own_batch ... ok
+test store::supervision::dispatch::tests::every_durable_write_precedes_the_single_batch_wake ... ok
+test store::supervision::dispatch::tests::staging_is_host_free_and_the_wake_only_happens_in_the_actuate_phase ... ok
+test store::supervision::focus::tests::a_starved_low_priority_goal_eventually_outranks_an_unaged_normal ... ok
+test store::supervision::focus::tests::aging_is_bounded_and_never_exceeds_urgent ... ok
+test store::supervision::dispatch::tests::every_envelope_kind_delivers_its_producers_prose_never_a_kind_placeholder ... ok
+test store::supervision::focus::tests::an_unknown_priority_orders_as_normal_rather_than_stopping_the_review ... ok
+test store::supervision::delivery::tests::the_orphaned_row_of_an_ack_covered_delivery_is_archived ... ok
+test store::supervision::focus::tests::never_focused_goes_before_previously_focused_at_equal_rank ... ok
+test store::supervision::focus::tests::sorting_is_stable_across_two_identical_runs ... ok
+test store::supervision::focus::tests::the_order_is_total_and_ends_at_the_id ... ok
+test store::supervision::delivery::tests::the_delivery_breaker_trips_at_three_and_never_half_opens ... ok
+test store::supervision::observe::tests::a_foreign_holder_stops_the_prediction_after_identity ... ok
+test store::supervision::observe::tests::a_suppressed_observe_predicts_an_inert_cycle ... ok
+test store::supervision::observe::tests::a_watch_that_is_not_yet_due_is_not_predicted ... ok
+test store::supervision::observe::tests::the_supervision_store_marker_is_the_one_readers_use ... ok
+test store::supervision::delivery::tests::reopen_is_bounded_and_touches_only_failed_effects ... ok
+test store::supervision::observe::tests::observe_writes_nothing_by_construction ... ok
+test store::supervision::observe::tests::predicts_a_drain_for_a_goal_whose_owner_left_the_manager_order ... ok
+test store::supervision::reminders::tests::a_fresh_company_arms_nobody ... ok
+test store::supervision::observe::tests::predicts_exactly_what_the_cycle_does_for_a_due_review ... ok
+test store::supervision::reminders::tests::a_due_reminder_fires_and_rearms ... ok
+test store::supervision::reminders::tests::a_chiefd_that_was_down_fires_once_not_a_catch_up_burst ... ok
+test store::supervision::reminders::tests::a_past_due_reminder_is_included_in_the_alarm_clock ... ok
+test store::supervision::reminders::tests::a_one_shot_fires_exactly_once_and_stops ... ok
+test store::supervision::observe::tests::predicts_the_escalation_the_third_review_would_make ... ok
+test store::supervision::reminders::tests::a_reminder_never_marks_anyone_as_kept_alive ... ok
+test store::supervision::reminders::tests::a_reminder_whose_next_occurrence_is_past_its_expiry_retires_rather_than_lying ... ok
+test store::supervision::reminders::tests::a_sub_minute_cadence_is_refused_as_a_poll ... ok
+test store::supervision::reminders::tests::a_repeated_pass_over_the_same_window_does_not_double_fire ... ok
+test store::supervision::reminders::tests::a_stopped_reminder_never_reuses_its_id ... ok
+test store::supervision::reminders::tests::an_empty_prompt_is_refused ... ok
+test store::supervision::reminders::tests::an_expiry_already_in_the_past_is_refused ... ok
+test store::supervision::reminders::tests::an_armed_reminder_is_durable_across_a_reopen ... ok
+test store::supervision::reminders::tests::an_unknown_person_cannot_be_reminded ... ok
+test store::supervision::reminders::tests::arming_does_not_fire_immediately ... ok
+test store::supervision::reminders::tests::firing_and_rearming_land_in_one_commit ... ok
+test store::supervision::reminders::tests::stopping_someone_elses_reminder_is_refused_as_unknown ... ok
+test store::supervision::reminders::tests::listing_shows_a_persons_own_reminders_armed_first ... ok
+test store::supervision::reminders::tests::stopping_is_idempotent_and_keeps_the_row ... ok
+test store::supervision::rows::tests::a_non_legacy_unmodeled_key_is_refused_on_both_read_and_publish ... ok
+test store::supervision::reminders::tests::the_armed_count_and_the_alarm_clock_agree_with_the_rows ... ok
+test store::supervision::reminders::tests::the_fired_effect_carries_the_marker_and_the_persons_own_words ... ok
+test store::supervision::reminders::tests::a_person_cannot_arm_past_the_per_person_limit ... ok
+test store::supervision::reminders::tests::a_stopped_reminder_frees_a_slot ... ok
+test store::supervision::rows::tests::a_priority_outside_the_enum_is_refused_not_parsed ... ok
+test store::supervision::rows::tests::a_manager_goal_without_review_count_publishes_and_reconstructs_as_zero ... ok
+test store::supervision::rows::tests::a_second_companys_publish_never_delete_absents_the_firsts_rows ... ok
+test store::supervision::rows::tests::assignments_effects_and_counter_round_trip ... ok
+test store::supervision::rows::tests::assignment_task_id_round_trips_and_a_later_absence_clears_it ... ok
+test store::supervision::rows::tests::person_owns_manager_goals_detects_manager_and_delegated ... ok
+test store::supervision::rows::tests::clear_makes_reconstruct_return_none ... ok
+test store::supervision::rows::tests::read_tolerates_an_allowlisted_legacy_key_but_publish_refuses_it ... ok
+test store::supervision::rows::tests::reassign_fails_loud_on_a_target_watch_collision_never_silent_overwrite ... ok
+test store::supervision::rows::tests::reassign_manager_goals_rekeys_pointer_keeping_goal_ids_stable ... ok
+test store::supervision::rows::tests::release_person_assignments_fails_open_ones_leaves_terminal_and_others ... ok
+test store::supervision::rows::tests::clear_on_absent_is_a_noop ... ok
+test store::supervision::rows::tests::delegated_goal_priority_audit_fields_publish_and_round_trip ... ok
+test store::supervision::tests::a_blank_assignment_task_id_is_refused_before_any_row_write ... ok
+test store::supervision::rows::tests::manager_goal_priority_audit_fields_publish_and_round_trip ... ok
+test store::supervision::tests::a_blocked_wire_body_decodes_and_keeps_counting_as_open_work ... ok
+test store::supervision::rows::tests::effect_payload_shapes_round_trip_without_array_loss ... ok
+test store::supervision::tests::a_changed_reconcile_escalation_replay_is_a_no_op_not_a_conflict ... ok
+test store::supervision::tests::a_counter_behind_an_issued_effect_still_refuses_as_non_monotonic ... ok
+test store::supervision::tests::a_deadline_in_the_past_is_refused ... ok
+test store::supervision::tests::a_blocked_assignment_validates_only_with_a_reason_and_no_progress_deadline ... ok
+test store::supervision::tests::a_delegated_goal_parent_must_be_open ... ok
+test store::supervision::tests::a_delegated_goal_inherits_its_parents_priority_unless_one_is_given ... ok
+test store::supervision::tests::a_delegated_goal_parent_must_be_owned_by_the_assigning_manager ... ok
+test store::supervision::tests::a_departed_person_loses_their_runtime_generation ... ok
+test store::supervision::tests::a_generation_renewal_refuses_for_an_inactive_person ... ok
+test store::supervision::tests::a_goal_may_only_be_published_for_a_real_manager ... ok
+test store::supervision::tests::a_generation_renewal_refuses_while_the_person_has_open_work ... ok
+test store::supervision::tests::a_live_assignments_delivery_effect_is_never_reaped ... ok
+test store::supervision::tests::a_mutation_refuses_an_absent_document_instead_of_reseeding_it ... ok
+test store::supervision::tests::a_manager_removed_from_the_manifest_loses_its_protected_schedules ... ok
+test store::supervision::tests::a_pre_existing_recorded_escalation_survives_a_drifted_retry ... ok
+test store::supervision::tests::a_reason_may_not_outlive_the_block ... ok
+test store::supervision::tests::a_failed_reconcile_escalation_is_reopened_on_the_next_re_escalation_bounded_by_the_reopen_limit ... ok
+test store::supervision::tests::a_refused_mutation_persists_neither_a_new_assignment_nor_its_effect ... ok
+test store::supervision::tests::a_reconcile_escalation_enqueues_a_deliverable_effect_exactly_once ... ok
+test store::supervision::tests::a_replayed_effect_id_is_a_noop_and_a_changed_one_is_refused ... ok
+test store::supervision::tests::a_removed_managers_open_goal_does_not_wedge_the_cycle_gather_read ... ok
+test store::supervision::tests::adoption_ignores_people_the_manifest_does_not_have ... ok
+test store::supervision::tests::acknowledgement_settles_the_pending_delivery_envelope_only ... ok
+test store::supervision::tests::adoption_never_fabricates_an_attestation ... ok
+test store::supervision::tests::an_empty_batch_is_refused ... ok
+test store::supervision::tests::adoption_never_lowers_a_generation ... ok
+test store::supervision::tests::adoption_raises_only_generations_the_external_committed_higher ... ok
+test store::supervision::tests::an_invalid_tail_item_exposes_no_valid_prefix ... ok
+test store::supervision::tests::an_id_with_no_child_suffix_is_its_own_group ... ok
+test store::supervision::rows::tests::terminal_goals_round_trip_their_completed_and_cancelled_timestamps ... ok
+test store::supervision::tests::an_offboarded_person_loses_their_runtime_generation_and_their_open_assignment ... ok
+test store::supervision::tests::an_open_fresh_session_transition_blocks_both_assignment_and_renewal ... ok
+test store::supervision::tests::assign_batch_commits_the_assignment_and_its_delivery_effect_together ... ok
+test store::supervision::tests::cycle_d9::a_company_held_by_another_chiefd_stops_after_identity ... ok
+test store::supervision::tests::child_assignments_share_one_delegated_goal_group ... ok
+test store::supervision::tests::assignment_rows_agree_with_the_document_projection ... ok
+test store::supervision::tests::cycle_d9::a_cycle_that_queues_effects_leaves_the_counter_rule_satisfied ... ok
+test store::supervision::tests::cycle_d9::a_departed_persons_absent_pane_is_not_a_projection_mismatch ... ok
+test store::supervision::tests::assignment_order_is_insertion_order_not_id_order ... ok
+test store::supervision::tests::cycle_d9::a_goal_watch_that_is_not_yet_due_is_not_stamped ... ok
+test store::supervision::tests::cycle_d9::a_goal_whose_manager_lost_authority_is_reattributed_never_dropped ... ok
+test store::supervision::tests::cycle_d9::a_due_goal_watch_reviews_open_goals_and_queues_one_watch_effect ... ok
+test store::supervision::tests::cycle_d9::a_refusal_inside_the_cycle_publishes_nothing ... ok
+test store::supervision::tests::cycle_d9::a_goal_escalates_exactly_once_at_the_third_review ... ok
+test store::supervision::tests::cycle_d9::a_suppressed_company_goes_inert_and_writes_nothing ... ok
+test store::supervision::tests::cycle_d9::a_root_executives_stalled_goal_escalates_to_themselves_with_operator_copy ... ok
+test store::supervision::tests::cycle_d9::a_stalled_goal_under_a_head_escalates_to_that_heads_manager ... ok
+test store::supervision::tests::cycle_d9::a_watch_with_no_open_goals_still_records_that_it_was_evaluated ... ok
+test store::supervision::tests::cycle_d9::a_watch_that_was_missed_for_hours_advances_in_whole_intervals_not_a_burst ... ok
+test store::supervision::tests::cycle_d9::an_unavailable_audit_never_claims_recovery_it_could_not_observe ... ok
+test store::supervision::tests::cycle_d9::an_evaluated_goal_watch_stamps_when_it_was_evaluated ... ok
+test store::supervision::tests::cycle_d9::cycle_order_is_the_d9_sequence_by_recorded_execution_order ... ok
+test store::supervision::tests::cycle_d9::recovery_is_claimed_when_the_post_reconcile_projection_matches_exactly ... ok
+test store::supervision::tests::cycle_d9::deferred_goals_accumulate_focus_debt_and_the_focus_resets_it ... ok
+test store::supervision::tests::cycle_d9::recovery_is_not_claimed_while_an_expected_pane_is_missing ... ok
+test store::supervision::tests::cycle_d9::effects_the_cycle_emits_draw_strictly_increasing_sequences ... ok
+test store::supervision::tests::cycle_d9::recovery_runs_before_fast_health_because_inv_11_says_so ... ok
+test store::supervision::tests::cycle_d9::an_inert_cycle_never_advances_a_goal_watch_and_says_so ... ok
+test store::supervision::tests::cycle_d9::the_projection_is_reproved_after_reconcile_because_inv_10_says_so ... ok
+test store::supervision::tests::cycle_d9::the_drain_source_id_is_stable_so_a_second_drain_is_a_no_op ... ok
+test store::supervision::tests::every_manager_is_seeded_with_both_protected_schedules ... ok
+test store::supervision::tests::dangling_delegated_goal_link_is_repaired_before_orphan_reaping ... ok
+test store::supervision::tests::cycle_d9::the_watch_effect_id_is_deterministic_so_a_replay_collides_instead_of_duplicating ... ok
+test store::supervision::tests::cycle_d9::the_effect_counter_is_durable_across_cycles_and_never_reuses_a_sequence ... ok
+test store::supervision::tests::ingest_applies_a_launcher_runtime_generation_advance_into_the_native_ledger ... ok
+test store::supervision::tests::ingest_drops_a_person_the_native_manifest_does_not_know_rather_than_wedging ... ok
+test store::supervision::tests::ingest_preserves_the_relational_assignment_and_effect_rows ... ok
+test store::supervision::tests::ingest_adopts_a_launcher_authored_delegation_assignment ... ok
+test store::supervision::tests::manager_goal_id_matches_the_typescript_digest_byte_for_byte ... ok
+test store::supervision::tests::manager_goal_id_is_stable_and_input_sensitive ... ok
+test store::supervision::tests::live_read_tolerates_a_non_departed_invalid_element_the_reconcile_read_still_refuses ... ok
+test store::supervision::tests::ingest_still_rejects_a_delegated_goal_referencing_a_missing_assignment ... ok
+test store::supervision::tests::orphan_effect_is_reaped_and_no_longer_dispatched ... ok
+test store::supervision::tests::publishing_a_goal_pulls_its_owner_goal_watch_forward ... ok
+test store::supervision::rows::tests::the_status_timestamp_coherence_check_rejects_an_incoherent_row ... ok
+test store::supervision::tests::reaping_orphan_effects_is_idempotent ... ok
+test store::supervision::tests::offboarding_a_manager_sheds_its_goals_delegated_goals_and_assignments_not_just_its_schedules ... ok
+test store::supervision::tests::seeding_a_fresh_supervision_document_validates_instead_of_refusing_non_monotonic ... ok
+test store::supervision::tests::retry_ceilings_surface_as_refusals_before_the_check_can_fire ... ok
+test store::supervision::tests::settling_a_goal_requires_its_owner_and_a_terminal_status ... ok
+test store::supervision::tests::stale_launcher_effect_collision_preserves_the_native_effect_and_resequences_the_new_effect ... ok
+test store::supervision::tests::stale_launcher_collision_refuses_an_ambiguous_unrelated_shared_row_change ... ok
+test store::supervision::tests::stale_launcher_effect_collision_does_not_resurrect_unrelated_explicit_removals ... ok
+test store::supervision::tests::supervision_mutation_has_no_manifest_wide_counter_fence ... ok
+test store::supervision::tests::stale_launcher_retry_preserves_complete_authoritative_effect_and_assignment_state ... ok
+test store::supervisor_armed_intent::tests::a_company_with_no_row_is_not_armed ... ok
+test store::supervisor_armed_intent::tests::a_corrupt_row_is_never_silently_unarmed ... ok
+test store::supervisor_armed_intent::tests::arm_then_read_round_trips ... ok
+test store::supervisor_armed_intent::tests::clear_reports_presence_and_absence ... ok
+test store::supervisor_armed_intent::tests::re_arm_overwrites_the_single_company_row ... ok
+test store::supervision::tests::the_effect_counter_stays_ahead_of_every_sequence_ever_issued_even_after_a_prune ... ok
+test store::supervision::tests::terminal_cap_is_a_noop_under_the_limit ... ok
+test store::supervisor_armed_intent_rows::tests::changed_publish_emits_one_event ... ok
+test store::supervisor_armed_intent_rows::tests::backfill_from_live_blob_shape ... ok
+test store::supervisor_armed_intent_rows::tests::rejects_unmodeled_keys ... ok
+test store::supervisor_armed_intent_rows::tests::round_trips_both_socket_and_session ... ok
+test store::supervisor_armed_intent_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::supervisor_process_state_rows::tests::a_second_direct_publish_uses_current_state ... ok
+test store::supervision::rows::tests::priority_is_the_enum_label_round_tripped_verbatim_and_ranked ... ok
+test store::supervisor_process_state_rows::tests::events_only_document_has_no_state ... ok
+test store::supervisor_process_state_rows::tests::rejects_unmodeled_event_keys ... ok
+test store::supervisor_process_state_rows::tests::empty_before_any_publish ... ok
+test store::supervisor_process_state_rows::tests::rejects_unmodeled_state_keys ... ok
+test store::supervisor_process_state_rows::tests::round_trips_state_with_crash_recovery_and_log ... ok
+test store::supervisor_process_state_rows::tests::shadow_diff_zero_loss_on_a_full_blob_shape ... ok
+test store::supervisor_watermark::tests::a_duty_stale_by_more_than_the_multiple_but_others_healthy_raises_only_the_stale_one ... ok
+test store::supervisor_watermark::tests::a_fresh_company_has_an_empty_watermark_named_for_itself ... ok
+test store::supervisor_watermark::tests::a_never_recorded_duty_is_never_raised ... ok
+test store::supervisor_watermark::tests::a_recently_run_duty_is_not_stalled ... ok
+test store::supervisor_watermark::tests::clear_removes_the_watermark ... ok
+test store::supervisor_watermark::tests::record_success_upserts_the_duty_and_counts_runs ... ok
+test store::supervisor_process_state_rows::tests::round_trips_state_only_and_derives_identity ... ok
+test store::supervisor_watermark::tests::the_41_hour_telegram_blackout_raises_one_incident_carrying_the_retroactive_backlog ... ok
+test store::supervisor_watermark::tests::the_watermark_row_is_plain_json_an_external_reader_can_parse_without_our_types ... ok
+test store::supervisor_watermark::tests::the_startup_self_audit_raises_a_health_incident_and_it_resolves_on_recovery ... ok
+test store::supervisor_process_state_rows::tests::shrinking_the_log_deletes_trailing_slots ... ok
+test store::supervisor_watermark_rows::tests::advancing_one_duty_upserts_only_it ... ok
+test store::supervisor_process_state_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::supervisor_watermark_rows::tests::backfill_round_trips_a_blob_body ... ok
+test store::supervisor_watermark_rows::tests::a_second_direct_publish_uses_current_state ... ok
+test store::supervisor_watermark_rows::tests::clear_deletes_all_duty_rows ... ok
+test store::supervisor_watermark_rows::tests::empty_before_any_publish ... ok
+test store::supervisor_watermark_rows::tests::removing_a_duty_deletes_its_row ... ok
+test store::telegram::tests::a_failure_record_keeps_the_cursor_and_counts_consecutively ... ok
+test store::telegram::tests::a_lone_priority_marker_is_consumed_so_it_can_never_pin_the_cursor ... ok
+test store::telegram::tests::a_persisted_failure_record_has_no_field_that_could_hold_a_token ... ok
+test store::telegram::tests::a_pre_v2_file_without_a_schema_version_still_reads ... ok
+test store::telegram::tests::a_remembered_contact_name_survives_an_upstream_rename ... ok
+test store::telegram::tests::a_success_clears_a_historic_failure_rather_than_leaving_it_looking_current ... ok
+test store::telegram::tests::an_interrupt_prefix_is_stripped_from_the_body_but_recorded_as_a_flag ... ok
+test store::telegram::tests::an_unknown_field_from_a_newer_launcher_is_ignored_not_fatal ... ok
+test store::telegram::tests::backoff_doubles_to_a_thirty_second_ceiling ... ok
+test store::telegram::tests::clearing_is_idempotent ... ok
+test store::telegram::tests::the_store_name_matches_the_typescript_writers_document_key_exactly ... ok
+test store::telegram::tests::unreadable_bytes_are_an_empty_cursor_and_a_warning_never_an_error ... ok
+test store::telegram::tests::updates_below_the_cursor_are_ignored_and_never_move_it_backwards ... ok
+test store::supervisor_watermark_rows::tests::round_trips_and_derives_identity ... ok
+test store::telegram_gateway_rows::tests::none_before_any_publish ... ok
+test store::telegram_gateway_rows::tests::rejects_unmodeled_keys ... ok
+test store::supervisor_watermark_rows::tests::slug_scoping_isolates_companies ... ok
+test store::supervisor_watermark_rows::tests::unchanged_publish_is_a_no_op ... ok
+test store::telegram_gateway_rows::tests::removing_a_contact_deletes_its_row ... ok
+test store::telegram_inbound::tests::a_changed_display_name_or_received_at_is_not_a_conflict ... ok
+test store::telegram_inbound::tests::a_conflicting_archived_copy_is_also_a_hard_error ... ok
+test store::telegram_inbound::tests::a_conflicting_pending_copy_is_a_hard_error_never_an_overwrite ... ok
+test store::telegram_inbound::tests::a_corrupt_blob_is_an_error_never_an_empty_document ... ok
+test store::telegram_inbound::tests::a_fresh_message_is_queued_into_pending ... ok
+test store::telegram_inbound::tests::a_pending_redelivery_is_a_noop_that_still_wakes ... ok
+test store::telegram_inbound::tests::a_round_trip_preserves_both_buckets ... ok
+test store::telegram_inbound::tests::an_archived_redelivery_is_a_noop_that_suppresses_the_wake ... ok
+test store::telegram_inbound::tests::archive_wins_over_pending_when_an_id_is_somehow_in_both ... ok
+test store::telegram_inbound::tests::the_serialized_document_matches_the_typescript_shape ... ok
+test store::telegram_inbound::tests::the_store_name_matches_the_typescript_key_exactly ... ok
+test store::telegram_gateway_rows::tests::round_trips_a_full_failure_record ... ok
+test store::telegram_gateway_rows::tests::round_trips_the_live_shape_across_three_tables ... ok
+test store::telegram_gateway_rows::tests::shadow_diff_zero_loss_on_live_blob ... ok
+test store::telegram_inbound_rows::tests::enqueue_decides_against_current_pending_and_archive_rows ... ok
+test store::telegram_inbound_rows::tests::moving_an_envelope_pending_to_archive_rebuckets_in_place ... ok
+test store::telegram_inbound_rows::tests::rejects_unmodeled_keys ... ok
+test store::telegram_inbound_rows::tests::none_for_a_person_with_no_rows ... ok
+test store::tests::a_readonly_open_never_creates_the_database ... ok
+test store::telegram_inbound_rows::tests::round_trips_pending_and_archive ... ok
+test store::telegram_inbound_rows::tests::shadow_diff_zero_loss_on_live_blob ... ok
+test store::tests::company_db_is_durable_wal ... ok
+test store::tests::a_readonly_connection_can_read_but_cannot_write ... ok
+test store::tests::one_open_transition_index_rejects_a_second_open_transition_for_a_person ... ok
+test store::tests::opening_a_company_db_creates_the_full_schema ... ok
+test store::tests::opening_drops_the_retired_provider_pool_tables_and_keeps_everything_else ... ok
+test store::tests::opening_is_idempotent_and_preserves_rows ... ok
+test store::tests::opening_migrates_company_removal_to_the_filesystem_complete_checkpoint ... ok
+test store::tests::opening_migrates_activity_and_supervision_metadata_without_local_counters ... ok
+test store::tests::opening_migrates_legacy_event_once_markers_with_terminal_ack_identity_columns ... ok
+test store::tests::opening_migrates_historical_assignments_with_no_task_id_without_losing_order ... ok
+test store::tests::opening_migrates_mutation_journal_without_copied_counters ... ok
+test store::tests::opening_migrates_registry_claims_without_a_company_wide_version ... ok
+test store::tests::opening_migrates_org_policy_without_a_manifest_revision_counter ... ok
+test store::tests::opening_migrates_legacy_maintenance_rows_without_copied_counters ... ok
+test store::tests::opening_migrates_materialization_and_contract_rows_without_structural_counters ... ok
+test store::tests::registry_allows_the_same_slug_under_two_data_roots ... ok
+test store::tests::registry_db_carries_lifecycle_intents ... ok
+test store::tests::opening_removes_the_retired_manifest_document_generation_counter ... ok
+test store::tests::the_adoptable_ledgers_are_exactly_what_the_adopt_loop_used_to_spell ... ok
+test test_support::tests::a_wait_on_the_manual_clock_resolves_only_when_a_test_advances_past_it ... ok
+test test_support::tests::a_zero_wait_is_already_resolved ... ok
+test test_support::tests::advance_moves_monotonic_and_wall_together ... ok
+test test_support::tests::manual_clock_does_not_move_on_its_own ... ok
+test store::tests::opening_migrates_runtime_without_manifest_revision_fences ... ok
+test store::tests::reopening_seeds_only_the_structural_root_ceo_model_default ... ok
+test store::tests::opening_removes_the_retired_memory_review_row_fence ... ok
+test store::supervision::tests::terminal_assignments_are_capped_dropping_oldest_first_with_their_effects ... ok
+test store::supervision::tests::the_cap_preserves_next_effect_sequence_monotonicity ... ok
+
+test result: ok. 1214 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 11.54s
+
+     Running tests/conformance_activity.rs (target/debug/deps/conformance_activity-f9efea1bf3de11f1)
+
+running 5 tests
+test the_northstar_template_matches_what_the_fixtures_were_recorded_against ... ok
+test no_activity_fixture_depends_on_the_model_catalog ... ok
+test the_corpus_still_pins_the_invariants_this_milestone_owes ... ok
+test the_activity_family_declares_no_plan_divergences ... ok
+test every_activity_fixture_replays_against_the_rust_store ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/conformance_assignment.rs (target/debug/deps/conformance_assignment-2166eff4995a0866)
+
+running 5 tests
+test the_assignment_family_declares_no_plan_divergences ... ok
+test the_corpus_still_pins_the_invariants_this_milestone_owes ... ok
+test the_northstar_template_matches_what_the_fixtures_were_recorded_against ... ok
+test no_assignment_fixture_depends_on_the_model_catalog ... ok
+test every_assignment_fixture_replays_against_the_rust_store ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/fence_containment.rs (target/debug/deps/fence_containment-ab5239bbad211e8c)
+
+running 8 tests
+test a_launch_fence_can_never_become_permissive_by_omission ... ok
+test every_out_of_line_test_module_is_cfg_test_gated ... ok
+test the_store_names_the_registry_reports_are_the_ones_the_types_carry ... ok
+test every_store_type_in_the_crate_is_in_the_registry ... ok
+test the_launch_intent_type_has_no_permissive_variant ... ok
+test no_unfenced_escape_hatch_has_been_reintroduced_under_any_historical_spelling ... ok
+test no_source_outside_a_stores_own_module_can_name_its_store_type ... ok
+test no_source_outside_a_stores_own_module_can_name_its_documents_key ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+
+     Running tests/inv14_single_commit.rs (target/debug/deps/inv14_single_commit-25f30cd48fe963ff)
+
+running 7 tests
+test a_stale_fence_conflicts_and_publishes_nothing ... ok
+test a_refused_completion_publishes_neither_the_fence_nor_the_effect ... ok
+test inv14_the_result_effect_mirrors_the_assignment_fields ... ok
+test a_goal_replay_is_idempotent_and_a_changed_replay_is_refused ... ok
+test goal_publication_is_small_class_and_overtakes_queued_ordinary_work ... ok
+test the_observer_detects_tearing_when_tearing_genuinely_exists ... ok
+test inv14_result_and_fence_land_in_exactly_one_commit ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/live_control_session_maintenance.rs (target/debug/deps/live_control_session_maintenance-24aadd0f7eb4b273)
+
+running 1 test
+test the_live_session_maintenance_blob_ports_into_fresh_rows_cleanly ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/live_transition_conflict_repro.rs (target/debug/deps/live_transition_conflict_repro-7f7762e784bfc0a0)
+
+running 2 tests
+test the_repaired_live_capture_converges ... ok
+test an_applied_park_pointer_never_wedges_the_reconcile_commit ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/polarity_matrix.rs (target/debug/deps/polarity_matrix-14f5b60a9245c695)
+
+running 5 tests
+test every_declared_store_matches_the_plan_inventory_on_every_operation ... ok
+test the_generated_matrix_is_the_full_cross_product_in_declaration_order ... ok
+test the_inventory_is_partitioned_exactly_into_declared_and_pending_stores ... ok
+test store_names_are_unique_because_they_are_the_documents_primary_key ... ok
+test every_store_crossed_with_every_operation_behaves_as_its_polarity_declares ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/port_provenance.rs (target/debug/deps/port_provenance-48f8bc96c050f10b)
+
+running 1 test
+test every_port_of_doc_comment_names_a_source_path_that_exists ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/serde_flatten_catchall_conformance.rs (target/debug/deps/serde_flatten_catchall_conformance-994127c10349774a)
+
+running 2 tests
+test the_permissive_extra_allowlist_names_only_files_that_still_carry_a_flatten_extra_catchall ... ok
+test every_serde_flatten_extra_catchall_has_write_time_unmodeled_key_enforcement ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/two_implementation_stores.rs (target/debug/deps/two_implementation_stores-8b02bfe87308e5cd)
+
+running 6 tests
+test every_native_relational_table_has_a_recorded_owner ... ok
+test the_typed_row_route_scan_can_actually_match ... ok
+test every_boot_seeded_store_has_one_typed_row_authority ... ok
+test the_unbridged_native_stores_still_have_no_production_caller ... ok
+test no_store_is_written_on_both_sides_without_a_recorded_reason ... ok
+test the_scans_can_actually_match_and_are_not_silently_empty ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running unittests src/lib.rs (target/debug/deps/chiefd_e2e-10f7a8210f6dec3c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/goal-durability-victim.rs (target/debug/deps/goal_durability_victim-a3f8dea35fa5db87)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/backbone_real_tmux.rs (target/debug/deps/backbone_real_tmux-fd0f060dfcf21b8d)
+
+running 5 tests
+test an_untagged_session_is_untrusted_not_read_as_an_empty_tag ... ok
+test a_foreign_session_is_refused_and_never_touched ... ok
+test pane_identity_and_pid_describe_a_process_that_really_exists ... ok
+test killing_panes_empties_the_audit_and_only_a_gone_session_permits_rebuild ... ok
+test a_real_company_session_audits_to_exactly_the_panes_that_were_spawned ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.51s
+
+     Running tests/goal_durability_sigkill.rs (target/debug/deps/goal_durability_sigkill-2cf3726f81c6dc71)
+
+running 1 test
+test an_accepted_goal_survives_an_immediate_sigkill ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/harness_isolation.rs (target/debug/deps/harness_isolation-81bbb7734cfd585f)
+
+running 6 tests
+test a_missing_attested_file_is_an_error_not_a_silent_pass ... ok
+test attestation_is_real_even_though_the_pi_build_is_a_fixture ... ok
+test every_environment_gets_a_distinct_socket_of_the_documented_shape ... ok
+test teardown_is_idempotent ... ok
+test teardown_kills_only_its_own_server ... ok
+test chiefd_never_runs_tmux_without_an_explicit_socket ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
+     Running tests/normalized_host_gather.rs (target/debug/deps/normalized_host_gather-3e509f0131deada1)
+
+running 2 tests
+test fresh_normalized_restart_preserves_rows_without_creating_blob_authority ... ok
+test host_gather_round_trips_normalized_rows_without_blob_table ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/respawned_pane_auth.rs (target/debug/deps/respawned_pane_auth-288ed0b132ee735d)
+
+running 3 tests
+test a_pane_on_another_server_is_not_authenticated_here ... ok
+test a_generation_rolled_forward_refuses_the_previous_claim ... ok
+test a_respawned_pane_authenticates_on_its_new_pid_against_real_tmux ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/restart_mid_materialize.rs (target/debug/deps/restart_mid_materialize-bf66d60471b43285)
+
+running 4 tests
+test crash_child ... ok
+
+running 1 test
+test crash_child ... 
+running 1 test
+test crash_child ... test a_host_transaction_issues_no_tmux_commands_at_all ... ok
+test a_crash_after_publish_rolls_forward_against_the_real_executor ... ok
+
+running 1 test
+test crash_child ... test a_crash_mid_materialize_rolls_back_against_the_real_executor ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/supervisor_handoff_byte_identity.rs (target/debug/deps/supervisor_handoff_byte_identity-31cbbd256f6676d4)
+
+running 1 test
+test the_phase4_handoff_changes_no_durable_byte_and_reproves_the_same_projection ... FAILED
+
+failures:
+
+---- the_phase4_handoff_changes_no_durable_byte_and_reproves_the_same_projection stdout ----
+Error: Invariant("supervisor-handoff-driver.ts write-markers failed (Some(1)): 1012 |   constructor(private readonly transport: SyncHttpTransport) {}\n1013 | \n1014 |   private post<R>(path: string, body: unknown): R {\n1015 |     const response = this.transport.post(path, body);\n1016 |     if (response.status < 200 || response.status >= 300) {\n1017 |       throw new WriteServiceUnavailableError(\n                   ^\nWriteServiceUnavailableError: chiefd docstore /v1/org/manifest/genesis-with-models returned 422: Failed to deserialize the JSON body into the target type: at: unknown field `at`, expected one of `slug`, `manifest`, `bootstrap` at line 1 column 5923\n cause: undefined,\n\n      at post (/workspace/builds/merger/apps/cli/src/legacy/organization/org-durable-store.ts:1017:13)\n      at orgManifestGenesisWithModels (/workspace/builds/merger/apps/cli/src/legacy/organization/org-durable-store.ts:1141:17)\n      at /workspace/builds/merger/tests/migration/supervisor-handoff-driver.ts:203:12\n      at loadAndEvaluateModule (2:1)\n\nBun v1.3.10 (Linux x64 baseline)")
+
+
+failures:
+    the_phase4_handoff_changes_no_durable_byte_and_reproves_the_same_projection
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+
+error: test failed, to rerun pass `-p chiefd-e2e --test supervisor_handoff_byte_identity`

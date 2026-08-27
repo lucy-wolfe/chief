@@ -1,0 +1,83 @@
+{
+  "name": "queue-creates-a-first-attempt-request",
+  "family": "session-maintenance",
+  "description": "Queueing produces a durable queued request at attempt 1.",
+  "invariants": [
+    "§2.5 queue"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "maint.queue",
+  "in": {
+    "action": "compact",
+    "personId": "signal-researcher",
+    "requestedBy": "signal-researcher",
+    "reason": "Context is nearly full."
+  },
+  "expect": {
+    "ok": {
+      "action": "compact",
+      "attempt": 1,
+      "automatic": false,
+      "claimToken": null,
+      "claimedProcessId": null,
+      "claimedSessionId": null,
+      "compactAnchorEntryId": null,
+      "compactSessionId": null,
+      "completedCompactionEntryId": null,
+      "completedSessionId": null,
+      "error": null,
+      "force": false,
+      "id": "session-maintenance:1:signal-researcher:compact",
+      "interruptedSessionId": null,
+      "personId": "signal-researcher",
+      "recoveredFromRequestId": null,
+      "requestedBy": "signal-researcher",
+      "retryNotBefore": null,
+      "status": "queued"
+    }
+  },
+  "expectState": [
+    {
+      "read": "maint.request",
+      "args": {
+        "requestId": "session-maintenance:1:signal-researcher:compact"
+      },
+      "equals": {
+        "action": "compact",
+        "attempt": 1,
+        "automatic": false,
+        "claimToken": null,
+        "claimedProcessId": null,
+        "claimedSessionId": null,
+        "compactAnchorEntryId": null,
+        "compactSessionId": null,
+        "completedCompactionEntryId": null,
+        "completedSessionId": null,
+        "error": null,
+        "force": false,
+        "id": "session-maintenance:1:signal-researcher:compact",
+        "interruptedSessionId": null,
+        "personId": "signal-researcher",
+        "recoveredFromRequestId": null,
+        "requestedBy": "signal-researcher",
+        "retryNotBefore": null,
+        "status": "queued"
+      }
+    },
+    {
+      "read": "maint.summary",
+      "equals": {
+        "requestOrder": [
+          "session-maintenance:1:signal-researcher:compact"
+        ]
+      }
+    }
+  ]
+}

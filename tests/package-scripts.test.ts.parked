@@ -1,0 +1,64 @@
+// PARKED by E0-S2 (monorepo revamp wave 0): this file pins the exact
+// pre-monorepo root script list and the pre-monorepo layout it assumes; kept
+// as reference for later-wave test-reinstatement work. It was already red on
+// main when parked (the committed script list includes `test:clean-env`,
+// absent from this file's lock list); its Pi-pin assertions are re-homed by
+// E3-S1's attestation tests.
+import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import packageJson from "../package.json";
+
+test("keeps the public package script surface intentional and human-facing", () => {
+  expect(Object.keys(packageJson.scripts)).toEqual(["start", "cli", "help", "company", "department", "contract", "org", "release:chiefd", "release:chiefd:fast", "test", "test:ci", "test:ci:e2e", "typecheck", "typecheck:capabilities", "check"]);
+  expect(packageJson.scripts.start).toBe("bun src/cli.ts");
+  expect("tribe" in packageJson.scripts).toBeFalse();
+  expect(packageJson.scripts.company).toBe("bun src/cli.ts company");
+  expect(packageJson.scripts.department).toBe("bun src/cli.ts department");
+  expect(packageJson.scripts.contract).toBe("bun src/cli.ts contract");
+  expect(packageJson.scripts.org).toBe("bun src/cli.ts org");
+  expect(packageJson.scripts.typecheck).toContain("typecheck:capabilities");
+  expect(packageJson.scripts["typecheck:capabilities"]).toContain("tsconfig.capabilities.json");
+  expect(packageJson.scripts.check).toContain("bun test tests");
+  expect(packageJson.scripts["test:ci"]).toBe("bun scripts/ci-shard.ts");
+  // The e2e lane is the SAME sharder behind an explicit opt-in flag, never a
+  // second, divergent runner: the surface stays one entry point per job.
+  expect(packageJson.scripts["test:ci:e2e"]).toBe("bun scripts/ci-shard.ts --e2e");
+  expect(packageJson.scripts["release:chiefd"]).toBe("bun scripts/release-chiefd.ts");
+  // The dev-loop twin: the SAME script and the SAME output path, differing
+  // only by cargo profile overrides. It must never become a second, divergent
+  // release path -- that is why it ends in `bun scripts/release-chiefd.ts`
+  // rather than invoking cargo itself.
+  const fast = packageJson.scripts["release:chiefd:fast"];
+  expect(fast).toContain("bun scripts/release-chiefd.ts");
+  expect(fast).toContain("CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16");
+  expect(fast).toContain("CARGO_PROFILE_RELEASE_LTO=false");
+  expect(fast).toContain("CARGO_PROFILE_RELEASE_INCREMENTAL=true");
+  // The shipped profile is untouched: `release:chiefd` must carry NO overrides,
+  // so a production build never silently inherits the dev tuning.
+  expect(packageJson.scripts["release:chiefd"]).not.toContain("CARGO_PROFILE");
+  expect((packageJson.scripts as Record<string, string | undefined>)["release:local"]).toBeUndefined();
+});
+
+test("keeps persisted company state and credentials outside version control", () => {
+  const ignored = readFileSync(".gitignore", "utf8").split(/\r?\n/);
+  expect(ignored).toContain(".env");
+  expect(ignored).toContain(".env.*");
+  expect(ignored).toContain("!.env.example");
+  expect(ignored).toContain(".tribes/");
+  expect(ignored).toContain("orgs/");
+  expect(Bun.spawnSync(["git", "check-ignore", "-q", ".env.tribes-capital"]).exitCode).toBe(0);
+  expect(Bun.spawnSync(["git", "check-ignore", "-q", ".env.example"]).exitCode).not.toBe(0);
+  for (const secret of [".tribes/agent-authorization-key.json", ".tribes/cli-login-key.json", ".tribes/jwt-token-cache.json"]) {
+    expect(Bun.spawnSync(["git", "check-ignore", "-q", secret]).exitCode).toBe(0);
+  }
+});
+
+test("pins one coherent Pi 0.80.10 dependency set", () => {
+  expect(packageJson.devDependencies["@earendil-works/pi-coding-agent"]).toBe("0.80.10");
+  expect(packageJson.devDependencies["@earendil-works/pi-tui"]).toBe("0.80.10");
+  const lock = readFileSync("bun.lock", "utf8");
+  for (const name of ["pi-agent-core", "pi-ai", "pi-coding-agent", "pi-tui"]) {
+    expect(lock).toContain(`@earendil-works/${name}@0.80.10`);
+    expect(lock).not.toContain(`@earendil-works/${name}@0.80.7`);
+  }
+});

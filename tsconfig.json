@@ -1,0 +1,17 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/piing"
+    },
+    {
+      "path": "packages/chiefing"
+    },
+    {
+      "path": "packages/testing"
+    },
+    {
+      "path": "apps/web"
+    }
+  ]
+}

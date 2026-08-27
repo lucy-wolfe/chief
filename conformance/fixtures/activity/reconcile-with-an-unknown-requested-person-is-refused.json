@@ -1,0 +1,43 @@
+{
+  "name": "reconcile-with-an-unknown-requested-person-is-refused",
+  "family": "activity",
+  "description": "A request naming someone outside the manifest is refused rather than silently ignored.",
+  "invariants": [],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "activity.reconcile",
+  "in": {
+    "launchIntentPersonIds": [],
+    "requestedPersonIds": [
+      "nobody"
+    ]
+  },
+  "expect": {
+    "error": {
+      "type": "Refused",
+      "code": "unknown-person",
+      "message": "Unknown requested person 'nobody'"
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.summary",
+      "equals": {
+        "nextTransitionSequence": 1,
+        "personOrder": [
+          "chief",
+          "quant-head",
+          "signal-researcher",
+          "it-head"
+        ],
+        "transitionOrder": []
+      }
+    }
+  ]
+}

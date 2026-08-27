@@ -1,0 +1,59 @@
+[package]
+name = "beacond"
+description = "The company registry: which companies exist, and where each one's chiefd is running."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "beacond"
+path = "src/main.rs"
+
+[dependencies]
+# The daemon-level observability stream, and the `tracing` layer that
+# feeds it. A LEAF both sides of the backend/client boundary may link.
+chiefd-log = { path = "../chiefd-log" }
+axum = { workspace = true }
+# The one shared shape for "which file is this process running", already used
+# by the company daemon's rendezvous. beacond reports it the same way, so
+# `chief` has ONE comparison to make and not two.
+host-primitives = { path = "../host-primitives" }
+# `kill(pid, 0)` for the admission liveness judge. Already a workspace
+# dependency (with the `signal` feature) used by chiefd-host, so this adds
+# nothing to the dependency graph.
+nix = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+# Target-conditional (D17, E1-S2 #759): rusqlite's "bundled" feature compiles
+# sqlite3.c with the host cc, which rejects the Darwin-only
+# -arch/-mmacosx-version-min flags on the check-only cross-target. Dropping
+# "bundled" only for Darwin removes the only C-compilation step; the real
+# Linux build is byte-identical. Same
+# split as the other four workspace crates — apps/chiefd/Cargo.toml is a
+# virtual manifest, so this cannot live there.
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+rusqlite = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+rusqlite = { version = "0.40" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+# `ServiceExt::oneshot` drives the router through a real axum Router without a
+# socket (test 8). Same self-scoped feature opt-in chiefd-api already uses
+# (crates/chiefd-api/Cargo.toml:57) — `util` is NOT in tower's default features.
+tower = { workspace = true, features = ["util"] }
+# A real HTTP client for the bound-socket integration test (test 10), the same
+# three crates crates/chiefd-daemon/Cargo.toml:55-57 uses for exactly this.
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+http-body-util = { workspace = true }
+
+[lints]
+workspace = true

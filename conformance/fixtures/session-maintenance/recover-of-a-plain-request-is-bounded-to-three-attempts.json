@@ -1,0 +1,213 @@
+{
+  "name": "recover-of-a-plain-request-is-bounded-to-three-attempts",
+  "family": "session-maintenance",
+  "description": "Ordinary per-person maintenance is bounded: after the third attempt recovery preserves the failure and queues no successor.",
+  "invariants": [
+    "§2.5 D6"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    },
+    {
+      "op": "maint.queue",
+      "in": {
+        "action": "compact",
+        "personId": "signal-researcher",
+        "requestedBy": "signal-researcher",
+        "reason": "Context is nearly full."
+      }
+    },
+    {
+      "op": "maint.start",
+      "in": {
+        "personId": "signal-researcher",
+        "action": "compact",
+        "claim": {
+          "processId": 4242,
+          "sessionId": "session-alpha",
+          "claimToken": "token-alpha"
+        }
+      }
+    },
+    {
+      "op": "maint.recover",
+      "in": {
+        "personId": "signal-researcher",
+        "claim": {
+          "processId": 9999,
+          "sessionId": "session-beta",
+          "claimToken": "token-beta"
+        }
+      }
+    },
+    {
+      "op": "maint.start",
+      "in": {
+        "personId": "signal-researcher",
+        "action": "compact",
+        "claim": {
+          "processId": 9999,
+          "sessionId": "session-beta",
+          "claimToken": "token-beta"
+        }
+      }
+    },
+    {
+      "op": "maint.recover",
+      "in": {
+        "personId": "signal-researcher",
+        "claim": {
+          "processId": 4242,
+          "sessionId": "session-alpha",
+          "claimToken": "token-alpha"
+        }
+      }
+    },
+    {
+      "op": "maint.start",
+      "in": {
+        "personId": "signal-researcher",
+        "action": "compact",
+        "claim": {
+          "processId": 4242,
+          "sessionId": "session-alpha",
+          "claimToken": "token-alpha"
+        }
+      }
+    }
+  ],
+  "op": "maint.recover",
+  "in": {
+    "personId": "signal-researcher",
+    "claim": {
+      "processId": 9999,
+      "sessionId": "session-beta",
+      "claimToken": "token-beta"
+    }
+  },
+  "expect": {
+    "ok": {
+      "interrupted": [
+        {
+          "action": "compact",
+          "attempt": 3,
+          "automatic": false,
+          "claimToken": "token-alpha",
+          "claimedProcessId": 4242,
+          "claimedSessionId": "session-alpha",
+          "compactAnchorEntryId": null,
+          "compactSessionId": null,
+          "completedCompactionEntryId": null,
+          "completedSessionId": null,
+          "error": "The Pi process ended before session maintenance completed; the durable attempt was recovered on the next exact runtime startup.",
+          "force": false,
+          "id": "session-maintenance:3:signal-researcher:compact",
+          "interruptedSessionId": null,
+          "personId": "signal-researcher",
+          "recoveredFromRequestId": "session-maintenance:2:signal-researcher:compact",
+          "requestedBy": "signal-researcher",
+          "retryNotBefore": null,
+          "status": "failed"
+        }
+      ],
+      "replacements": []
+    }
+  },
+  "expectState": [
+    {
+      "read": "maint.request",
+      "args": {
+        "requestId": "session-maintenance:1:signal-researcher:compact"
+      },
+      "equals": {
+        "action": "compact",
+        "attempt": 1,
+        "automatic": false,
+        "claimToken": "token-alpha",
+        "claimedProcessId": 4242,
+        "claimedSessionId": "session-alpha",
+        "compactAnchorEntryId": null,
+        "compactSessionId": null,
+        "completedCompactionEntryId": null,
+        "completedSessionId": null,
+        "error": "The Pi process ended before session maintenance completed; the durable attempt was recovered on the next exact runtime startup.",
+        "force": false,
+        "id": "session-maintenance:1:signal-researcher:compact",
+        "interruptedSessionId": null,
+        "personId": "signal-researcher",
+        "recoveredFromRequestId": null,
+        "requestedBy": "signal-researcher",
+        "retryNotBefore": null,
+        "status": "failed"
+      }
+    },
+    {
+      "read": "maint.request",
+      "args": {
+        "requestId": "session-maintenance:2:signal-researcher:compact"
+      },
+      "equals": {
+        "action": "compact",
+        "attempt": 2,
+        "automatic": false,
+        "claimToken": "token-beta",
+        "claimedProcessId": 9999,
+        "claimedSessionId": "session-beta",
+        "compactAnchorEntryId": null,
+        "compactSessionId": null,
+        "completedCompactionEntryId": null,
+        "completedSessionId": null,
+        "error": "The Pi process ended before session maintenance completed; the durable attempt was recovered on the next exact runtime startup.",
+        "force": false,
+        "id": "session-maintenance:2:signal-researcher:compact",
+        "interruptedSessionId": null,
+        "personId": "signal-researcher",
+        "recoveredFromRequestId": "session-maintenance:1:signal-researcher:compact",
+        "requestedBy": "signal-researcher",
+        "retryNotBefore": null,
+        "status": "failed"
+      }
+    },
+    {
+      "read": "maint.request",
+      "args": {
+        "requestId": "session-maintenance:3:signal-researcher:compact"
+      },
+      "equals": {
+        "action": "compact",
+        "attempt": 3,
+        "automatic": false,
+        "claimToken": "token-alpha",
+        "claimedProcessId": 4242,
+        "claimedSessionId": "session-alpha",
+        "compactAnchorEntryId": null,
+        "compactSessionId": null,
+        "completedCompactionEntryId": null,
+        "completedSessionId": null,
+        "error": "The Pi process ended before session maintenance completed; the durable attempt was recovered on the next exact runtime startup.",
+        "force": false,
+        "id": "session-maintenance:3:signal-researcher:compact",
+        "interruptedSessionId": null,
+        "personId": "signal-researcher",
+        "recoveredFromRequestId": "session-maintenance:2:signal-researcher:compact",
+        "requestedBy": "signal-researcher",
+        "retryNotBefore": null,
+        "status": "failed"
+      }
+    },
+    {
+      "read": "maint.summary",
+      "equals": {
+        "requestOrder": [
+          "session-maintenance:1:signal-researcher:compact",
+          "session-maintenance:2:signal-researcher:compact",
+          "session-maintenance:3:signal-researcher:compact"
+        ]
+      }
+    }
+  ]
+}

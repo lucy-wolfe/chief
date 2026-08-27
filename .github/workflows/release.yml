@@ -1,0 +1,215 @@
+# Release: cut a versioned, prebuilt release from every GREEN commit on main.
+#
+# This is the ONLY workflow with write permission, and it is deliberately
+# separate from CI (which is read-only and fork-safe). It fires on CI SUCCESS
+# for main — never on the push itself — so a commit that fails CI produces no
+# release, which is exactly the behaviour the operator asked for. The upgrade
+# lands ~20-35 minutes after the push: full CI first, then four release builds.
+#
+# One tag per green commit (patch monotonic within the major.minor series
+# `package.json` declares), so every shipped version
+# stays addressable and `chief upgrade --rollback` has a name to return to.
+name: Release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+# A burst of pushes to main releases only the newest green commit: an older
+# release run still in flight is cancelled when a newer green commit starts one.
+# Tag creation and `gh release create` are the last steps, so a cancelled run
+# leaves no half-published release behind — only uploaded-artifact scratch.
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+env:
+  RUST_TOOLCHAIN: 1.97.1
+
+jobs:
+  # Compute the next tag from the previous one. Runs only when the CI run that
+  # triggered this succeeded — `workflow_run` fires on success AND failure.
+  next-tag:
+    name: Compute next tag
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.compute.outputs.tag }}
+      version: ${{ steps.compute.outputs.version }}
+    steps:
+      # THE CHECKOUT IS REQUIRED: this job reads `package.json`, and without a
+      # working tree there is nothing to read. It had no checkout while the
+      # version was a literal in the script below.
+      - name: Check out the commit being released
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Compute next tag
+        id: compute
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # THE MAJOR AND MINOR COME FROM package.json, WHICH IS THE VERSION OF
+          # RECORD. This used to seed a literal `v2.0.0` and then take
+          # major.minor from whatever tag existed -- while the comment claimed
+          # the workspace version governed them. Nothing implemented that
+          # claim, so `package.json` was a declared intent with no consumer and
+          # the workflow was the real source of record. Changing the declared
+          # version changed nothing shipped, which is the failure this reads
+          # against.
+          #
+          # Only the PATCH is automatic, one per green commit. To move major or
+          # minor, edit `package.json` (and `apps/chiefd/Cargo.toml` with it --
+          # `one-version-of-record.test.mjs` fails if they disagree); the next
+          # release picks it up and starts that line at `.0`.
+          series="$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")"
+          case "$series" in
+            [0-9]*.[0-9]*) ;;
+            *) echo "::error::package.json version did not yield a major.minor: '$series'"; exit 1 ;;
+          esac
+          # The HIGHEST patch in this series -- sorted numerically, not by
+          # release date. `gh release list` orders by creation, and a
+          # re-cut or out-of-order publish would otherwise hand back a patch
+          # that is not the maximum and mint a tag that already exists.
+          # A series change starts at .0 rather than inheriting a patch number
+          # from the previous line, because the filter is per-series.
+          highest="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName --jq \
+            ".[] | select(.tagName | test(\"^v${series}\\\\.[0-9]+$\")) | .tagName" 2>/dev/null \
+            | sed "s/^v${series}\\.//" | sort -n | tail -1)"
+          if [ -z "$highest" ]; then
+            next="v${series}.0"
+          else
+            next="v${series}.$((highest + 1))"
+          fi
+          echo "tag=${next}" >> "$GITHUB_OUTPUT"
+          echo "version=${next#v}" >> "$GITHUB_OUTPUT"
+          echo "Next release: ${next}"
+
+  # One job per published target. macOS targets build on macOS runners so the
+  # linker ad-hoc-signs the binaries — mandatory on Apple Silicon and the reason
+  # a cheaper Linux cross-build of the Darwin targets is not an option.
+  build:
+    name: Build ${{ matrix.target }}
+    needs: next-tag
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-14
+          - target: x86_64-apple-darwin
+            os: macos-14
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+    steps:
+      - name: Check out the commit CI just passed
+        uses: actions/checkout@v7
+        with:
+          # The exact green commit, not the branch tip: a later push must not
+          # smuggle unverified code into this release.
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - name: Install Rust toolchain and target
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+          rustup default "$RUST_TOOLCHAIN"
+          rustup target add "${{ matrix.target }}"
+      # The aarch64 Linux target cross-compiles on an x86_64 runner and needs a
+      # cross linker; the other three link natively on their own runner.
+      - name: Install the aarch64 Linux cross linker
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Restore cargo and target cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/chiefd
+          shared-key: release-${{ matrix.target }}
+      # `bun install` materialises packages/piing/dist, which the resource
+      # payload copies from — a release refuses if it is missing.
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+      - name: Build and package the tarball
+        env:
+          # Stamped into the binaries via build.rs and into the manifest and
+          # directory name, so `chief --version`, versions/<v> and the release
+          # tag can never disagree.
+          CHIEF_RELEASE_VERSION: ${{ needs.next-tag.outputs.version }}
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        run: bun scripts/package-release.ts --target "${{ matrix.target }}" --out dist
+      - name: Upload the target tarball
+        uses: actions/upload-artifact@v7
+        with:
+          name: chief-${{ matrix.target }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  # Collect every target's tarball, checksum them together, and publish the tag.
+  publish:
+    name: Publish release
+    needs: [next-tag, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the commit CI just passed
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Download every target's tarball
+        uses: actions/download-artifact@v8
+        with:
+          path: staging
+          pattern: chief-*
+          merge-multiple: true
+      - name: Assemble the release directory, the manifest asset, and SHA256SUMS
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          mv staging/*.tar.gz dist/
+          # A standalone manifest.json asset (H.3-R1). `version` and `piFloor`
+          # are target-independent, so any target's manifest carries them — pull
+          # one out so `chief upgrade --check` can read the TARGET release's Pi
+          # floor WITHOUT downloading a whole tarball first.
+          first_tarball="$(ls dist/chief-*.tar.gz | head -1)"
+          tar -xzf "$first_tarball" -O manifest.json > dist/manifest.json
+          cd dist
+          # One SHA256SUMS across all four tarballs; `chief upgrade` and
+          # install.sh match their own asset's line by name, never by position.
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum chief-*.tar.gz > SHA256SUMS
+          else
+            shasum -a 256 chief-*.tar.gz > SHA256SUMS
+          fi
+          ls -l
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.next-tag.outputs.tag }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$HEAD_SHA" \
+            --title "$TAG" \
+            --generate-notes \
+            dist/chief-*.tar.gz dist/SHA256SUMS dist/manifest.json

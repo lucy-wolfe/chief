@@ -1,0 +1,89 @@
+{
+  "name": "abandon-twice-is-refused",
+  "family": "activity",
+  "description": "Abandonment is not idempotent — a second attempt is refused so the reason string cannot be appended repeatedly.",
+  "invariants": [
+    "inv 18"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    },
+    {
+      "op": "activity.begin_transition",
+      "in": {
+        "personId": "signal-researcher",
+        "action": "park",
+        "reason": "Conformance park."
+      }
+    },
+    {
+      "op": "activity.abandon_transition",
+      "in": {
+        "transitionId": "transition:1:signal-researcher:park",
+        "personId": "signal-researcher",
+        "reason": "First."
+      }
+    }
+  ],
+  "op": "activity.abandon_transition",
+  "in": {
+    "transitionId": "transition:1:signal-researcher:park",
+    "personId": "signal-researcher",
+    "reason": "Second."
+  },
+  "expect": {
+    "error": {
+      "type": "Refused",
+      "code": "transition-terminal",
+      "message": "Graceful transition 'transition:1:signal-researcher:park' is already cancelled"
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.transition",
+      "args": {
+        "transitionId": "transition:1:signal-researcher:park"
+      },
+      "equals": {
+        "abandoned": true,
+        "action": "park",
+        "id": "transition:1:signal-researcher:park",
+        "personId": "signal-researcher",
+        "status": "cancelled"
+      }
+    },
+    {
+      "read": "activity.person",
+      "args": {
+        "personId": "signal-researcher"
+      },
+      "equals": {
+        "activeTransitionId": null,
+        "idleSince": null,
+        "lastDesiredActive": false,
+        "lastEmploymentState": "active",
+        "lastOperational": true,
+        "personId": "signal-researcher"
+      }
+    },
+    {
+      "read": "activity.summary",
+      "equals": {
+        "nextTransitionSequence": 2,
+        "personOrder": [
+          "chief",
+          "quant-head",
+          "signal-researcher",
+          "it-head"
+        ],
+        "transitionOrder": [
+          "transition:1:signal-researcher:park"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+# rustfmt.toml — the Rust workspace at apps/chiefd. Workspace edition 2021
+# (every `[package] edition` under here), stable toolchain (rust-toolchain.toml
+# pins 1.97.1, not nightly — only stable rustfmt options are usable).
+#
+# There was no rustfmt.toml before this (#850, first half — see DECISIONS.md
+# for the full ruling): the tree has been hand-formatted since the #787
+# chiefd move with nothing recorded about intent, `cargo fmt` has never run
+# as a gate, and there is no rustfmt.toml in git history to inherit from.
+# This file exists to capture what the codebase's ACTUAL, sampled formatting
+# already does, not to impose a new preference, so the mass reformat (#850's
+# second half, deliberately NOT done in this change — see below) lands
+# against one settled target instead of rustfmt's bare defaults guessing at
+# intent from a tree that was never machine-formatted in the first place.
+#
+# Measured against every `.rs` file under `apps/chiefd` (not target/) at
+# revamp/monorepo@49506ff5, `cargo fmt --check` (bare rustfmt defaults):
+#   - 249 of the crate's files are flagged.
+# With this file's settings: 229 flagged (-20 files, ~8%). Every file that
+# drops out does so because of `use_small_heuristics = "Max"` below; no
+# other stable option tested moved that count at all. That 229 remaining is
+# expected and fine — it is the mass-reformat's job (#850's held second
+# half), not this file's, to close it to zero.
+
+edition = "2021"        # The parser edition — matches every Cargo.toml under this workspace. `cargo fmt` already infers this from Cargo.toml, so this line changes nothing measured above; it is here so a bare `rustfmt` invocation (no cargo context) formats identically.
+style_edition = "2021"  # The RFC 3338 style-guide version, pinned explicitly rather than left on rustfmt's own default (which is 2015 unless set, and can change across rustfmt releases) — same reasoning as `edition`, for the style rules layer.
+
+# The codebase consistently keeps small struct literals, short fn-call
+# argument lists (including one with a trailing closure), and similar short
+# constructs on one line even where rustfmt's very conservative built-in
+# per-construct thresholds (`struct_lit_width` 18, `fn_call_width` 60, etc.)
+# would force them across several — e.g. `bootstrap.rs`'s
+# `Some(Args { slug: slug?, data_root: data_root? })` stays one line in the
+# committed source; under bare defaults `cargo fmt` breaks it across four.
+# `use_small_heuristics = "Max"` raises every one of those per-construct
+# width heuristics toward `max_width` at once, and IS the one change that
+# measurably matches this: dropping the flagged-file count from 249 to 229.
+#
+# Tried hand-tuning the individual width knobs instead of the blanket
+# preset (`struct_lit_width`, `fn_call_width`, `chain_width`, `array_width`,
+# `struct_variant_width`, `attr_fn_like_width`, each set to 100 alone) to
+# see whether a narrower, more surgical change would do the same job with
+# less magic. It does not: the knobs interact. `struct_lit_width = 100`
+# alone INCREASES the flagged-file count to 253 — worse than doing nothing —
+# because it inlines slightly-too-long literals into lines that other
+# still-default heuristics then re-break elsewhere. `use_small_heuristics =
+# "Max"` is the one coherent, named, documented preset that matches the
+# sampled intent without hand-picking several interacting magic numbers.
+use_small_heuristics = "Max"
+
+# Everything else stays at rustfmt's stable defaults — sampled and found no
+# consistent divergence worth encoding:
+#   - `max_width` (100, unchanged): line-length distribution across every
+#     `.rs` file under `apps/chiefd` (163,625 lines sampled) has p50=39,
+#     p90=80, p95=89, p99=108 — the overwhelming majority of the codebase
+#     already fits comfortably under 100. The 3,036 lines (1.9%) over 100
+#     chars are long string/macro literals and doc-comment URLs that should
+#     just wrap in the mass reformat, not evidence the column should move.
+#   - `use_field_init_shorthand` (false, unchanged): 491 real `field: field`
+#     struct-literal occurrences exist where the shorthand form was
+#     available and not used — the codebase's own explicit style (this
+#     program consistently favors spelling things out over implicit
+#     shortcuts elsewhere too), matching the default rather than
+#     contradicting it. Enabling the shorthand here would be imposing a
+#     preference the tree does not show, not reading one.
+#   - `merge_derives` (true, unchanged): zero files stack separate
+#     `#[derive(...)]` attributes back to back — nothing to preserve.
+#   - `reorder_imports` / `reorder_modules` (true, unchanged), `fn_params_layout`
+#     (Tall, unchanged), `match_arm_leading_pipes` (Never, unchanged), and
+#     every other stable knob not named above: no sampled evidence of a
+#     different convention: leaving these at their defaults.
+#
+# The held second half is DONE. `cargo fmt --manifest-path
+# apps/chiefd/Cargo.toml --all` has been run across the workspace (145 files
+# reformatted), `cargo fmt --check` now exits 0, and `ci.yml` runs it as a
+# gate — preceded there by a non-vacuity assertion that the tree it scans
+# resolves 200+ `.rs` files, because a gate that checks nothing is the defect
+# class #850 is itself an instance of. Keep it green in the same commit as
+# whatever Rust you write; a reformat this size is only reviewable once.

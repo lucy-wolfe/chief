@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="520" viewBox="0 0 900 520"
+     role="img" aria-labelledby="t d">
+  <title id="t">chief architecture</title>
+  <desc id="d">The operator's terminal drives the chief client, which owns tmux and speaks HTTP
+  to chiefd. One chiefd runs per company and owns that company's SQLite database and supervisor
+  loop; it decides which people should be running, and the client materialises them as Pi panes.
+  beacond is a small box-wide discovery daemon. The browser host is drawn dashed because it is
+  not live.</desc>
+
+  <style>
+    .s { fill: none; stroke: #7d8590; stroke-width: 1.6; }
+    .box { fill: none; stroke: #7d8590; stroke-width: 1.6; rx: 10; }
+    .dashed { stroke-dasharray: 6 5; }
+    .t { fill: #7d8590; font-family: ui-sans-serif, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .h { font-size: 16px; font-weight: 700; }
+    .b { font-size: 12.5px; }
+    .m { font-size: 11.5px; font-style: italic; }
+    .fill { fill: #7d8590; fill-opacity: 0.10; stroke: #7d8590; stroke-width: 1.6; }
+    @media (prefers-color-scheme: light) {
+      .s, .box, .fill { stroke: #4a5259; }
+      .t { fill: #3d444d; }
+      .fill { fill: #4a5259; fill-opacity: 0.07; }
+    }
+    @media (prefers-color-scheme: dark) {
+      .s, .box, .fill { stroke: #a8b1bb; }
+      .t { fill: #c2cad3; }
+      .fill { fill: #a8b1bb; fill-opacity: 0.10; }
+    }
+  </style>
+
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7d8590"/>
+    </marker>
+  </defs>
+
+  <!-- operator terminal -->
+  <rect class="fill" x="24" y="60" width="170" height="86" rx="10"/>
+  <text class="t h" x="109" y="96" text-anchor="middle">Your terminal</text>
+  <text class="t b" x="109" y="118" text-anchor="middle">one human, one company</text>
+
+  <!-- chief client -->
+  <rect class="fill" x="256" y="40" width="206" height="126" rx="10"/>
+  <text class="t h" x="359" y="72" text-anchor="middle">chief</text>
+  <text class="t b" x="359" y="94" text-anchor="middle">the client</text>
+  <text class="t b" x="359" y="116" text-anchor="middle">owns tmux and the terminal</text>
+  <text class="t b" x="359" y="136" text-anchor="middle">decides WHERE people show</text>
+  <text class="t m" x="359" y="156" text-anchor="middle">reaches a company over HTTP only</text>
+
+  <!-- chiefd -->
+  <rect class="fill" x="540" y="30" width="248" height="146" rx="10"/>
+  <text class="t h" x="664" y="62" text-anchor="middle">chiefd</text>
+  <text class="t b" x="664" y="84" text-anchor="middle">the backend — one per company</text>
+  <text class="t b" x="664" y="104" text-anchor="middle">decides WHO should be running</text>
+  <text class="t b" x="664" y="126" text-anchor="middle">.chief/db/chief.db · every durable fact</text>
+  <text class="t b" x="664" y="146" text-anchor="middle">supervisor loop · six duties</text>
+  <text class="t m" x="664" y="166" text-anchor="middle">never sees a terminal</text>
+
+  <!-- arrows client <-> daemon -->
+  <path class="s" d="M462 88 L536 88" marker-end="url(#a)"/>
+  <text class="t m" x="499" y="80" text-anchor="middle">HTTP</text>
+  <path class="s" d="M536 122 L466 122" marker-end="url(#a)"/>
+  <text class="t m" x="500" y="140" text-anchor="middle">actions</text>
+
+  <path class="s" d="M198 103 L252 103" marker-end="url(#a)"/>
+
+  <!-- beacond -->
+  <rect class="fill" x="540" y="232" width="248" height="74" rx="10"/>
+  <text class="t h" x="664" y="262" text-anchor="middle">beacond</text>
+  <text class="t b" x="664" y="284" text-anchor="middle">box-wide discovery · one daemon per slug</text>
+  <path class="s" d="M664 180 L664 228" marker-end="url(#a)"/>
+
+  <!-- tmux panes -->
+  <rect class="box" x="200" y="232" width="290" height="152"/>
+  <text class="t h" x="345" y="262" text-anchor="middle">tmux session  org-&lt;slug&gt;_</text>
+  <rect class="fill" x="222" y="278" width="118" height="42" rx="8"/>
+  <text class="t b" x="281" y="304" text-anchor="middle">CEO · Pi</text>
+  <rect class="fill" x="352" y="278" width="118" height="42" rx="8"/>
+  <text class="t b" x="411" y="304" text-anchor="middle">head · Pi</text>
+  <rect class="fill" x="222" y="330" width="118" height="42" rx="8"/>
+  <text class="t b" x="281" y="356" text-anchor="middle">person · Pi</text>
+  <rect class="fill" x="352" y="330" width="118" height="42" rx="8"/>
+  <text class="t b" x="411" y="356" text-anchor="middle">person · Pi</text>
+  <path class="s" d="M345 170 L345 228" marker-end="url(#a)"/>
+  <text class="t m" x="352" y="200" text-anchor="start">materialise · observe</text>
+
+  <!-- company directory -->
+  <rect class="box dashed" x="200" y="410" width="290" height="80"/>
+  <text class="t h" x="345" y="440" text-anchor="middle">the company directory</text>
+  <text class="t b" x="345" y="462" text-anchor="middle">.chief/db · .chief/agent · .chief/bus · .chief/logs</text>
+  <text class="t m" x="345" y="481" text-anchor="middle">the directory IS the company</text>
+  <path class="s dashed" d="M540 130 C 520 420, 500 450, 494 450" marker-end="url(#a)"/>
+
+  <!-- browser host, not live -->
+  <rect class="box dashed" x="540" y="356" width="248" height="86"/>
+  <text class="t h" x="664" y="386" text-anchor="middle">apps/web — browser host</text>
+  <text class="t b" x="664" y="408" text-anchor="middle">a second host for the same daemon</text>
+  <text class="t m" x="664" y="428" text-anchor="middle">not live, currently broken</text>
+  <path class="s dashed" d="M664 352 L664 312"/>
+</svg>

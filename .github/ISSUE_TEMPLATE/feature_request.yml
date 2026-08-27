@@ -1,0 +1,48 @@
+name: Feature request
+description: Propose a change to what chief does.
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two things this project holds to, so that a proposal is judged fairly:
+
+        - **No backward compatibility.** Obsolete paths are removed, not wrapped in a
+          fallback. A proposal that adds a compatibility layer will be asked to delete
+          the old path instead.
+        - **The simplest thing that fully meets the current requirement.** Speculative
+          abstraction, configuration, and indirection are declined on principle, not
+          on taste.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you unable to do today? Describe the situation, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: What should chief do instead, and what would you remove to make room for it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: Existing commands, extensions, or workarounds, and why each falls short.
+
+  - type: dropdown
+    id: contributing
+    attributes:
+      label: Would you implement it?
+      options:
+        - 'Yes, if the design is agreed'
+        - 'Maybe, with guidance'
+        - 'No'
+    validations:
+      required: true

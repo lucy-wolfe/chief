@@ -1,0 +1,74 @@
+{
+  "name": "begin-transition-opens-an-awaiting-handoff-record",
+  "family": "activity",
+  "description": "Beginning a park transition records the person's prior placement on the durable record.",
+  "invariants": [
+    "D7"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "activity.begin_transition",
+  "in": {
+    "personId": "signal-researcher",
+    "action": "park",
+    "reason": "Conformance park."
+  },
+  "expect": {
+    "ok": {
+      "action": "park",
+      "id": "transition:1:signal-researcher:park",
+      "personId": "signal-researcher",
+      "status": "awaiting_handoff"
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.transition",
+      "args": {
+        "transitionId": "transition:1:signal-researcher:park"
+      },
+      "equals": {
+        "abandoned": false,
+        "action": "park",
+        "id": "transition:1:signal-researcher:park",
+        "personId": "signal-researcher",
+        "status": "awaiting_handoff"
+      }
+    },
+    {
+      "read": "activity.person",
+      "args": {
+        "personId": "signal-researcher"
+      },
+      "equals": {
+        "activeTransitionId": "transition:1:signal-researcher:park",
+        "idleSince": null,
+        "lastDesiredActive": false,
+        "lastEmploymentState": "active",
+        "lastOperational": true,
+        "personId": "signal-researcher"
+      }
+    },
+    {
+      "read": "activity.summary",
+      "equals": {
+        "nextTransitionSequence": 2,
+        "personOrder": [
+          "chief",
+          "quant-head",
+          "signal-researcher",
+          "it-head"
+        ],
+        "transitionOrder": [
+          "transition:1:signal-researcher:park"
+        ]
+      }
+    }
+  ]
+}

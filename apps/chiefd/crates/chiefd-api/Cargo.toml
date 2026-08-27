@@ -1,0 +1,81 @@
+[package]
+name = "chiefd-api"
+description = "chiefd wire surface: axum routes, request/response types."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# Propagates the test-only surface to the crates below. Never in a release build.
+test-support = ["chiefd-core/test-support", "chiefd-host/test-support"]
+
+[dependencies]
+# The daemon-level observability stream, and the `tracing` layer that
+# feeds it. A LEAF both sides of the backend/client boundary may link.
+chiefd-log = { path = "../chiefd-log" }
+# The install-layout predicates — `install::is_installed_resource_root`, which
+# `org_settings_publish` uses to REFUSE persisting the exe-derived install root
+# as a company's launcher-root override (H.2.5). A LEAF. Promoted from a
+# dev-dependency when the route began enforcing that rule; the test fixtures
+# that used `rendezvous::company_key` read it through this same edge now.
+host-primitives = { path = "../host-primitives" }
+# Where the operator key and the HS256 secret live, and the mode they must
+# have. A LEAF both sides of the backend/client boundary may link, holding the
+# one derivation this daemon and `chief-cli` must agree on exactly.
+identity-keys = { path = "../identity-keys" }
+axum = { workspace = true }
+chiefd-core = { workspace = true }
+chiefd-host = { workspace = true }
+sha2 = { workspace = true }
+# agent-auth (P0): P-256 challenge verify + hand-rolled HS256 JWT + randomness.
+p256 = { workspace = true }
+hmac = { workspace = true }
+base64 = { workspace = true }
+getrandom = { workspace = true }
+# For the /v1/docs/watch SSE route's custom Stream (#259) — already resolved
+# transitively via axum's own SSE module, not a new dependency. See the
+# workspace Cargo.toml comment.
+futures-util = { workspace = true }
+http-body-util = { workspace = true }
+# The typed docstore owns the pre-existing `org.sqlite` directly (see
+# `docstore::engine` for why it is deliberately not a `chiefd-core` store).
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+tracing = { workspace = true }
+
+# Target-conditional (D17): rusqlite's "bundled" feature compiles sqlite3.c
+# with the host cc. On the check-only Darwin cross-target that cc rejects the
+# Darwin-only -arch/-mmacosx-version-min flags; dropping "bundled" there
+# removes the only C-compilation step in the graph while leaving the real
+# Linux build byte-identical.
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+rusqlite = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+rusqlite = { version = "0.40" }
+
+[dev-dependencies]
+# The auth tests drive the real `Authenticator` against `FakeHostExecutor`;
+# integration-style fakes live behind the feature, never `#[cfg(test)]`
+# (plan §5.2 item 3).
+chiefd-host = { workspace = true, features = ["test-support"] }
+# `tests/goal_idempotency.rs` drives the wire type's goal-id derivation into a
+# real `CompanyDb` seeded from the northstar conformance manifest (plan §10 Q6).
+chiefd-core = { workspace = true, features = ["test-support"] }
+insta = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+# agent-auth: `ServiceExt::oneshot` drives the verify-middleware through a real
+# axum Router in the middleware unit tests.
+tower = { workspace = true, features = ["util"] }
+
+[lints]
+workspace = true

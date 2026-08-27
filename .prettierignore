@@ -1,0 +1,27 @@
+bun.lock
+.github/workflows
+.claude
+node_modules
+# Root CLAUDE.md is a SYMLINK to AGENTS.md — without this line prettier writes
+# through the link and reformats the ignored AGENTS.md.
+CLAUDE.md
+# Legacy tree — pre-monorepo style (double quotes + semicolons). Each
+# migration epic reformats code as it moves into packages/apps; running the
+# terminal prettier config over the legacy tree would be a 47k-LOC noise diff.
+packages/piing/extensions/
+packages/piing/skills/
+tests/
+shim/
+conformance/
+scripts/
+apps/chiefd/
+patches/
+operator-home/
+docs/
+CHANGELOG.md
+DECISIONS.md
+README.md
+AGENTS.md
+# Generated schemars export (E2-S2, #771): must stay byte-identical to
+# shim/generated/chiefd-request-schemas.json — never reformatted.
+packages/chiefing/generated/chiefd-request-schemas.json

@@ -1,0 +1,34 @@
+{
+  "name": "queue-with-an-invalid-action-is-refused",
+  "family": "session-maintenance",
+  "description": "Only compact exists; anything else is invalid input. (This said \"compact and fresh_session\" until the 2026-08-24 deletion; the refusal it records is unchanged.)",
+  "invariants": [],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "maint.queue",
+  "in": {
+    "action": "restart",
+    "personId": "signal-researcher",
+    "requestedBy": "signal-researcher",
+    "reason": "Context is nearly full."
+  },
+  "expect": {
+    "error": {
+      "type": "Refused",
+      "code": "invalid-input",
+      "message": "Session maintenance action is invalid"
+    }
+  },
+  "expectState": [
+    {
+      "read": "maint.summary",
+      "equals": null
+    }
+  ]
+}

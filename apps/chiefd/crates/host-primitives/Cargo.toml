@@ -1,0 +1,91 @@
+[package]
+name = "host-primitives"
+description = "Host primitives both actuators share. One definition, linked by chiefd-host and chief-cli."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# A LEAF: `chief-cli`
+# is forbidden to depend on `chiefd-core`/`chiefd-host`/`chiefd-api`/
+# `chiefd-daemon` and the backend is forbidden to depend on it (the
+# backend/client boundary guard, rules 5 and 7), so code BOTH sides need
+# cannot live in either of them. Before this crate the answer was a mirrored
+# file per member, hand-kept in step.
+#
+# It began depending on NOTHING, which is what kept it linkable from both sides.
+# A dependency added here is a dependency forced on BOTH actuators, so the bar
+# for adding one is the bar for adding it to `chief-cli` AND `chiefd-host` at
+# once — and it is met the only way it can be: both consumers already carry the
+# same `workspace = true` dependency, so neither graph gains anything new. A
+# dependency only ONE side has is still forbidden here, and always will be.
+#
+# That property is SPENT deliberately and once per layer, and each spend is
+# recorded here rather than discovered later:
+#   * `thiserror` (layer 2) — `HostErr` derives `thiserror::Error` in both
+#     actuators, so moving the type without it would have moved a DIFFERENT
+#     type from the one both crates already had.
+#   * `tracing` (layer 2, integrator) — `spawn_detached`'s reaper thread warns
+#     when a detached worker cannot be reaped. Dropping the call to keep the
+#     manifest short would have moved a QUIETER function than the one both
+#     actuators had, on the one path in that file reporting a failure nobody
+#     else can see.
+#   * `serde` (layer 3) — see the note above `[dependencies]`.
+#
+# It must never name a multiplexer. `backend-tmux-boundary.test.mjs` rule 6
+# sweeps every crate under `apps/chiefd/crates` and a crate carrying tmux must
+# be declared BACKEND or CLIENT; this one is deliberately neither, so the day
+# it names tmux is the day it stops being linkable by the backend. That rule
+# is why `proc.rs` and `spawn.rs` here are the `chiefd-host` copies: the
+# `chief-cli` copies said tmux in a doc line and in a test fixture.
+#
+# NOT listed in `[workspace.dependencies]`, for the same reason `beacond` is
+# not: a path dependency with a handful of consumers is
+# chosen once already, and a version table entry would only add a second place
+# to keep it right. (It said "exactly two consumers" until `beacond` became the
+# third — it reports its own build identity through `rendezvous::ReportedBuild`,
+# the same shape the company daemon publishes, so `chief` has one comparison to
+# make and not two.)
+
+[features]
+default = []
+# `pause::at`'s named crash-injection boundaries. NOT `#[cfg(test)]`: the
+# crash tests are separate crates that link their host as a normal library, so
+# `cfg(test)` is false for them and the pause hook would compile out of
+# exactly the build that needs it. Both consumers forward their own
+# `test-support` to this one, so a build that wants pause points gets them
+# through whichever crate it already links.
+test-support = []
+
+[dependencies]
+# `HostErr` derives `thiserror::Error` in both actuators. See the spend list
+# above the `[features]` block for why each of these is here.
+thiserror = { workspace = true }
+tracing = { workspace = true }
+# `materialize`'s three types derive `Serialize`/`Deserialize` with
+# `deny_unknown_fields`, and that derive is the reason they exist: a caller
+# journals the whole plan before touching the filesystem, so a crash recovery
+# has a record to replay. The types cannot cross into this crate without it.
+serde = { workspace = true }
+# The company identity is `sha256(canonical <dir>)[..12]`, and `rendezvous`
+# holds the ONE definition of it because `chiefd-daemon` and `chief-cli` both
+# need it and may not depend on each other. Its predecessor was written nine
+# times and drifted; a hash function is a cheap price for one answer.
+sha2 = { workspace = true }
+
+[dev-dependencies]
+# `rendezvous`'s wire test asserts the published field names LITERALLY rather
+# than through a round trip: a round trip proves the two halves of one
+# declaration agree, and the whole point of the type is that there is one
+# declaration for two programs. Naming the fields needs a JSON value.
+serde_json = { workspace = true }
+# `proc`'s parser tests read fixture files from a throwaway `/proc`-shaped
+# directory rather than the real one, and `spawn`'s reaping test SIGKILLs the
+# long-lived worker it started so nothing is left behind for the rest of the
+# suite. TEST-only, so neither reaches either actuator's build.
+nix = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

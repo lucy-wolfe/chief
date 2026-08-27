@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Chief logo</title>
+  <desc id="desc">A white geometric C and chevron on a black rounded-square background.</desc>
+
+  <rect width="1024" height="1024" rx="198" fill="#000"/>
+
+  <!-- Leadership chevron -->
+  <path d="M352 342 512 241 674 342 663 408 512 315 364 408Z" fill="#fff"/>
+
+  <!-- Geometric C: an angular, open hexagonal mark -->
+  <path fill="#fff" d="M512 389 660 481 603 516 512 460 426 513 426 626 512 682 603 626 660 669 512 755 366 666 366 480Z"/>
+</svg>

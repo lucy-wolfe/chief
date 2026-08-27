@@ -1,0 +1,79 @@
+[package]
+name = "chiefd-host"
+description = "chiefd host boundary: HostExecutor, host transactions, caller authentication."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# Enables `fake::FakeHostExecutor` (scripted responses, recorded calls,
+# indexed failure injection). Never enabled in a release build.
+test-support = ["chiefd-core/test-support", "host-primitives/test-support"]
+
+[dependencies]
+# The daemon-level observability stream, and the `tracing` layer that
+# feeds it. A LEAF both sides of the backend/client boundary may link.
+chiefd-log = { path = "../chiefd-log" }
+chiefd-core = { workspace = true }
+nix = { workspace = true }
+# The named pause points and the diagnostic redactor, which `chief-cli` runs
+# too. Both crates held their own copy of each until this leaf existed; they
+# agreed on the day it was made, which is the only day a move like this is
+# free. NOT `workspace = true`, for the same reason beacond is not.
+host-primitives = { path = "../host-primitives" }
+# The host-transaction path awaits the writer actor's `mutate` (plan §5.6
+# commit 1 and commit 2). No runtime is started here — chiefd owns that.
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+# agent-auth (P0), #751: the materializer mints a person's P-256 identity key
+# ONCE, at first materialization. It is the durable, revocable anchor the
+# enrolment flow later publishes, so it must be created where the pi-home is
+# created — the alternative was a trait seam nobody could bind without this
+# dependency, i.e. a person with no identity. Same crate and features
+# chiefd-api already verifies challenges with, so the graph gains nothing new.
+p256 = { workspace = true }
+getrandom = { workspace = true }
+# #751/P7: the same materialization pass that mints a person's key also ENROLS
+# its public half, so the base64 the `identities` row stores is derived here
+# rather than round-tripped through a second crate.
+base64 = { workspace = true }
+
+# Target-conditional (D17): rusqlite's "bundled" feature compiles sqlite3.c
+# with the host cc. On the check-only Darwin cross-target that cc rejects the
+# Darwin-only -arch/-mmacosx-version-min flags; dropping "bundled" there
+# removes the only C-compilation step in the graph while leaving the real
+# Linux build byte-identical.
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+rusqlite = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+rusqlite = { version = "0.40" }
+
+[dev-dependencies]
+# The API-host profile's focused unit fixtures use the same normalized
+# northstar manifest as the HTTP seam tests. Test-only only; the release
+# artifact continues to exclude chiefd-core's test support surface.
+chiefd-core = { workspace = true, features = ["test-support"] }
+# The crash-injection tests re-invoke this crate's own test binary as a child
+# process and SIGKILL it at a named pause point (TESTING.md §4.3).
+nix = { workspace = true }
+# `Builder::start_paused` (the runtime-lifecycle tests' deterministic clock)
+# lives behind tokio's `test-util` feature. DEV-only on purpose: enabling it in
+# the production dependency would let a real daemon pause its own clock.
+tokio = { workspace = true, features = ["test-util"] }
+# Integration tests live in a separate crate and therefore cannot see
+# `#[cfg(test)]` items; the fakes are reached through the feature instead
+# (plan §5.2 item 3, the `test-support` policy).
+chiefd-host = { path = ".", features = ["test-support"] }
+
+[lints]
+workspace = true

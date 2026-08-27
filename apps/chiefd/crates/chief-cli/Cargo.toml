@@ -1,0 +1,151 @@
+[package]
+name = "chief-cli"
+description = "The operator client, installed as `chief`. Owns tmux and the terminal surface; reaches the backend only over HTTP."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# THE INSTALLED NAME IS `chief`. This crate builds the program an operator
+# types (P6 of the design record); `crates/chiefd-daemon`
+# builds `chiefd`, the backend it `exec`s. `scripts/release-chiefd.ts` installs
+# both into `~/.chiefd/bin/`, and
+# `scripts/test/prebuilt-binary-manifest.test.mjs` holds that script and this
+# table to each other. `scripts/test/binary-names.test.mjs` holds the two names
+# apart: the front door is `chief`, never `chiefd`.
+[[bin]]
+name = "chief"
+path = "src/main.rs"
+
+# THE DEPENDENCY LIST IS THE ARCHITECTURE. `chiefd-core`, `chiefd-host`,
+# `chiefd-api` and `chiefd-daemon` are absent and must stay absent: this crate
+# is a client of chiefd's HTTP API and knows nothing of its internals. All four
+# are enforced by `scripts/test/backend-tmux-boundary.test.mjs`'s rule 7
+# (`clientCratesDependingOnBackend`), the mirror of the rule 5 that already
+# forbids the opposite edge.
+#
+# The absence is load-bearing rather than decorative: P6 moved 2,800 lines in
+# here that DID name those crates, and every one of the four reaches was
+# replaced by a client-side derivation of a fact the client already holds — the
+# composite document key and the ISO stamp (`company.rs`), the operator's own
+# model registry (`create.rs`), and the beacond sentinel that moved into
+# `beacond::config` where both halves can read one definition of it.
+[dependencies]
+# The daemon-level observability stream, and the `tracing` layer that
+# feeds it. A LEAF both sides of the backend/client boundary may link.
+chiefd-log = { path = "../chiefd-log" }
+# `chief host`'s lifecycle router and SSE phase stream, and `founder`'s
+# loopback genesis endpoint — the ephemeral 127.0.0.1:0 listener a Founder Pi
+# session POSTs its company launch to.
+axum = { workspace = true }
+# The SHARED DEFINITIONS this client and the registry must agree on exactly,
+# and nothing else: `beacond::config::{DEFAULT_BIND, default_url,
+# UNNAMEABLE_HOST}` and `beacond::liveness::{hostname, pid_is_live}`. The
+# discovery address is written down exactly once in this workspace —
+# `scripts/test/beacond-port-single-definition.test.mjs` enforces it — because
+# an INSTALLED beacond that predated a port move once bound the old address and
+# was never found by a client carrying its own copy of the number. The liveness
+# judge is here for the same reason and cost the same way: this crate held a
+# second `kill(pid, 0)` and beacond a third, and the third read `EPERM` as
+# death. This crate reads the definitions rather than adding a fourth copy.
+# NOT `workspace = true`: beacond is deliberately absent from
+# [workspace.dependencies] (see crates/chiefd-daemon/Cargo.toml's own note).
+beacond = { path = "../beacond" }
+# `chief host`'s SSE phase stream (`stream::unfold` + `chain`). Resolved
+# transitively through axum's own SSE module, so this adds nothing to the graph.
+futures-util = { workspace = true }
+# The named pause points and the diagnostic redactor, shared with
+# `chiefd-host`. A LEAF that carries no store, no multiplexer and no HTTP —
+# NOT the backend edge rule 7 forbids — and it exists precisely because
+# neither side may depend on the other. NOT `workspace = true`, for the same
+# reason beacond is not.
+host-primitives = { path = "../host-primitives" }
+# Where the operator's key lives, the mode it must have, and the exact bytes a
+# challenge signature covers. A LEAF for the same reason the two above are:
+# the daemon READS this key at boot and this crate SIGNS with it, and rule 7
+# forbids this crate from linking the daemon's. NOT `workspace = true`, for the
+# same reason beacond and host-primitives are not.
+identity-keys = { path = "../identity-keys" }
+# Signing the challenge: ECDSA P-256 over SHA-256, IEEE-P1363 fixed-width, from
+# a PKCS#8 PEM private key. The `pem` feature is what reads the key file the
+# daemon minted; `ecdsa` is the signer. The exact crate and features the daemon
+# VERIFIES with, so the two halves cannot disagree about the primitive.
+p256 = { workspace = true }
+# Standard-alphabet base64 for the signature the token route expects, and for
+# nothing else.
+base64 = { workspace = true }
+# The bounded JSON transport: hyper, never `reqwest`, and never a shelled-out
+# `curl` — a curl subprocess is a thread that cannot be cancelled.
+http-body-util = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+# `kill(pid, SIGTERM/SIGKILL)` and `kill(pid, None)` — stopping a company's
+# daemon, and judging a beacond registration's pid.
+nix = { workspace = true }
+# The operator's terminal size (`terminal.rs`), through
+# `rustix::termios::tcgetwinsize`. Already in this workspace's lock file
+# transitively, so it adds nothing to the dependency graph. Chosen over a
+# hand-rolled `libc::ioctl` because `TIOCGWINSZ` is a `c_ulong` on Linux and a
+# `c_uint` on Darwin, and `Winsize` carries `u16` columns and rows on both — a
+# hand-rolled call is the standard way to write code that builds on exactly one
+# of the two platforms this project must ship on.
+rustix = { version = "1.1", features = ["termios"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# `document_key` — the composite `slug@digest(dataRoot)` every `/v1/org/*`
+# route matches a request against. It is a WIRE key, computed by each client
+# from facts it already holds (`packages/chiefing` composes the same one from
+# its `root`), which is exactly why this crate can produce it without linking
+# chiefd-core.
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+# The publish-by-rename temp name (`files::publish_atomically`). A sibling
+# `.chiefd-<uuid>.tmp` is what makes the rename(2) swap collision-free between
+# two actuators staging the same target at the same instant; a pid or a clock
+# is not, which is why this is not hand-rolled.
+uuid = { workspace = true }
+# `chief host` is a resident service whose stdout is a redirected log; it
+# reports through tracing, and `main` installs the subscriber.
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+# The operator's sidebar rail (`sidebar/`). This crate's own description is
+# "owns tmux and the terminal surface", and the rail is that surface: a
+# full-screen program in a tmux pane that must take the terminal out of cooked
+# mode, decode SGR mouse reports into (column, row, button) and redraw two
+# scrolling regions without flicker. Every one of those is a solved problem
+# with a maintained crate, and `chief/CLAUDE.md` prefers the crate to a
+# hand-rolled TUI. `crossterm` is the terminal driver — its
+# `EnableMouseCapture` emits `?1000h ?1002h ?1003h ?1006h`, which is exactly
+# the set tmux's `mouse_any_flag` needs before it forwards the wheel instead of
+# swallowing it into copy-mode. `ratatui` is the immediate-mode renderer over
+# it, and is the reason the 50/50 split and the two independent scroll offsets
+# are arithmetic rather than cursor bookkeeping. NOT `workspace = true`: no
+# other crate in this workspace draws anything, and a shared version for one
+# consumer states a sharing that does not exist.
+ratatui = "0.30"
+crossterm = { version = "0.29", features = ["event-stream"] }
+
+[features]
+# `pause::at`'s named crash-injection boundaries and the `fake` executors.
+# NOT `#[cfg(test)]`: the crash tests under `tests/` are separate crates that
+# link this one as a normal library, so `cfg(test)` is false for them and the
+# pause hook would compile out of exactly the build that needs it. In a release
+# build `pause::at` is an empty inline fn — the recorded-name vector does not
+# exist at all, so the resident loop cannot accumulate one.
+test-support = ["host-primitives/test-support"]
+
+[dev-dependencies]
+# `create.rs`'s registry-observation tests write a fixture `models.json` into a
+# throwaway directory rather than reading — or worse, writing — the operator's
+# real `~/.pi/agent/models.json`.
+tempfile = { workspace = true }
+# The crate depending on ITSELF is deliberate and is the standard way to turn a
+# feature on for the test profile only: `tests/interpret_crash*.rs` need
+# `pause::install`, and a dev-dependency edge is the only place a feature can be
+# switched on without switching it on for the shipped binary too.
+chief-cli = { path = ".", features = ["test-support"] }
+
+[lints]
+workspace = true

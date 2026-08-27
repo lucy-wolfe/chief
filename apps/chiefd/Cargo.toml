@@ -1,0 +1,221 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/beacond",
+    # Host primitives BOTH actuators run — the named pause points and the
+    # diagnostic redactor. A LEAF: `chiefd-host` and `chief-cli` may not depend
+    # on each other, so what they must agree on exactly lives where both can
+    # link it instead of being mirrored file by file.
+    "crates/host-primitives",
+    # Where a non-person identity key lives and the mode it must have. A LEAF
+    # for the same reason the one above is: the daemon READS the operator key
+    # at boot and `chief-cli` SIGNS with it, and the boundary guard forbids
+    # either from depending on the other. It depends on nothing at all, which
+    # is what keeps the key MINT out of it — see its own manifest.
+    "crates/identity-keys",
+    # The daemon-level observability stream, and a LEAF for the same reason the
+    # two above are: the sink used to live in `chiefd-core`, which `chief-cli`
+    # may not link — and `chief-cli` owns the minutes of a company launch that
+    # no log could see. It moved here so both sides write one schema to one
+    # directory.
+    "crates/chiefd-log",
+    "crates/chiefd-core",
+    "crates/chiefd-host",
+    "crates/chiefd-api",
+    # The backend binary (`chiefd`). Was `crates/chiefd` and built the
+    # single executable that was both CLI and daemon; P6 of
+    # the design record split it in two.
+    "crates/chiefd-daemon",
+    # The operator client (P2/P6 of the design record),
+    # installed as `chiefd`. It depends on NONE of
+    # chiefd-core/chiefd-host/chiefd-api/chiefd-daemon — it talks HTTP — and
+    # that is the point of the crate, enforced by
+    # scripts/test/backend-tmux-boundary.test.mjs in both directions.
+    "crates/chief-cli",
+    # Unit D (#871): assembled-seam integration tests across chiefd-core +
+    # chiefd-host, previously scaffolded but never wired into the workspace —
+    # 20 test functions that had never once compiled. A harness `cargo test
+    # --workspace` does not run is a harness that rots.
+    "tests/unit-d",
+    # #751/P4: the wire-boundary assertion. It must NAME tmux to assert its
+    # absence from chiefd's response bodies, and the backend-tmux boundary
+    # guard refuses that word inside `crates/chiefd-{core,host,api}` — rightly,
+    # since there the word is a symptom. Here it is the subject, so the crate
+    # sits outside the scanned roots and is a member so `cargo test
+    # --workspace` still runs it.
+    "tests/wire-boundary",
+    # The resume seam. chiefd COMPOSES what a relaunched agent is told and
+    # `chief-cli` RENDERS it into a tmux command line; neither may link the
+    # other, so the one test that drives the real sentence through the real
+    # quoting lives outside both. See its own manifest.
+]
+# `tests/seam-fixture` is a deliberately-failing clippy fixture (plan §3.1 of
+# TESTING.md). It carries its own `[workspace]` table so it can never be built
+# by `cargo build --workspace`, and CI asserts clippy *fails* on it.
+exclude = ["tests/seam-fixture"]
+
+[workspace.package]
+# Kept equal to the root `package.json` version, which is the DECLARED version
+# of record; `scripts/test/one-version-of-record.test.mjs` fails if they drift.
+# This one is only the `CARGO_PKG_VERSION` fallback a build script stamps when
+# `CHIEF_RELEASE_VERSION` is absent -- an unstamped local build. It said 0.1.0
+# while releases said 2.0.x, which is two answers to one question.
+version = "0.5.0"
+edition = "2021"
+rust-version = "1.95"
+license = "Apache-2.0"
+publish = false
+
+# Shared versions for every crate named in the design record. Member
+# crates opt in with `dep = { workspace = true }` so a version is chosen once.
+[workspace.dependencies]
+# --- runtime / transport -------------------------------------------------
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "macros",
+    "sync",
+    "signal",
+    "net",
+    "time",
+    # The session brain and its thin rail clients speak a length-prefixed
+    # protocol over a unix socket, which needs `AsyncReadExt`/`AsyncWriteExt`.
+    # A feature of a crate already in the graph, never a new dependency.
+    "io-util",
+] }
+axum = "0.8"
+hyper = { version = "1", features = ["http1", "server", "client"] }
+hyper-util = { version = "0.1", features = ["tokio", "server", "client-legacy"] }
+# Whole response bodies are collected — Cobalt's supervision ledger is
+# 4.4 MB, so the client must stream frames rather than assume one chunk.
+http-body-util = "0.1"
+tower = "0.5"
+# NOT a new dependency: axum's own SSE module (`axum::response::sse`) already
+# requires `futures_util::stream::{Stream, TryStream}` internally (see its
+# module doc's own example), so `futures-util` is already resolved in
+# Cargo.lock at this exact version via axum/axum-core — this promotes it to a
+# direct dependency for `docstore::feed`'s SSE watch route (#259) to build a
+# custom `Stream` with `futures_util::stream::unfold`. `default-features =
+# false` + only `std`: the default feature set pulls in the `futures-macro`
+# proc-macro crate (for `join!`/`select!`, which nothing here uses) — that
+# WOULD be a genuinely new crate in the build graph, so it's deliberately
+# excluded to keep the "zero new runtime deps" decision (plan
+# the design record) honest, not just nominally true.
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+# --- storage -------------------------------------------------------------
+# Bundled on purpose: chiefd owns the SQLite it links (README §0). Synchronous
+# connection owned by one writer thread — deliberately not sqlx.
+rusqlite = { version = "0.40", features = ["bundled"] }
+arc-swap = "1"
+# --- serialization / schema ---------------------------------------------
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+# --- diagnostics ---------------------------------------------------------
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+# --- host / process ------------------------------------------------------
+# SO_PEERCRED, /proc, kill(pid, 0) — README §4, §6.
+nix = { version = "0.31", features = [
+  "fs",
+  "socket",
+  "signal",
+  "process",
+  "user",
+  "hostname",
+  # `resource` is `getrlimit`/`setrlimit`: the daemon claims its own
+  # descriptor budget at startup rather than inheriting the shell's, which is
+  # 256 on macOS and 1024 on Linux for identical code
+  # (`chiefd-daemon/src/descriptor_budget.rs`).
+  "resource",
+] }
+# #504: attribute the SIGTERM sender (si_pid) at shutdown. `extended-siginfo`
+# gives the `WithOrigin` exfiltrator; registration multiplexes through
+# signal-hook-registry so tokio's own SIGTERM handler is untouched.
+signal-hook = { version = "0.4", features = ["extended-siginfo"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+sha2 = "0.11"
+# --- agent-auth (P0) crypto ---------------------------------------------
+# P-256 ECDSA verify of the agent's challenge signature (SPKI-DER pubkey,
+# IEEE-P1363 fixed-width sig). `pkcs8` enables SPKI public-key DER decode.
+p256 = { version = "0.14", features = ["ecdsa", "pkcs8", "pem"] }
+# HS256 JWT is hand-rolled from hmac+sha2 (sha2 already vendored) rather than a
+# JWT crate: full control over the no-exp/kid claim set and a smaller graph.
+hmac = "0.13"
+base64 = "0.23"
+# Random nonces, channel epochs, and the first-init HS256 secret.
+getrandom = "0.4"
+# Ported redaction (`boundedPersistedError`) is six ordered regexes whose exact
+# behaviour is a security property — see chiefd-core::diagnostics and DECISIONS.
+regex = "1"
+tempfile = "3"
+# --- dev / test ----------------------------------------------------------
+insta = { version = "1", features = ["json"] }
+# --- intra-workspace -----------------------------------------------------
+chiefd-core = { path = "crates/chiefd-core" }
+chiefd-host = { path = "crates/chiefd-host" }
+chiefd-api = { path = "crates/chiefd-api" }
+# NOT for any crate under `crates/` to use. The backend/client boundary guard
+# forbids every backend crate from naming it (rule 5). Its only consumer was
+# `tests/resume-launch`, which held chiefd's composed resume copy against this
+# client's tmux quoting -- deleted with the copy itself, since chiefd composes
+# nothing for a pane any more.
+chief-cli = { path = "crates/chief-cli" }
+
+# Seam rule (README §5.2 item 4, TESTING.md §7/M1): a silent `unwrap` in a
+# store or handler is exactly how the historical fail-fast regressions shipped.
+# `clippy.toml` sets allow-unwrap-in-tests/allow-expect-in-tests, so these deny
+# only in non-test code.
+#
+# No `all = "deny"` row here (#984): `warnings = "deny"` in
+# `[workspace.lints.rust]` below is emitted to the compiler driver as
+# `-D warnings`, which denies every warn-by-default lint — and when the driver
+# is clippy, clippy's own default groups (correctness, suspicious, style,
+# complexity, perf) are warn-by-default too. A `clippy::all` row would restate
+# what is already true and give two places to edit. The rows below stay because
+# they are UPGRADES: `unwrap_used`/`expect_used`/`panic` are allow-by-default
+# and `-D warnings` never touches them.
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+disallowed_methods = "deny"
+disallowed_types = "deny"
+
+[workspace.lints.rust]
+# Every rustc warning is a hard error, workspace-wide, in committed manifest
+# state (#984). This deliberately does NOT live in a `RUSTFLAGS="-D warnings"`
+# shell export, a CI env var, or a build script: those are machine-local: they
+# hold for whoever set them and are invisible on a clean clone, which is
+# precisely the failure class that has repeatedly shipped here (a lockfile
+# naming a deleted workspace; a guard demanding README text that no longer
+# existed; a release script importing a deleted module — each fine on a warm
+# checkout, broken on a fresh one). `[workspace.lints]` is inherited by every
+# member via `[lints] workspace = true`, so the denial is identical for every
+# developer, for CI, and for both targets.
+#
+# Safe rather than fragile because `rust-toolchain.toml` pins 1.97.1: a denied
+# `warnings` group only churns when the lint set moves, and the lint set moves
+# only when the toolchain does. A future toolchain bump that surfaces new
+# lints is a bump-sized fix to the code, NOT a reason to relax this deny —
+# unpin nothing and downgrade nothing here.
+#
+# `missing_docs` is spelled `deny` OUTRIGHT rather than left at `warn` and
+# swept up by the group. Verified, not assumed: `cargo check -v` shows cargo
+# emitting `--deny=warnings … --warn=missing_docs` — the group flag comes
+# FIRST, and rustc lets the later, more specific flag win, so a `warn` row
+# here would SURVIVE the group deny and an undocumented public item would keep
+# building. That is exactly how `chiefd-host::launcher_assets` went
+# undocumented on main while every local build stayed green: only
+# `scripts/cargo-check-macos.sh` caught it, because its `RUSTFLAGS="-D
+# warnings"` is appended AFTER the manifest's lint flags. Stating the level
+# here makes the outcome independent of cargo's flag order.
+warnings = "deny"
+unsafe_code = "deny"
+missing_docs = "deny"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

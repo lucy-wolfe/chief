@@ -1,0 +1,38 @@
+# The client-agnostic wire boundary, asserted over REAL response bodies.
+#
+# WHY IT IS NOT IN `crates/chiefd-api/tests/`: to assert that chiefd's wire
+# carries nothing tmux-shaped, a test must name tmux — and
+# `scripts/test/backend-tmux-boundary.test.mjs` scans the full text of every
+# `.rs` file under `crates/chiefd-{core,host,api}` and refuses the word,
+# comments included, on purpose. That refusal is correct: a `chiefd-api` file
+# saying "tmux" is evidence the crate still serves it. This crate is the one
+# place where the word is the SUBJECT rather than a symptom, so it lives
+# outside the scanned roots. It is a workspace member, so `cargo test
+# --workspace` runs it and `chiefd-workspace-membership.test.mjs` accounts for
+# it.
+#
+# WHY IT EXISTS AT ALL: the boundary guard reads file text and Cargo edges. It
+# cannot inspect a wire shape, so a route can satisfy it completely while
+# serving `{"session":"org-cobalt"}`. This crate closes that gap by driving the
+# real router and walking the real JSON.
+[package]
+name = "chiefd-wire-boundary"
+description = "The client-agnostic HTTP wire boundary (#751/P4): asserts chiefd's response bodies carry no tmux-shaped field, over real router responses."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dev-dependencies]
+chiefd-api = { workspace = true }
+chiefd-core = { workspace = true, features = ["test-support"] }
+axum = { workspace = true }
+http-body-util = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+
+[lints]
+workspace = true

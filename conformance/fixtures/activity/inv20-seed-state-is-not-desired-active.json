@@ -1,0 +1,72 @@
+{
+  "name": "inv20-seed-state-is-not-desired-active",
+  "family": "activity",
+  "description": "A freshly created company seeds every person with lastDesiredActive:false — manifest employment is not evidence that a Pi exists.",
+  "invariants": [
+    "inv 20"
+  ],
+  "setup": [],
+  "op": "company.create",
+  "in": {
+    "template": "northstar"
+  },
+  "expect": {
+    "ok": {
+      "departments": [
+        "executive",
+        "it",
+        "quant"
+      ],
+      "people": [
+        "chief",
+        "quant-head",
+        "signal-researcher",
+        "it-head"
+      ],
+      "slug": "northstar-conformance"
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.person",
+      "args": {
+        "personId": "chief"
+      },
+      "equals": {
+        "activeTransitionId": null,
+        "idleSince": null,
+        "lastDesiredActive": false,
+        "lastEmploymentState": "active",
+        "lastOperational": true,
+        "personId": "chief"
+      }
+    },
+    {
+      "read": "activity.person",
+      "args": {
+        "personId": "signal-researcher"
+      },
+      "equals": {
+        "activeTransitionId": null,
+        "idleSince": null,
+        "lastDesiredActive": false,
+        "lastEmploymentState": "active",
+        "lastOperational": true,
+        "personId": "signal-researcher"
+      }
+    },
+    {
+      "read": "activity.summary",
+      "equals": {
+        "nextTransitionSequence": 1,
+        "personOrder": [
+          "chief",
+          "quant-head",
+          "signal-researcher",
+          "it-head"
+        ],
+        "transitionOrder": []
+      }
+    }
+  ]
+}

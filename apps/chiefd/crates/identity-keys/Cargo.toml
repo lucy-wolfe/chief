@@ -1,0 +1,37 @@
+[package]
+name = "identity-keys"
+description = "Where an identity key lives, and the mode it must have. One definition, linked by the daemon and the operator client."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# A LEAF, for exactly the reason `host-primitives` is a
+# leaf: `chief-cli` is forbidden to depend on `chiefd-core`/`chiefd-host`/
+# `chiefd-api`/`chiefd-daemon`, and the backend is forbidden to depend on
+# `chief-cli` (the backend/client boundary guard, rules 5 and 7). The daemon
+# READS the operator key at boot and the operator client SIGNS with it, so
+# where that file lives is a fact both halves must agree on exactly — and
+# neither may hold the definition for the other.
+#
+# It depends on NOTHING, and that is deliberate rather than incidental. The
+# obvious thing to put here is the key MINT, which would drag `p256` and
+# `getrandom` in; `host-primitives` records the rule that stops it — a
+# dependency only ONE side already carries is forbidden here, and `chief-cli`
+# carries neither today. Minting stays where minting already lives
+# (`chiefd_host::materialize::identity_key::SystemIdentityKeyMint`), and this
+# crate holds only what both sides must SAY THE SAME WAY: the directory, the
+# filenames, the identity ids, and the permission rule.
+#
+# NOT listed in `[workspace.dependencies]`, for the same reason `beacond` and
+# `host-primitives` are not: a path dependency chosen once
+# gains nothing from a second place to keep it right.
+
+[dev-dependencies]
+# The mode tests stage real files and chmod them; a tempdir keeps that out of
+# the developer's own `~/.chiefd`. TEST-only, so it reaches neither consumer.
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

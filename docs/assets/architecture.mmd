@@ -1,0 +1,23 @@
+%% Editable source for docs/assets/architecture.svg.
+%% The committed SVG is hand-tuned for both GitHub themes; this file records the
+%% same shape in a form that is easy to re-read and re-draw. Regenerating the SVG
+%% from this file is not automatic — edit both, or redraw the SVG from this.
+flowchart TD
+    T["Your terminal<br/>one human, one company"] --> C
+
+    subgraph client["chief — the client"]
+        C["owns tmux and the terminal<br/>decides WHERE people are shown<br/>reaches a company over HTTP only"]
+    end
+
+    subgraph daemon["chiefd — the backend, one per company"]
+        D["decides WHO should be running<br/>.chief/db/chief.db — every durable fact<br/>supervisor loop — six duties<br/>never sees a terminal"]
+    end
+
+    C -- "HTTP: observed runtime" --> D
+    D -- "actions, launch catalog" --> C
+    D --> B["beacond<br/>box-wide discovery, one daemon per slug"]
+
+    C --> S["tmux session org-&lt;slug&gt;_<br/>CEO · head · person · person — each a Pi pane"]
+    D -.-> DIR["the company directory<br/>.chief/db · .chief/agent · .chief/bus · .chief/logs"]
+
+    B -.-> W["apps/web — browser host<br/>a second host for the same daemon<br/>NOT LIVE, currently broken"]

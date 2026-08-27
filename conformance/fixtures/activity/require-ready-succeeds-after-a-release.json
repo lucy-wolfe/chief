@@ -1,0 +1,89 @@
+{
+  "name": "require-ready-succeeds-after-a-release",
+  "family": "activity",
+  "description": "Once the owner has released the transition the gate opens for exactly that action.",
+  "invariants": [
+    "D7"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    },
+    {
+      "op": "activity.begin_transition",
+      "in": {
+        "personId": "signal-researcher",
+        "action": "park",
+        "reason": "Conformance park."
+      }
+    },
+    {
+      "op": "activity.release",
+      "caller": {
+        "personId": "signal-researcher",
+        "role": "worker"
+      },
+      "in": {
+        "transitionId": "transition:1:signal-researcher:park"
+      }
+    }
+  ],
+  "op": "activity.require_ready",
+  "in": {
+    "personId": "signal-researcher",
+    "action": "park"
+  },
+  "expect": {
+    "ok": {
+      "id": "transition:1:signal-researcher:park",
+      "status": "ready"
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.transition",
+      "args": {
+        "transitionId": "transition:1:signal-researcher:park"
+      },
+      "equals": {
+        "abandoned": false,
+        "action": "park",
+        "id": "transition:1:signal-researcher:park",
+        "personId": "signal-researcher",
+        "status": "ready"
+      }
+    },
+    {
+      "read": "activity.person",
+      "args": {
+        "personId": "signal-researcher"
+      },
+      "equals": {
+        "activeTransitionId": "transition:1:signal-researcher:park",
+        "idleSince": null,
+        "lastDesiredActive": false,
+        "lastEmploymentState": "active",
+        "lastOperational": true,
+        "personId": "signal-researcher"
+      }
+    },
+    {
+      "read": "activity.summary",
+      "equals": {
+        "nextTransitionSequence": 2,
+        "personOrder": [
+          "chief",
+          "quant-head",
+          "signal-researcher",
+          "it-head"
+        ],
+        "transitionOrder": [
+          "transition:1:signal-researcher:park"
+        ]
+      }
+    }
+  ]
+}

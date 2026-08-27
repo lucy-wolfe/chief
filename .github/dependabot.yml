@@ -1,0 +1,54 @@
+#
+# Why this needs a decision rather than a default: Dependabot pull requests
+# churn `bun.lock` and `Cargo.lock`, and every one of them runs the full ~20-job
+# CI matrix. The limits below are deliberately small so that a quiet week
+# produces a readable queue rather than a wall. Raise them knowingly.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /apps/chiefd
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      cargo-minor-and-patch:
+        update-types: ['minor', 'patch']
+    ignore:
+      # The Rust toolchain is pinned by rust-toolchain.toml, not by Dependabot.
+      - dependency-name: 'rust-toolchain'
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      npm-minor-and-patch:
+        update-types: ['minor', 'patch']
+    ignore:
+      # Pi stays pinned and Dependabot stays out, but THE REASON CHANGED and the
+      # old one is deleted. It used to be that PiAttestation.ts pinned artifact
+      # digests and the pin moved only through RepinPiAttestation.ts, so a bump
+      # would leave the attestation stale and fail closed. The patch and the
+      # attestation are both gone.
+      #
+      # What remains is different, not weaker: chief runs one specific Pi, the
+      # extension surface it loads is not covered by semver, and a version move
+      # needs the toolcontract lanes run against it deliberately. That is a
+      # human decision, not a weekly PR.
+      - dependency-name: '@earendil-works/*'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: 'chore(ci)'

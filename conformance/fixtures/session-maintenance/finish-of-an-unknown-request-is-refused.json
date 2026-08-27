@@ -1,0 +1,32 @@
+{
+  "name": "finish-of-an-unknown-request-is-refused",
+  "family": "session-maintenance",
+  "description": "An unknown request id is refused rather than creating a terminal record.",
+  "invariants": [],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "maint.finish",
+  "in": {
+    "requestId": "session-maintenance:1:signal-researcher:compact",
+    "status": "completed"
+  },
+  "expect": {
+    "error": {
+      "type": "Refused",
+      "code": "unknown-request",
+      "message": "Unknown session maintenance request 'session-maintenance:1:signal-researcher:compact'"
+    }
+  },
+  "expectState": [
+    {
+      "read": "maint.summary",
+      "equals": null
+    }
+  ]
+}

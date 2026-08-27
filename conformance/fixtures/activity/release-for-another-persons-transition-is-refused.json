@@ -1,0 +1,83 @@
+{
+  "name": "release-for-another-persons-transition-is-refused",
+  "family": "activity",
+  "description": "The transition is identity-fenced: another person cannot release someone else's transition.",
+  "invariants": [
+    "D7"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    },
+    {
+      "op": "activity.begin_transition",
+      "in": {
+        "personId": "signal-researcher",
+        "action": "park",
+        "reason": "Conformance park."
+      }
+    }
+  ],
+  "op": "activity.release",
+  "caller": {
+    "personId": "quant-head",
+    "role": "manager"
+  },
+  "in": {
+    "transitionId": "transition:1:signal-researcher:park"
+  },
+  "expect": {
+    "error": {
+      "type": "Refused",
+      "code": "unknown-transition",
+      "message": "Unknown graceful transition 'transition:1:signal-researcher:park' for 'quant-head'"
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.transition",
+      "args": {
+        "transitionId": "transition:1:signal-researcher:park"
+      },
+      "equals": {
+        "abandoned": false,
+        "action": "park",
+        "id": "transition:1:signal-researcher:park",
+        "personId": "signal-researcher",
+        "status": "awaiting_handoff"
+      }
+    },
+    {
+      "read": "activity.person",
+      "args": {
+        "personId": "signal-researcher"
+      },
+      "equals": {
+        "activeTransitionId": "transition:1:signal-researcher:park",
+        "idleSince": null,
+        "lastDesiredActive": false,
+        "lastEmploymentState": "active",
+        "lastOperational": true,
+        "personId": "signal-researcher"
+      }
+    },
+    {
+      "read": "activity.summary",
+      "equals": {
+        "nextTransitionSequence": 2,
+        "personOrder": [
+          "chief",
+          "quant-head",
+          "signal-researcher",
+          "it-head"
+        ],
+        "transitionOrder": [
+          "transition:1:signal-researcher:park"
+        ]
+      }
+    }
+  ]
+}

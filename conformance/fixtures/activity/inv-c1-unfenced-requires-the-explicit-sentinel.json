@@ -1,0 +1,83 @@
+{
+  "name": "inv-c1-unfenced-requires-the-explicit-sentinel",
+  "family": "activity",
+  "description": "Running without the fence takes a deliberate sentinel value that no caller can produce by omission or a dropped key. UNFENCED is permissive, not a request: it contributes no names of its own, so it starts nobody who has no demand. The root is active here on its own organization-root lease, not because UNFENCED asked for it - every other person still needs something to ask.",
+  "invariants": [
+    "inv c-1"
+  ],
+  "setup": [
+    {
+      "op": "company.create",
+      "in": {
+        "template": "northstar"
+      }
+    }
+  ],
+  "op": "activity.reconcile",
+  "in": {
+    "launchIntentPersonIds": "UNFENCED",
+    "requestedPersonIds": [
+      "signal-researcher"
+    ]
+  },
+  "expect": {
+    "ok": {
+      "people": {
+        "chief": {
+          "active": true,
+          "reasons": [
+            "organization-root"
+          ],
+          "transitionId": null
+        },
+        "it-head": {
+          "active": false,
+          "reasons": [],
+          "transitionId": null
+        },
+        "quant-head": {
+          "active": false,
+          "reasons": [],
+          "transitionId": null
+        },
+        "signal-researcher": {
+          "active": true,
+          "reasons": [
+            "requested"
+          ],
+          "transitionId": null
+        }
+      }
+    }
+  },
+  "expectState": [
+    {
+      "read": "activity.person",
+      "args": {
+        "personId": "signal-researcher"
+      },
+      "equals": {
+        "activeTransitionId": null,
+        "idleSince": null,
+        "lastDesiredActive": true,
+        "lastEmploymentState": "active",
+        "lastOperational": true,
+        "personId": "signal-researcher"
+      }
+    },
+    {
+      "read": "activity.person",
+      "args": {
+        "personId": "quant-head"
+      },
+      "equals": {
+        "activeTransitionId": null,
+        "idleSince": null,
+        "lastDesiredActive": false,
+        "lastEmploymentState": "active",
+        "lastOperational": true,
+        "personId": "quant-head"
+      }
+    }
+  ]
+}

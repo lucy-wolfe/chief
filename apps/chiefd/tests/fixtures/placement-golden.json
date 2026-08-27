@@ -1,0 +1,307 @@
+{
+  "layouts": [
+    {
+      "height": 24,
+      "layout": "b25e,80x24,0,0,1",
+      "panes": [
+        "%1"
+      ],
+      "width": 80
+    },
+    {
+      "height": 24,
+      "layout": "020a,80x24,0,0{40x24,0,0,1,39x24,41,0,2}",
+      "panes": [
+        "%1",
+        "%2"
+      ],
+      "width": 80
+    },
+    {
+      "height": 24,
+      "layout": "1bd7,80x24,0,0{26x24,0,0,1,26x24,27,0,2,26x24,54,0,3}",
+      "panes": [
+        "%1",
+        "%2",
+        "%3"
+      ],
+      "width": 80
+    },
+    {
+      "height": 40,
+      "layout": "a72c,120x40,0,0[120x20,0,0{40x20,0,0,1,39x20,41,0,2,39x20,81,0,3},120x19,0,21{60x19,0,21,4,59x19,61,21,5}]",
+      "panes": [
+        "%1",
+        "%2",
+        "%3",
+        "%4",
+        "%5"
+      ],
+      "width": 120
+    },
+    {
+      "height": 24,
+      "layout": "3bd4,80x24,0,0[80x12,0,0{26x12,0,0,1,26x12,27,0,2,26x12,54,0,3},80x11,0,13{26x11,0,13,4,26x11,27,13,5,26x11,54,13,6}]",
+      "panes": [
+        "%1",
+        "%2",
+        "%3",
+        "%4",
+        "%5",
+        "%6"
+      ],
+      "width": 80
+    },
+    {
+      "height": 50,
+      "layout": "aa1d,200x50,0,0[200x16,0,0{66x16,0,0,10,66x16,67,0,11,66x16,134,0,12},200x16,0,17{100x16,0,17,13,99x16,101,17,14},200x16,0,34{100x16,0,34,15,99x16,101,34,16}]",
+      "panes": [
+        "%10",
+        "%11",
+        "%12",
+        "%13",
+        "%14",
+        "%15",
+        "%16"
+      ],
+      "width": 200
+    }
+  ],
+  "roster": {
+    "company": {
+      "displayName": "Northstar Conformance",
+      "slug": "northstar-conformance"
+    },
+    "departments": [
+      {
+        "headPersonId": "chief",
+        "id": "executive",
+        "name": "Northstar Conformance",
+        "order": 0,
+        "parentDepartmentId": null,
+        "state": "active"
+      },
+      {
+        "headPersonId": "quant-head",
+        "id": "quant",
+        "name": "Quant",
+        "order": 1,
+        "parentDepartmentId": "executive",
+        "state": "active"
+      },
+      {
+        "headPersonId": "it-head",
+        "id": "it",
+        "name": "IT",
+        "order": 2,
+        "parentDepartmentId": "executive",
+        "state": "active"
+      },
+      {
+        "headPersonId": "alpha-head",
+        "id": "quant-alpha",
+        "name": "Alpha",
+        "order": 3,
+        "parentDepartmentId": "quant",
+        "state": "active"
+      }
+    ],
+    "people": [
+      {
+        "departmentId": "executive",
+        "desiredActive": true,
+        "displayName": "Avery",
+        "displayOrder": 0,
+        "employmentState": "active",
+        "id": "chief",
+        "isHeadOf": "executive",
+        "title": "Chief"
+      },
+      {
+        "departmentId": "quant",
+        "desiredActive": true,
+        "displayName": "Quinn",
+        "displayOrder": 1,
+        "employmentState": "active",
+        "id": "quant-head",
+        "isHeadOf": "quant",
+        "title": "Head of Quant"
+      },
+      {
+        "departmentId": "quant",
+        "desiredActive": true,
+        "displayName": "Signal Researcher",
+        "displayOrder": 2,
+        "employmentState": "active",
+        "id": "signal-researcher",
+        "isHeadOf": null,
+        "title": "Signal Researcher"
+      },
+      {
+        "departmentId": "it",
+        "desiredActive": true,
+        "displayName": "Ira",
+        "displayOrder": 3,
+        "employmentState": "active",
+        "id": "it-head",
+        "isHeadOf": "it",
+        "title": "Head of IT"
+      },
+      {
+        "departmentId": "quant-alpha",
+        "desiredActive": true,
+        "displayName": "Alex",
+        "displayOrder": 4,
+        "employmentState": "active",
+        "id": "alpha-head",
+        "isHeadOf": "quant-alpha",
+        "title": "Head of Alpha"
+      },
+      {
+        "departmentId": "quant-alpha",
+        "desiredActive": true,
+        "displayName": "Ada",
+        "displayOrder": 5,
+        "employmentState": "active",
+        "id": "alpha-worker",
+        "isHeadOf": null,
+        "title": "Alpha Researcher"
+      }
+    ],
+    "rootDepartmentId": "executive"
+  },
+  "topology": {
+    "knownPersonIds": [
+      "alpha-head",
+      "alpha-worker",
+      "chief",
+      "it-head",
+      "quant-head",
+      "signal-researcher"
+    ],
+    "organization": "northstar-conformance",
+    "session": "org-northstar-conformance_",
+    "windows": [
+      {
+        "logicalId": "__person__:chief",
+        "name": "Avery",
+        "panes": [
+          {
+            "launchHash": "hash-chief",
+            "order": 0,
+            "personId": "chief"
+          }
+        ]
+      },
+      {
+        "logicalId": "__person__:quant-head",
+        "name": "Quinn",
+        "panes": [
+          {
+            "launchHash": "hash-quant-head",
+            "order": 1,
+            "personId": "quant-head"
+          }
+        ]
+      },
+      {
+        "logicalId": "__person__:signal-researcher",
+        "name": "Signal Researcher",
+        "panes": [
+          {
+            "launchHash": "hash-signal-researcher",
+            "order": 2,
+            "personId": "signal-researcher"
+          }
+        ]
+      },
+      {
+        "logicalId": "__person__:it-head",
+        "name": "Ira",
+        "panes": [
+          {
+            "launchHash": "hash-it-head",
+            "order": 3,
+            "personId": "it-head"
+          }
+        ]
+      },
+      {
+        "logicalId": "__person__:alpha-head",
+        "name": "Alex",
+        "panes": [
+          {
+            "launchHash": "hash-alpha-head",
+            "order": 4,
+            "personId": "alpha-head"
+          }
+        ]
+      },
+      {
+        "logicalId": "__person__:alpha-worker",
+        "name": "Ada",
+        "panes": [
+          {
+            "launchHash": "hash-alpha-worker",
+            "order": 5,
+            "personId": "alpha-worker"
+          }
+        ]
+      }
+    ]
+  },
+  "windowNames": [
+    {
+      "raw": "Leo Capital Inc.",
+      "safe": "Leo Capital Inc"
+    },
+    {
+      "raw": "Trading: Alpha",
+      "safe": "Trading- Alpha"
+    },
+    {
+      "raw": "a.b.c",
+      "safe": "a-b-c"
+    },
+    {
+      "raw": ":lead:",
+      "safe": "lead"
+    },
+    {
+      "raw": "R&D / Growth #1 (100%)",
+      "safe": "R&D / Growth #1 (100%)"
+    },
+    {
+      "raw": "under_score-dash",
+      "safe": "under_score-dash"
+    },
+    {
+      "raw": "...",
+      "safe": "window"
+    },
+    {
+      "raw": "   ",
+      "safe": "window"
+    },
+    {
+      "raw": "",
+      "safe": "window"
+    },
+    {
+      "raw": "Northstar Conformance",
+      "safe": "Northstar Conformance"
+    },
+    {
+      "raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.",
+      "safe": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "raw": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "safe": "éééééééééééééééééééééééééééééééééééééééé"
+    },
+    {
+      "raw": "Research & Development, Advanced Systems Division",
+      "safe": "Research & Development, Advanced Systems"
+    }
+  ]
+}

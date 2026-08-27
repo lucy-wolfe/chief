@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "parked-suite-triage.schema.json",
+  "title": "Parked-suite triage map",
+  "description": "Committed, drift-guarded disposition for every file in the parked bun:test legacy corpus (issue #834). See docs/testing/parked-suite-triage.md for the narrative and scripts/test/parked-suite-triage.test.mjs for the guard that enforces this shape.",
+  "type": "object",
+  "required": [
+    "capturedAt",
+    "generatedBy",
+    "entries"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "capturedAt": {
+      "type": "string",
+      "description": "The git SHA the corpus counts in the .md narrative and issue #834/#839 were measured at."
+    },
+    "generatedBy": {
+      "type": "string"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/entry"
+      }
+    }
+  },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "required": [
+        "path",
+        "lane",
+        "cluster",
+        "disposition",
+        "target",
+        "story",
+        "reason",
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Repo-relative path, e.g. tests/org-row-stores.test.ts. Must be unique across all entries."
+        },
+        "lane": {
+          "type": "string",
+          "enum": [
+            "unit",
+            "e2e",
+            "manual",
+            "support"
+          ],
+          "description": "unit/e2e/manual mirror scripts/ci-shard.ts's own routing; support covers non-test files the map still accounts for (helpers, fixtures, harness modules, migration drivers, the bunfig preload)."
+        },
+        "cluster": {
+          "type": "string",
+          "enum": [
+            "meta",
+            "park-realdaemon",
+            "chiefing",
+            "cli",
+            "piing",
+            "org-engine",
+            "extensions",
+            "other",
+            "e2e"
+          ],
+          "description": "The mechanical classifier's bucket (scripts/test/classify-parked-suites.mjs), verbatim, for unit-lane files. 'e2e' is used for the e2e/manual/support rows this story adds beyond the classifier's scope."
+        },
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "port:chiefing",
+            "port:piing",
+            "port:cli",
+            "port:api",
+            "retire:rust",
+            "retire:meta",
+            "retire:obsolete",
+            "park:e2e",
+            "keep:active",
+            "migrate:paths",
+            "split"
+          ],
+          "description": "keep:active -- the file is healthy and should simply RUN; nothing is owed. Added by #1020 because every other value asserts work is owed, so a healthy file had to claim a debt it did not have. migrate:paths -- a real test whose relative imports point at a layout that no longer exists (the pre-monorepo repo-root `src/` tree). DISTINCT FROM retire:obsolete, which must keep meaning a decision someone made: a test whose imports moved is UNMIGRATED, not obsolete, and filing one as the other launders a maintenance gap into a deliberate retirement nobody revisits. See docs/testing/parked-suite-triage.md's Contract section for each value's `target` meaning."
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Meaning depends on disposition -- see the enum table in docs/testing/parked-suite-triage.md's Contract section."
+        },
+        "story": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The story/epic id that executes this row."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "ported",
+            "retired",
+            "parked"
+          ]
+        }
+      }
+    }
+  }
+}

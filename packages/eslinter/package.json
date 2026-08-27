@@ -1,0 +1,19 @@
+{
+  "name": "@chief/eslinter",
+  "license": "Apache-2.0",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:unit": "vitest run",
+    "test:unit:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@typescript-eslint/utils": "8.67.0"
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "8.67.0",
+    "eslint": "10.9.0",
+    "vitest": "4.1.11"
+  }
+}

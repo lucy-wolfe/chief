@@ -1,0 +1,51 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.tribes/
+orgs/
+# Ephemeral top-level launcher runtime state (`runtimeRoot` in
+# src/foundation/paths.ts = <launcherRoot>/runtime). Anchored with a leading
+# slash so it only matches the repo-root dir — a bare `runtime/` also swallowed
+# legitimate source dirs named "runtime" anywhere in the tree (e.g. the chiefd
+# reconciler at apps/chiefd/crates/chiefd-core/src/runtime/). Per-org
+# runtime state lives under orgs/, already ignored above.
+/runtime/
+operator-home/
+*.log
+
+node_modules
+
+# Rust build artifacts, anywhere in the tree
+**/target/
+
+# Monorepo build artifacts
+dist/
+.turbo/
+*.tsbuildinfo
+.eslintcache
+coverage/
+.next/
+# Local e2e debug logs (harness writes here; never committed)
+e2e-stderr-logs/
+
+# A company's SQLite database, and any stray copy of one. `chief.db` is the
+# durable company — never a repo artifact — and a bare `chief` run inside this
+# checkout leaves one at the root. Anchored where it must be: `/chief.db` is
+# the root-only case, and `**/.chief/db/*.db` catches a company created in a
+# subdirectory. A bare `*.db` is NOT used, because it would swallow test
+# fixtures that are deliberately committed.
+/chief.db
+**/.chief/db/*.db
+
+# Playwright CLI scratch state. The browser tooling writes this wherever it is
+# invoked from, and nothing reads it back.
+.playwright-cli/
+
+# The per-change plan document. `plans/<slug>.md` is written before every
+# significant change and kept current as facts change, but it is a LOCAL
+# working document — never committed. See CONTRIBUTING.md "Plan first" and the
+# software-development-process skill. The tree carried ~1,500 committed plans
+# until the go-public redaction (E.2) removed them; the workflow that writes
+# them stays, the directory no longer ships.
+plans/

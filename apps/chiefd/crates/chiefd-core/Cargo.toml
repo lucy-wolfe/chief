@@ -1,0 +1,53 @@
+[package]
+name = "chiefd-core"
+description = "chiefd store layer: writer actor, schema, leases, failure polarity."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# Test-only helpers (manual clock, zero-wait retry ladder, pause points).
+# Deliberately a cargo feature and NOT `#[cfg(test)]`: integration tests are a
+# separate crate and would not see `cfg(test)` items. CI asserts this feature is
+# off in release builds — see apps/chiefd/README.md.
+test-support = []
+
+[dependencies]
+arc-swap = { workspace = true }
+# The daemon-level log. This crate held the sink until it had to be linkable
+# from `chief-cli` too, and it still owns the ISO-8601 PARSING beside the leaf's
+# rendering, so the edge stays after the move.
+chiefd-log = { path = "../chiefd-log" }
+regex = { workspace = true }
+sha2 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+# Target-conditional (D17): rusqlite's "bundled" feature compiles sqlite3.c
+# with the host cc. On the check-only Darwin cross-target that cc rejects the
+# Darwin-only -arch/-mmacosx-version-min flags; dropping "bundled" there
+# removes the only C-compilation step in the graph while leaving the real
+# Linux build byte-identical.
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+rusqlite = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+rusqlite = { version = "0.40" }
+
+[dev-dependencies]
+# A self dev-dependency is how a crate enables its own feature for its
+# integration tests: `tests/` is a separate crate and cannot see `cfg(test)`,
+# and the conformance runner needs `test-support` (the corpus `clock.advance`
+# op moves a ledger's clock without going through the writer). CI still asserts
+# the feature is absent from release builds.
+chiefd-core = { path = ".", features = ["test-support"] }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true
