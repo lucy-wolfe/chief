@@ -23,6 +23,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
+import { isNullish } from '@test/support/Nullish'
 import {
   footerIdentity,
   footerIdentityFields,
@@ -88,17 +89,30 @@ describe('the pre-company footer identity is Founder', () => {
     expect(footerIdentityFields(identity).role).not.toContain('head-quant-research')
   })
 
-  test('a company pane without a username is not a company pane', () => {
-    // There is deliberately no fall back to rendering the id: that fallback IS
-    // the defect. A pane that cannot name its person correctly must not name
-    // it wrongly instead. Extensions ship in the same release as the daemon
-    // that sets the variable, so there is no version where one exists without
-    // the other.
-    expect(organizationFooterIdentity({ ORG_LAUNCHER_ORGANIZATION: 'leo-capital' })).toBeUndefined()
-    expect(organizationFooterIdentity({
+  test('a company pane with no username renders an empty person slot, never the id', () => {
+    // The identity is STILL resolved without a username, because this function
+    // is not display-only: it also gates daemon resolution and pane identity,
+    // so returning undefined would cost the pane its connection rather than
+    // just its name. The rule that the key is never shown is enforced where
+    // showing happens.
+    const identity = organizationFooterIdentity({
       ORG_LAUNCHER_ORGANIZATION: 'leo-capital',
       ORG_LAUNCHER_PERSON: 'head-quant-research'
-    })).toBeUndefined()
+    })
+    expect(identity).toEqual({ team: 'leo-capital', role: 'head-quant-research' })
+    if (isNullish(identity)) throw new Error('the identity must resolve without a username')
+
+    const fields = footerIdentityFields(identity)
+    expect(fields.role).toBe('')
+    expect(fields.role).not.toContain('head-quant-research')
+    expect(fields.team).toBe('leo-capital')
+  })
+
+  test('an organization is still required to be an organization identity', () => {
+    expect(organizationFooterIdentity({ ORG_LAUNCHER_ORGANIZATION: 'leo-capital' })).toBeUndefined()
+    expect(
+      organizationFooterIdentity({ ORG_LAUNCHER_PERSON: 'head-quant-research' })
+    ).toBeUndefined()
   })
 
   test('the Founder footer is unchanged: its role is already a handle, not a key', () => {

@@ -865,19 +865,20 @@ const FOOTER_FIELD_TOKENS = {
 export function organizationFooterIdentity(environment: Record<string, string | undefined>): TeamIdentity | undefined {
   const organization = environment.ORG_LAUNCHER_ORGANIZATION?.trim();
   const person = environment.ORG_LAUNCHER_PERSON?.trim();
-  // The USERNAME is REQUIRED for an organization pane, and its absence means
-  // this is not one — exactly as a missing person id does.
+  if (!organization || !person) return undefined;
+  // The USERNAME is attached when the launcher published it, and its absence
+  // does NOT make this "not an organization pane".
   //
-  // There is deliberately no fall back to rendering `person`. That is what the
-  // footer used to do, and it is how the operator came to be shown
-  // `@portfolio-management-head`: an internal key presented as a handle, in
-  // the one place a reader looks to learn what to call somebody. A pane with
-  // no handle is better than a pane teaching the wrong name. Extensions ship
-  // from the same release as the daemon that sets this, so there is no version
-  // in which one exists without the other.
+  // That distinction is load-bearing: this function is not display-only. It
+  // also gates `resolveTeamUiCompany` and `paneIdentity`, so returning
+  // `undefined` here costs the pane its daemon connection and its identity,
+  // not merely its name. A missing display fact must never take out a
+  // functional one.
+  //
+  // The rule that the key is never SHOWN is enforced where showing happens —
+  // see `footerIdentityFields`.
   const handle = environment.ORG_LAUNCHER_PERSON_NAME?.trim();
-  if (!organization || !person || !handle) return undefined;
-  return { team: organization, role: person, handle };
+  return handle ? { team: organization, role: person, handle } : { team: organization, role: person };
 }
 
 /**
@@ -922,9 +923,24 @@ function readIdentity(): TeamIdentity {
  * makes `@founder` checkable in one place.
  */
 export function footerIdentityFields(identity: TeamIdentity): { team: string; role: string } {
-  // `handle` when there is one, `role` only for the Founder — whose `role` is
-  // `founder`, a handle already, not a key.
-  return { team: identity.team, role: `@${identity.handle ?? identity.role}` };
+  // THE KEY IS NEVER RENDERED. An organization identity shows its USERNAME;
+  // the Founder shows its `role`, which is `founder` — a handle already, not a
+  // key, and the reason this cannot simply always read `handle`.
+  //
+  // An organization identity with no handle renders an EMPTY person slot. That
+  // state needs a launcher older than the extension reading it, which cannot
+  // happen inside one release — and if it ever did, an empty slot is honest
+  // where `@portfolio-management-head` is a name the reader will copy and try
+  // to address. Showing nothing beats teaching the wrong thing.
+  if (identity.handle) return { team: identity.team, role: `@${identity.handle}` };
+  // Compared against the Founder identity explicitly rather than guessed at
+  // from the shape of the string: a heuristic like "does it contain a hyphen"
+  // would render the key for any person whose id happens not to have one,
+  // which is the whole defect reappearing in a harder-to-see form.
+  if (identity.role === FOUNDER_FOOTER_IDENTITY.role) {
+    return { team: identity.team, role: `@${identity.role}` };
+  }
+  return { team: identity.team, role: "" };
 }
 
 function formatCost(value: number): string {

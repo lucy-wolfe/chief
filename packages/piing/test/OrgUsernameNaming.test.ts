@@ -18,17 +18,22 @@
  * and the addressing are one bug, which is why presentation and resolution are
  * asserted together here.
  */
-import { describe, expect, test } from 'vitest'
-
+import type {
+  IntercomOrganizationManifest,
+  OrganizationEnvelope
+} from '@test-assets/organization-intercom'
 import {
   messageContextForTest,
   primeManifestForTest,
   recipientsForTest
-} from '../extensions/organization-intercom'
+} from '@test-assets/organization-intercom'
+import { describe, expect, test } from 'vitest'
 
 const ORGANIZATION = 'leo-capital'
 
-function manifest(people: Array<{ id: string; name: string; departed?: boolean }>): any {
+function manifest(
+  people: Array<{ id: string; name: string; departed?: boolean }>
+): IntercomOrganizationManifest {
   return {
     schemaVersion: 1,
     kind: 'organization',
@@ -44,12 +49,25 @@ function manifest(people: Array<{ id: string; name: string; departed?: boolean }
         {
           id: person.id,
           name: person.name,
+          title: 'Analyst',
+          kind: 'worker' as const,
           departmentId: 'root',
-          employmentState: person.departed === true ? 'departed' : 'employed'
+          employmentState: person.departed === true ? ('departed' as const) : ('active' as const),
+          createdAt: '2026-01-01T00:00:00.000Z'
         }
       ])
     )
   }
+}
+
+/** The message a refusal carries, so a test can assert what it TELLS the caller. */
+function refusalMessage(attempt: () => unknown): string {
+  try {
+    attempt()
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error)
+  }
+  throw new Error('expected a refusal, but the call succeeded')
 }
 
 const ROSTER = manifest([
@@ -58,7 +76,7 @@ const ROSTER = manifest([
   { id: 'retired-analyst', name: 'Sam Vance', departed: true }
 ])
 
-const ENVELOPE = {
+const ENVELOPE: OrganizationEnvelope = {
   schemaVersion: 1,
   id: 'msg-1',
   organization: ORGANIZATION,
@@ -66,8 +84,9 @@ const ENVELOPE = {
   to: 'signal-researcher',
   recipients: ['signal-researcher'],
   body: 'Status please.',
-  urgency: 'normal'
-} as any
+  urgency: 'normal',
+  createdAt: '2026-01-01T00:00:00.000Z'
+}
 
 describe('a delivered message names its sender by username', () => {
   test('the prompt an agent reads carries @priya, not the kebab id', () => {
@@ -128,13 +147,7 @@ describe('an ambiguous username is refused, naming both people', () => {
       { id: 'signal-researcher', name: 'Dana Okafor' }
     ])
 
-    let message = ''
-    try {
-      recipientsForTest(twoPriyas, 'signal-researcher', 'priya')
-      throw new Error('expected an ambiguity refusal')
-    } catch (error) {
-      message = error instanceof Error ? error.message : String(error)
-    }
+    const message = refusalMessage(() => recipientsForTest(twoPriyas, 'signal-researcher', 'priya'))
 
     expect(message).toContain('ambiguous')
     expect(message).toContain('portfolio-management-head')
@@ -147,13 +160,7 @@ describe('an unknown recipient error lists usernames', () => {
     // This error text is not diagnostics: it is the list an agent reads and
     // then addresses somebody from. Listing ids here is how an agent learns to
     // send to ids.
-    let message = ''
-    try {
-      recipientsForTest(ROSTER, 'signal-researcher', 'nobody')
-      throw new Error('expected an unknown-recipient refusal')
-    } catch (error) {
-      message = error instanceof Error ? error.message : String(error)
-    }
+    const message = refusalMessage(() => recipientsForTest(ROSTER, 'signal-researcher', 'nobody'))
 
     expect(message).toContain('@priya')
     expect(message).toContain('@dana')
