@@ -37,7 +37,7 @@ You need macOS or Linux, [`tmux`](https://github.com/tmux/tmux), and
 (`npm install -g --ignore-scripts @earendil-works/pi-coding-agent`).
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tribes-protocol/chief/main/install.sh | sh
+curl -fsSL https://chief.zipbox.ai/install.sh | sh
 export PATH="$HOME/.chief/bin:$PATH"
 ```
 
