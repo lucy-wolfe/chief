@@ -95,16 +95,24 @@ describe('the pre-company footer identity is Founder', () => {
     // so returning undefined would cost the pane its connection rather than
     // just its name. The rule that the key is never shown is enforced where
     // showing happens.
+    //
+    // THE FIXTURE ID IS DELIBERATELY HYPHEN-FREE. An earlier draft of the
+    // renderer told an organization identity from the Founder by asking
+    // whether the id contained a hyphen — the same defect in disguise, since
+    // any person whose id has none would have had their key rendered. A
+    // hyphenated fixture cannot tell that heuristic apart from the explicit
+    // comparison that replaced it: both would pass. `chief` makes the two
+    // disagree, so this test fails if the heuristic ever comes back.
     const identity = organizationFooterIdentity({
       ORG_LAUNCHER_ORGANIZATION: 'leo-capital',
-      ORG_LAUNCHER_PERSON: 'head-quant-research'
+      ORG_LAUNCHER_PERSON: 'chief'
     })
-    expect(identity).toEqual({ team: 'leo-capital', role: 'head-quant-research' })
+    expect(identity).toEqual({ team: 'leo-capital', role: 'chief' })
     if (isNullish(identity)) throw new Error('the identity must resolve without a username')
 
     const fields = footerIdentityFields(identity)
     expect(fields.role).toBe('')
-    expect(fields.role).not.toContain('head-quant-research')
+    expect(fields.role).not.toContain('chief')
     expect(fields.team).toBe('leo-capital')
   })
 
