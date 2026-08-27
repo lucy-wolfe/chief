@@ -103,7 +103,9 @@ describe('org_bench and a committed-but-unconverged bench', () => {
     const result = await runBench(tool)
 
     expect(result.details?.ok).toBe(true)
-    expect(text(result)).toContain('Benched bo')
+    // `@bo`, not `bo`: a tool result is prose an agent reads, so it names the
+    // person by username like every other communication surface.
+    expect(text(result)).toContain('Benched @bo')
     expect(text(result)).toContain('do not repeat the bench')
     expect(result.details?.handoff).toBe('unconfirmed')
     expect(result.details?.personId).toBe('bo')

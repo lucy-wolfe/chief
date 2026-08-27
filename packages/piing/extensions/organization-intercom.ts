@@ -252,7 +252,16 @@ export function colorizePersonMentions(
   reopenToken: string = "dim",
 ): string {
   const reopen = typeof theme?.getFgAnsi === "function" ? theme.getFgAnsi(reopenToken) : "";
-  return text.replace(PERSON_MENTION_PATTERN, (whole, id: string) => {
+  return text.replace(PERSON_MENTION_PATTERN, (whole, mention: string) => {
+    // A mention may be a USERNAME or an id, and both must colour. Ids still
+    // resolve first and exactly, so a handle that happens to equal a different
+    // person's id can never steal their colour; only an unmatched token falls
+    // through to the handle lookup. Without this the accent would quietly
+    // disappear from every surface that started naming people properly — the
+    // colour is how a reader tells one person from another at a glance.
+    const id = manifest.people[mention]
+      ? mention
+      : (manifest.peopleOrder.find((candidate) => personHandle(manifest, candidate) === mention.toLowerCase()) ?? mention);
     const hexColor = organizationPersonAccentHex(manifest, id);
     return hexColor
       ? truecolorMention(organizationPersonDisplayAccent(theme, hexColor), whole, reopen)
@@ -909,7 +918,7 @@ function healthNoticePresentation(
   const kind = envelope.healthIncident?.kind;
   if (!kind) return undefined;
   const personId = knownNoticePerson(envelope.body, manifest);
-  const context = personId ? [`Affected person: @${personId}`] : [];
+  const context = personId ? [`Affected person: @${manifest ? personHandle(manifest, personId) : personId}`] : [];
   if (kind === "idle_pane_awaiting_release") return {
     // The title set is a closed union; the reflection-era "🪞 Reflection
     // requested" entry left it with this packet. This is a runtime fault an
@@ -920,7 +929,7 @@ function healthNoticePresentation(
     summary: "A work-free person still holds a pane because their idle transition has not been released.",
     context,
     nextAction: personId
-      ? `ChiefD is waiting on @${personId}'s existing idle transition; do not kill the pane or open a second transition.`
+      ? `ChiefD is waiting on @${manifest ? personHandle(manifest, personId) : personId}'s existing idle transition; do not kill the pane or open a second transition.`
       : "ChiefD is waiting on the affected person's existing idle transition; do not kill the pane or open a second transition.",
     impact: "Normal work can continue; only the safe pause is blocked.",
     blocked: false,
@@ -1883,16 +1892,16 @@ function operationalIntercomManager(manifest: IntercomOrganizationManifest, pers
 function messageWakeDisposition(manifest: IntercomOrganizationManifest, personId: string): { wake: boolean; guidance?: string } {
   const person = manifest.people[personId];
   if (!person || person.employmentState === "departed") {
-    return { wake: false, guidance: `${personId} has departed; reroute the durable message to an employed owner.` };
+    return { wake: false, guidance: `@${personHandle(manifest, personId)} has departed; reroute the durable message to an employed owner.` };
   }
   if (person.employmentState !== "active") {
     // #401: never say the message "remains queued" — it is already durably
     // delivered (the mailbox write is the delivery authority); only the
     // recipient's WAKE-UP is on hold, which this guidance already states.
-    return { wake: false, guidance: `${personId} is benched; recall them or reroute ownership.` };
+    return { wake: false, guidance: `@${personHandle(manifest, personId)} is benched; recall them or reroute ownership.` };
   }
   if (!departmentIsActive(manifest, person.departmentId)) {
-    return { wake: false, guidance: `${personId}'s department is inactive; resume the unit or reroute ownership.` };
+    return { wake: false, guidance: `@${personHandle(manifest, personId)}'s department is inactive; resume the unit or reroute ownership.` };
   }
   return { wake: true };
 }
@@ -6005,10 +6014,10 @@ function organizationToolDomainIcon(name: string): { emoji: string; title: strin
   return ORGANIZATION_TOOL_DOMAIN_ICONS[name] ?? { emoji: "", title: name.replace(/^org_/, "").replaceAll("_", " ") };
 }
 
-function organizationToolTarget(name: string, args: Record<string, any>): string {
+function organizationToolTarget(organization: string, name: string, args: Record<string, any>): string {
   if (name === "org_send") return `@${String(args.to || "recipient").replace(/^@/, "")}`;
   if (name === "org_roster") return "disk authority";
-  if (args.personId) return `@${String(args.personId).replace(/^@/, "")}`;
+  if (args.personId) return `@${displayHandle(organization, String(args.personId).replace(/^@/, ""))}`;
   if (args.unitId) return String(args.unitId);
   if (args.departmentId) return String(args.departmentId);
   if (args.parentUnitId || args.parentDepartmentId) return `under ${args.parentUnitId || args.parentDepartmentId}`;
@@ -6129,8 +6138,8 @@ function renderOperatorEscalationCard(
   return renderOrganizationCard(theme, spec, options);
 }
 
-function defaultOrganizationToolRenderCall(name: string, args: Record<string, any>, theme: any, mentions?: MentionColorizer) {
-  const target = organizationToolTarget(name, args);
+function defaultOrganizationToolRenderCall(organization: string, name: string, args: Record<string, any>, theme: any, mentions?: MentionColorizer) {
+  const target = organizationToolTarget(organization, name, args);
   const icon = organizationToolDomainIcon(name);
   return renderDefaultOrganizationToolCard(theme, {
     kind: "tool-call",
@@ -6300,7 +6309,7 @@ function organizationToolRegistrar(pi: ExtensionAPI, context: OrganizationRuntim
           }
         },
         renderCall: definition.renderCall ?? ((args: Record<string, any>, theme: any) =>
-          defaultOrganizationToolRenderCall(name, args, theme, personMentionColorizer(theme, context))),
+          defaultOrganizationToolRenderCall(context.organization, name, args, theme, personMentionColorizer(theme, context))),
         renderResult: definition.renderResult ?? ((result: any, options: { expanded?: boolean }, theme: any) => defaultOrganizationToolRenderResult(name, result, options, theme, personMentionColorizer(theme, context))),
       } as any);
     }) as ExtensionAPI["registerTool"],
@@ -6577,7 +6586,12 @@ function prepareLaunchDepartmentArguments(input: unknown): {
  * it was deleted from chiefd ("a finished person moves immediately"), so a
  * card branch for it would be a state no route can now return.
  */
-function staffingLifecycleResult(action: string, personId: string, wire: Record<string, unknown>) {
+function staffingLifecycleResult(
+  organization: string,
+  action: string,
+  personId: string,
+  wire: Record<string, unknown>,
+) {
   const handoff = typeof wire.handoff === "string" ? wire.handoff : undefined;
   const transitionId = typeof wire.transitionId === "string" ? wire.transitionId : undefined;
   // Same rule as the department create: `/v1/org/staffing/lifecycle` answers
@@ -6585,7 +6599,7 @@ function staffingLifecycleResult(action: string, personId: string, wire: Record<
   // wrong AFTER that in `warnings`. Dropping them would leave the honesty the
   // route paid for stranded one layer below the manager who needs it.
   const warning = routeWarnings(wire.warnings).join(" ") || undefined;
-  return toolResult(true, `${STAFFING_LIFECYCLE_APPLIED_LABELS[action] ?? action} ${personId}.${warning ? `\n${warning}` : ""}`, {
+  return toolResult(true, `${STAFFING_LIFECYCLE_APPLIED_LABELS[action] ?? action} @${displayHandle(organization, personId)}.${warning ? `\n${warning}` : ""}`, {
     action,
     personId,
     status: "applied",
@@ -6669,7 +6683,7 @@ export async function executeAtomicPersonTransfer(
     });
   }
   const warning = await reconcileRuntime(context, [params.personId]);
-  return toolResult(true, `Transferred ${params.personId} to ${params.departmentId}.${warning ? `\n${warning}` : ""}`, {
+  return toolResult(true, `Transferred @${displayHandle(context.organization, params.personId)} to ${params.departmentId}.${warning ? `\n${warning}` : ""}`, {
     status: "applied", personId: params.personId, moved: result.moved, warning,
   });
 }
@@ -7527,7 +7541,7 @@ async function installSubtreeTools(
       if (action === "bench" && error instanceof ChiefdUnavailableError && error.status === 503
         && (await loadIntercomOrganization(context)).people[personId]?.employmentState === "benched") {
         return {
-          result: toolResult(true, `Benched ${personId}. Their pane's teardown was not confirmed in time; the bench itself is durable, so do not repeat the bench.`, {
+          result: toolResult(true, `Benched @${displayHandle(context.organization, personId)}. Their pane's teardown was not confirmed in time; the bench itself is durable, so do not repeat the bench.`, {
             ok: true, status: "applied", personId, handoff: "unconfirmed",
             warning: "The bench is durable; the pane's teardown was not confirmed.",
           }),
@@ -7613,7 +7627,7 @@ async function installSubtreeTools(
         if (results.length === 1) return results[0]!;
         const verb = action === "bench" ? "Benched" : "Recalled";
         const roster = applied
-          .map((entry) => (entry.alreadyActive ? `${entry.personId} (already active)` : entry.personId))
+          .map((entry) => `@${displayHandle(context.organization, String(entry.personId))}${entry.alreadyActive ? " (already active)" : ""}`)
           .join(", ");
         const warnings = applied.map((entry) => entry.warning).filter((note): note is string => typeof note === "string");
         return toolResult(true, `${verb} ${applied.length} people: ${roster}.${warnings.length ? `\n${warnings.join("\n")}` : ""}`, {
@@ -7801,7 +7815,7 @@ async function installSubtreeTools(
               : { ...refusal, details: { ...refusal.details, applied, appliedPersonIds: applied } };
           }
           const response = action === "start-person"
-            ? toolResult(true, `Starting ${personId}. Only this person was launched; everyone else is untouched.`, { status: "applied" })
+            ? toolResult(true, `Starting @${displayHandle(context.organization, personId)}. Only this person was launched; everyone else is untouched.`, { status: "applied" })
             : toolResult(true, `Stood ${personId} down. They stay employed with their pane down; everyone else keeps running.`, {
               status: "applied",
               ...(typeof outcome.wire.transitionId === "string" ? { transitionId: outcome.wire.transitionId } : {}),
@@ -7965,7 +7979,7 @@ async function installSubtreeTools(
             successorPersonId: params.successorPersonId,
           }, { action: "replace-head-and-offboard", departmentId: headed.id, headPersonId: params.personId, successorPersonId: params.successorPersonId });
           if ("refused" in replaced) return routeRefusal("Offboard", replaced, { personId: params.personId });
-          return toolResult(true, `Offboarded ${params.personId} and appointed ${params.successorPersonId} to head '${headed.id}'.`, {
+          return toolResult(true, `Offboarded @${displayHandle(context.organization, params.personId)} and appointed @${displayHandle(context.organization, params.successorPersonId)} to head '${headed.id}'.`, {
             status: "applied", personId: params.personId, departmentId: headed.id, successorPersonId: params.successorPersonId,
           });
         }
@@ -7980,7 +7994,7 @@ async function installSubtreeTools(
           personId: params.personId,
         }, { action: "offboard", personId: params.personId });
         if ("refused" in outcome) return routeRefusal("Offboard", outcome, { personId: params.personId });
-        return staffingLifecycleResult("offboard", params.personId, outcome.wire);
+        return staffingLifecycleResult(context.organization, "offboard", params.personId, outcome.wire);
       } catch (error) { return lifecycleFailure(error); }
     },
   });
@@ -8139,6 +8153,14 @@ function deliveryGuidance(role: RecipientRole): string {
  * survive — every surface agreed with every other surface, and all of them
  * were showing the key.
  */
+/** The wake guidance a sender is shown, for the naming rules. */
+export function messageWakeDispositionForTest(
+  manifest: IntercomOrganizationManifest,
+  personId: string,
+): { wake: boolean; guidance?: string } {
+  return messageWakeDisposition(manifest, personId);
+}
+
 export function recipientsForTest(manifest: IntercomOrganizationManifest, sender: string, to: string): string[] {
   return recipientsFor(manifest, sender, to);
 }
@@ -11902,7 +11924,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
         });
         try {
           latestExtensionContext?.ui.notify(
-            `The provider account is out of credits (402), so @${context.personId} cannot run a turn. Nothing was retried and no model or session was changed; add credits to clear it.`,
+            `The provider account is out of credits (402), so @${displayHandle(context.organization, context.personId)} cannot run a turn. Nothing was retried and no model or session was changed; add credits to clear it.`,
             "error",
           );
         } catch { /* The card and the exception log remain the record. */ }
@@ -11982,7 +12004,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
               : "";
             await sendOrganizationMessage(context, {
               to: sender,
-              body: `@${context.personId} could not process ${one ? "your message" : "your messages"} (${ids.join(", ")}): the turn ended before completion (${providerFailure.kind}), so ${one ? "it was" : "they were"} receipted and NOT read. Nothing was retried and nothing is queued.${partial} Resend if it still matters, or route the work to somebody else.`,
+              body: `@${displayHandle(context.organization, context.personId)} could not process ${one ? "your message" : "your messages"} (${ids.join(", ")}): the turn ended before completion (${providerFailure.kind}), so ${one ? "it was" : "they were"} receipted and NOT read. Nothing was retried and nothing is queued.${partial} Resend if it still matters, or route the work to somebody else.`,
             }, { id: `content-filter-bounce-${identity}`, now: bouncedAt });
             appendOrganizationEvent(context, {
               event: "message-bounced",
@@ -12042,7 +12064,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
             })).digest("hex").slice(0, 24);
             await sendOrganizationMessage(context, {
               to: recipient,
-              body: `Content refusal for @${context.personId}: the provider declined a turn on what it contained (content_filter). The provider is healthy — this is not an outage and no access or model-health check will find anything. The turn was not replayed, no session or model was changed, and any message that turn had already receipted was returned to its sender unread. It will keep happening for the same material: re-scope what this person is asked to work on, or move them to a model whose filter does not fire on it. Reported once; the durable trail is provider-turn-failed in the company bus.`,
+              body: `Content refusal for @${displayHandle(context.organization, context.personId)}: the provider declined a turn on what it contained (content_filter). The provider is healthy — this is not an outage and no access or model-health check will find anything. The turn was not replayed, no session or model was changed, and any message that turn had already receipted was returned to its sender unread. It will keep happening for the same material: re-scope what this person is asked to work on, or move them to a model whose filter does not fire on it. Reported once; the durable trail is provider-turn-failed in the company bus.`,
             }, { id: `content-filter-${identity}`, now: at });
           } else {
             try {
@@ -12093,7 +12115,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
             })).digest("hex").slice(0, 24);
             await sendOrganizationMessage(context, {
               to: recipient,
-              body: `Provider reliability alert for @${context.personId}: ${consecutiveProviderFailures} consecutive turns ended before completion (last: ${providerFailure.kind}). No turn was replayed and no session was changed. The route is the operator's own Pi, which this company does not choose or record — check that Pi's provider access and model health, then explicitly choose the next action.`,
+              body: `Provider reliability alert for @${displayHandle(context.organization, context.personId)}: ${consecutiveProviderFailures} consecutive turns ended before completion (last: ${providerFailure.kind}). No turn was replayed and no session was changed. The route is the operator's own Pi, which this company does not choose or record — check that Pi's provider access and model health, then explicitly choose the next action.`,
             }, { id: `provider-health-${identity}`, now: at });
             // No wake call. The recipient here is this person's DIRECT MANAGER,
             // so the same upward refusal applied: a company-wide runtime launch

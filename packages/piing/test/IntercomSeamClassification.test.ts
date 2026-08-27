@@ -281,6 +281,7 @@ const CLASSIFICATION: Readonly<Record<string, Bucket>> = {
   // Both are B: they are about what a person is SHOWN and what an agent may
   // type, not about where a decision lives.
   recipientsForTest: 'B',
+  messageWakeDispositionForTest: 'B',
   primeManifestForTest: 'B',
   renderOrganizationCard: 'B',
   isOperatorIdentity: 'B',

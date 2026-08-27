@@ -899,6 +899,9 @@ observe, in the launch catalog (`chiefd-host/src/converge_apply/cycle.rs`):
 `ORG_LAUNCHER_ORGANIZATION`, `ORG_LAUNCHER_PERSON`, `ORG_LAUNCHER_PERSON_NAME`,
 `ORG_LAUNCHER_ORG_DIR`,
 `ORG_LAUNCHER_DATA_ROOT`, `ORG_LAUNCHER_ROOT`, `PI_CODING_AGENT_SESSION_DIR` and `HOME`,
+plus `TEAM_LAUNCHER_BUN`, `BEACOND_URL` and
+`ORG_LAUNCHER_RELOAD_HARD_CONTRACT` when each is present.
+
 `ORG_LAUNCHER_PERSON` and `ORG_LAUNCHER_PERSON_NAME` are two different facts
 about one person and neither substitutes for the other: the first is the kebab
 id that addresses the mailbox and the document store, the second is the
@@ -906,9 +909,6 @@ person's username and is display-only. The footer renders the second. Rendering
 the first with an `@` in front — which is what it used to do — shows a reader
 an internal key where a name belongs, and a reader who copies what they are
 shown will address people by it.
-
-plus `TEAM_LAUNCHER_BUN`, `BEACOND_URL` and
-`ORG_LAUNCHER_RELOAD_HARD_CONTRACT` when each is present.
 
 The client adds the rest at spawn (`chief-cli/src/actuate/spawn_cmd.rs`'s
 `launch_command`): `COLORTERM`, `ORG_LAUNCHER_RUNTIME_SOCKET`,

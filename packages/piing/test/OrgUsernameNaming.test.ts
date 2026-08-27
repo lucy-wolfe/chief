@@ -24,6 +24,7 @@ import type {
 } from '@test-assets/organization-intercom'
 import {
   messageContextForTest,
+  messageWakeDispositionForTest,
   primeManifestForTest,
   recipientsForTest
 } from '@test-assets/organization-intercom'
@@ -167,5 +168,34 @@ describe('an unknown recipient error lists usernames', () => {
     // The id stays available in parentheses for anyone addressing by key.
     expect(message).toContain('(portfolio-management-head)')
     expect(message).toContain('or all')
+  })
+})
+
+describe('the swept surfaces name people by username too', () => {
+  test('wake guidance returned to a sender names the person by username', () => {
+    // This is guidance an agent reads mid-send and acts on, so it is the same
+    // class as a delivered message: naming the person by key here teaches the
+    // key to whoever is about to address them.
+    const roster = manifest([
+      { id: 'portfolio-management-head', name: 'Priya Sharma', departed: true },
+      { id: 'signal-researcher', name: 'Dana Okafor' }
+    ])
+
+    const disposition = messageWakeDispositionForTest(roster, 'portfolio-management-head')
+
+    expect(disposition.wake).toBe(false)
+    expect(disposition.guidance).toContain('@priya')
+    expect(disposition.guidance).not.toContain('portfolio-management-head')
+  })
+
+  test('a delivered batch names each sender by username', () => {
+    // The batch prompt is the manager triage checklist — the surface a manager
+    // reads and then routes work from, so it is the single most consequential
+    // place for a name to be a key.
+    primeManifestForTest(ORGANIZATION, ROSTER)
+    const batch = messageContextForTest(ENVELOPE, 'signal-researcher', 'manager')
+
+    expect(batch).toContain('@priya')
+    expect(batch).not.toContain('portfolio-management-head')
   })
 })
