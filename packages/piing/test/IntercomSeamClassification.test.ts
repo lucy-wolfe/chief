@@ -271,6 +271,18 @@ const CLASSIFICATION: Readonly<Record<string, Bucket>> = {
   // reason a single-branch test is what let the byte-identical guidance ship.
   messageContextForTest: 'B',
   mailboxBatchContextForTest: 'B',
+  // The USERNAME rules. `recipientsForTest` exposes the recipient resolver so
+  // "a username resolves", "an id still resolves" and "an ambiguous username is
+  // refused naming both" can be asserted as RULES rather than inferred from a
+  // delivered message — which is exactly how the old behaviour survived, since
+  // every surface agreed with every other surface and all of them showed the
+  // key. `primeManifestForTest` seeds the display-time roster a live pane
+  // already keeps, so the presentation half is testable without a company.
+  // Both are B: they are about what a person is SHOWN and what an agent may
+  // type, not about where a decision lives.
+  recipientsForTest: 'B',
+  messageWakeDispositionForTest: 'B',
+  primeManifestForTest: 'B',
   renderOrganizationCard: 'B',
   isOperatorIdentity: 'B',
   organizationPersonAccents: 'B',

@@ -23,6 +23,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
+import { isNullish } from '@test/support/Nullish'
 import {
   footerIdentity,
   footerIdentityFields,
@@ -65,16 +66,65 @@ describe('the pre-company footer identity is Founder', () => {
     expect(identity).toEqual(FOUNDER_FOOTER_IDENTITY)
   })
 
-  test('a person inside a company still renders that company and that person', () => {
-    // The Founder fallback must not swallow the org identity — the same line
-    // serves both, and only the fallback was wrong.
+  test('the footer renders the username and never the person id', () => {
+    // SUPERSEDED AND INVERTED, openly. This asserted
+    // `role === '@head-quant-research'` — the person's kebab id with an `@`
+    // stuck on the front, which reads as a handle and is not one. The footer
+    // is where a reader looks to learn what to call somebody, so an internal
+    // key presented there teaches the wrong name to every person who reads it.
+    //
+    // The id is still carried, because the mailbox and the document store are
+    // addressed by it. It is simply not what is shown.
     const identity = footerIdentity({
       ORG_LAUNCHER_ORGANIZATION: 'leo-capital',
-      ORG_LAUNCHER_PERSON: 'head-quant-research'
+      ORG_LAUNCHER_PERSON: 'head-quant-research',
+      ORG_LAUNCHER_PERSON_NAME: 'priya'
     })
-    expect(identity).toEqual({ team: 'leo-capital', role: 'head-quant-research' })
-    expect(footerIdentityFields(identity).role).toBe('@head-quant-research')
+    expect(identity).toEqual({
+      team: 'leo-capital',
+      role: 'head-quant-research',
+      handle: 'priya'
+    })
+    expect(footerIdentityFields(identity).role).toBe('@priya')
+    expect(footerIdentityFields(identity).role).not.toContain('head-quant-research')
+  })
+
+  test('a company pane with no username renders an empty person slot, never the id', () => {
+    // The identity is STILL resolved without a username, because this function
+    // is not display-only: it also gates daemon resolution and pane identity,
+    // so returning undefined would cost the pane its connection rather than
+    // just its name. The rule that the key is never shown is enforced where
+    // showing happens.
+    //
+    // THE FIXTURE ID IS DELIBERATELY HYPHEN-FREE. An earlier draft of the
+    // renderer told an organization identity from the Founder by asking
+    // whether the id contained a hyphen — the same defect in disguise, since
+    // any person whose id has none would have had their key rendered. A
+    // hyphenated fixture cannot tell that heuristic apart from the explicit
+    // comparison that replaced it: both would pass. `chief` makes the two
+    // disagree, so this test fails if the heuristic ever comes back.
+    const identity = organizationFooterIdentity({
+      ORG_LAUNCHER_ORGANIZATION: 'leo-capital',
+      ORG_LAUNCHER_PERSON: 'chief'
+    })
+    expect(identity).toEqual({ team: 'leo-capital', role: 'chief' })
+    if (isNullish(identity)) throw new Error('the identity must resolve without a username')
+
+    const fields = footerIdentityFields(identity)
+    expect(fields.role).toBe('')
+    expect(fields.role).not.toContain('chief')
+    expect(fields.team).toBe('leo-capital')
+  })
+
+  test('an organization is still required to be an organization identity', () => {
     expect(organizationFooterIdentity({ ORG_LAUNCHER_ORGANIZATION: 'leo-capital' })).toBeUndefined()
+    expect(
+      organizationFooterIdentity({ ORG_LAUNCHER_PERSON: 'head-quant-research' })
+    ).toBeUndefined()
+  })
+
+  test('the Founder footer is unchanged: its role is already a handle, not a key', () => {
+    expect(footerIdentityFields(FOUNDER_FOOTER_IDENTITY).role).toBe('@founder')
   })
 })
 

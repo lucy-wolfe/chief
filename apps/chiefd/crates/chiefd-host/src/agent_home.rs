@@ -756,6 +756,12 @@ mod tests {
             "and the role skill is installed — the error used to abort before this line, \
              leaving the person with no role at all"
         );
+        assert!(
+            home.join("AGENTS.md").is_file(),
+            "and the role contract is written: the conversion fence republishes it because \
+             the install CHANGED (nothing to worker), so the repair heals the third artifact \
+             too rather than leaving a home with a skill and no contract"
+        );
     }
 
     /// AND THE REPAIR IS ONCE, not on every pass. A repair that rewrote the

@@ -225,8 +225,14 @@ function truecolorMention(hexColor: string, text: string, reopen: string): strin
   return `\x1b[38;2;${r};${g};${b}m${text}\x1b[39m${reopen}`;
 }
 
-/** Matches a bare `@handle` mention — the roster-id grammar used everywhere in
- * these cards (lowercase alphanumerics + hyphens). */
+/** Matches a bare `@handle` mention (lowercase alphanumerics + hyphens).
+ *
+ * The grammar is shared by two different things and that is deliberate: a
+ * person's USERNAME, which is what these cards and every delivered message
+ * now show, and a person's kebab id, which older text and cross-organization
+ * senders may still carry. Both are matched so a mention is colored either
+ * way; the colorizer resolves the roster and leaves anything it cannot place
+ * uncolored. */
 const PERSON_MENTION_PATTERN = /@([a-z0-9][a-z0-9-]*)/gi;
 
 /**
@@ -246,7 +252,16 @@ export function colorizePersonMentions(
   reopenToken: string = "dim",
 ): string {
   const reopen = typeof theme?.getFgAnsi === "function" ? theme.getFgAnsi(reopenToken) : "";
-  return text.replace(PERSON_MENTION_PATTERN, (whole, id: string) => {
+  return text.replace(PERSON_MENTION_PATTERN, (whole, mention: string) => {
+    // A mention may be a USERNAME or an id, and both must colour. Ids still
+    // resolve first and exactly, so a handle that happens to equal a different
+    // person's id can never steal their colour; only an unmatched token falls
+    // through to the handle lookup. Without this the accent would quietly
+    // disappear from every surface that started naming people properly — the
+    // colour is how a reader tells one person from another at a glance.
+    const id = manifest.people[mention]
+      ? mention
+      : (manifest.peopleOrder.find((candidate) => personHandle(manifest, candidate) === mention.toLowerCase()) ?? mention);
     const hexColor = organizationPersonAccentHex(manifest, id);
     return hexColor
       ? truecolorMention(organizationPersonDisplayAccent(theme, hexColor), whole, reopen)
@@ -263,6 +278,20 @@ export function colorizePersonMentions(
  * fresh read — a cold cache renders uncolored, never throws, never stalls.
  */
 const lastKnownIntercomManifest = new Map<string, IntercomOrganizationManifest>();
+
+/**
+ * The USERNAME to SHOW for a person, resolved at render time from the
+ * last-known-good roster.
+ *
+ * Same contract as the mention colorizer below: display-only, never a fresh
+ * read, never throws. An unknown person — a cold cache, or a sender from
+ * another organization whose roster is not ours — renders the raw id, which is
+ * exactly what every surface did before and is therefore never a regression.
+ */
+function displayHandle(organization: string | undefined, personId: string): string {
+  const manifest = organization ? lastKnownIntercomManifest.get(organization) : undefined;
+  return manifest ? personHandle(manifest, personId) : personId;
+}
 
 /** Build a {@link MentionColorizer} for a card target, resolving the roster
  * from the last-known-good in-memory manifest at render time (never a fresh
@@ -889,7 +918,7 @@ function healthNoticePresentation(
   const kind = envelope.healthIncident?.kind;
   if (!kind) return undefined;
   const personId = knownNoticePerson(envelope.body, manifest);
-  const context = personId ? [`Affected person: @${personId}`] : [];
+  const context = personId ? [`Affected person: @${manifest ? personHandle(manifest, personId) : personId}`] : [];
   if (kind === "idle_pane_awaiting_release") return {
     // The title set is a closed union; the reflection-era "🪞 Reflection
     // requested" entry left it with this packet. This is a runtime fault an
@@ -900,7 +929,7 @@ function healthNoticePresentation(
     summary: "A work-free person still holds a pane because their idle transition has not been released.",
     context,
     nextAction: personId
-      ? `ChiefD is waiting on @${personId}'s existing idle transition; do not kill the pane or open a second transition.`
+      ? `ChiefD is waiting on @${manifest ? personHandle(manifest, personId) : personId}'s existing idle transition; do not kill the pane or open a second transition.`
       : "ChiefD is waiting on the affected person's existing idle transition; do not kill the pane or open a second transition.",
     impact: "Normal work can continue; only the safe pause is blocked.",
     blocked: false,
@@ -1863,16 +1892,16 @@ function operationalIntercomManager(manifest: IntercomOrganizationManifest, pers
 function messageWakeDisposition(manifest: IntercomOrganizationManifest, personId: string): { wake: boolean; guidance?: string } {
   const person = manifest.people[personId];
   if (!person || person.employmentState === "departed") {
-    return { wake: false, guidance: `${personId} has departed; reroute the durable message to an employed owner.` };
+    return { wake: false, guidance: `@${personHandle(manifest, personId)} has departed; reroute the durable message to an employed owner.` };
   }
   if (person.employmentState !== "active") {
     // #401: never say the message "remains queued" — it is already durably
     // delivered (the mailbox write is the delivery authority); only the
     // recipient's WAKE-UP is on hold, which this guidance already states.
-    return { wake: false, guidance: `${personId} is benched; recall them or reroute ownership.` };
+    return { wake: false, guidance: `@${personHandle(manifest, personId)} is benched; recall them or reroute ownership.` };
   }
   if (!departmentIsActive(manifest, person.departmentId)) {
-    return { wake: false, guidance: `${personId}'s department is inactive; resume the unit or reroute ownership.` };
+    return { wake: false, guidance: `@${personHandle(manifest, personId)}'s department is inactive; resume the unit or reroute ownership.` };
   }
   return { wake: true };
 }
@@ -2601,6 +2630,39 @@ function appendOrganizationLogLine(
   }
 }
 
+/**
+ * THE USERNAME for a person, which is what every surface an agent reads must
+ * show them.
+ *
+ * Operator ruling: *"Every time, use the USERNAME. That's how we
+ * communicate."* A person's `id` is a kebab slug — `portfolio-management-head`
+ * — and it is the durable key for mailboxes, document-store paths and
+ * transcripts. It is not a name, and showing it to an agent is how an agent
+ * comes to address people by it.
+ *
+ * Normalization matches the pane surfaces exactly: the lowercased first word
+ * of the roster name, keeping only alphanumerics, `_` and `-`.
+ *
+ * An id this roster does not know is returned unchanged. A cross-organization
+ * sender is a real case and its handle is not ours to invent.
+ */
+function personHandle(manifest: IntercomOrganizationManifest, personId: string): string {
+  const name = manifest.people[personId]?.name;
+  if (!name) return personId;
+  const first = name.trim().split(/\s+/)[0] ?? "";
+  const slug = first.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  return slug || personId;
+}
+
+/**
+ * Resolve `to` to person ids, accepting a USERNAME or an id.
+ *
+ * The id path stays first and exact, so nothing that addresses by key changes
+ * behaviour or gets slower. The handle path exists because every surface an
+ * agent reads now shows handles, and an agent that is shown a handle will send
+ * to a handle — a resolver that accepted only ids would turn the naming fix
+ * into a new class of failed delivery.
+ */
 function recipientsFor(manifest: IntercomOrganizationManifest, sender: string, to: string): string[] {
   const recipient = to.trim().replace(/^@/, "");
   if (!recipient) throw new Error("Recipient is required");
@@ -2609,13 +2671,31 @@ function recipientsFor(manifest: IntercomOrganizationManifest, sender: string, t
     if (!recipients.length) throw new Error("Broadcast has no employed peer recipients");
     return recipients;
   }
-  const target = manifest.people[recipient];
+  const employed = manifest.peopleOrder.filter((id) => manifest.people[id]?.employmentState !== "departed");
+  let resolved = recipient;
+  if (!manifest.people[recipient] || manifest.people[recipient]?.employmentState === "departed") {
+    // Not an id, so try it as a USERNAME across employed people.
+    const byHandle = employed.filter((id) => personHandle(manifest, id) === recipient.toLowerCase());
+    if (byHandle.length > 1) {
+      // AMBIGUOUS: two people share a first name. Guessing would deliver
+      // somebody's message to the wrong person silently, which is strictly
+      // worse than refusing, so name both and let the sender choose.
+      const both = byHandle.map((id) => `@${personHandle(manifest, id)} (${id})`).join(" and ");
+      throw new Error(
+        `'${recipient}' is ambiguous — it matches ${both}. Address the one you mean by its id.`,
+      );
+    }
+    if (byHandle.length === 1) resolved = byHandle[0] as string;
+  }
+  const target = manifest.people[resolved];
   if (!target || target.employmentState === "departed") {
-    const available = manifest.peopleOrder.filter((id) => manifest.people[id]?.employmentState !== "departed");
+    // The error text is guidance an agent copies from, so it lists USERNAMES
+    // and carries the id in parentheses for anyone addressing by key.
+    const available = employed.map((id) => `@${personHandle(manifest, id)} (${id})`);
     throw new Error(`Unknown employed recipient '${recipient}'; choose one of ${available.join(", ")} or all`);
   }
-  if (recipient === sender) throw new Error("Send messages to a peer, not yourself");
-  return [recipient];
+  if (resolved === sender) throw new Error("Send messages to a peer, not yourself");
+  return [resolved];
 }
 
 /** Compare caller-owned immutable content for idempotent replay. `createdAt` is
@@ -5934,10 +6014,10 @@ function organizationToolDomainIcon(name: string): { emoji: string; title: strin
   return ORGANIZATION_TOOL_DOMAIN_ICONS[name] ?? { emoji: "", title: name.replace(/^org_/, "").replaceAll("_", " ") };
 }
 
-function organizationToolTarget(name: string, args: Record<string, any>): string {
-  if (name === "org_send") return `@${String(args.to || "recipient").replace(/^@/, "")}`;
+function organizationToolTarget(organization: string, name: string, args: Record<string, any>): string {
+  if (name === "org_send") return `@${displayHandle(organization, String(args.to || "recipient").replace(/^@/, ""))}`;
   if (name === "org_roster") return "disk authority";
-  if (args.personId) return `@${String(args.personId).replace(/^@/, "")}`;
+  if (args.personId) return `@${displayHandle(organization, String(args.personId).replace(/^@/, ""))}`;
   if (args.unitId) return String(args.unitId);
   if (args.departmentId) return String(args.departmentId);
   if (args.parentUnitId || args.parentDepartmentId) return `under ${args.parentUnitId || args.parentDepartmentId}`;
@@ -5949,8 +6029,8 @@ function organizationToolTarget(name: string, args: Record<string, any>): string
  * best-effort read of whatever identifying field the tool's own `details`
  * happened to carry (often none, for a bare caught exception). Never worse
  * than the previous "no target at all", only ever better. */
-function organizationToolFailureTarget(detail: Record<string, any>): string {
-  if (typeof detail.personId === "string") return `@${detail.personId.replace(/^@/, "")}`;
+function organizationToolFailureTarget(organization: string, detail: Record<string, any>): string {
+  if (typeof detail.personId === "string") return `@${displayHandle(organization, detail.personId.replace(/^@/, ""))}`;
   if (typeof detail.unitId === "string") return detail.unitId;
   if (typeof detail.departmentId === "string") return detail.departmentId;
   return "";
@@ -5965,11 +6045,11 @@ interface ToolSuccessPresentation {
 /** A read-only op with no mutation keeps its own domain emoji in the
  * success color, per the house style's success carve-out; every mutating op
  * gets the plain ✅. */
-function organizationToolSuccessPresentation(name: string, detail: Record<string, any>): ToolSuccessPresentation {
+function organizationToolSuccessPresentation(organization: string, name: string, detail: Record<string, any>): ToolSuccessPresentation {
   if (name === "org_roster") return { icon: domainIcon("📋", "success"), title: "Roster updated" };
   if (name === "org_send") {
     if (detail.alreadyCompleted) return { icon: "success", title: "Final result already saved", target: "no duplicate sent" };
-    if (detail.envelope) return { icon: "success", title: "Message sent", target: `@${String(detail.envelope.to || "recipient").replace(/^@/, "")}` };
+    if (detail.envelope) return { icon: "success", title: "Message sent", target: `@${displayHandle(organization, String(detail.envelope.to || "recipient").replace(/^@/, ""))}` };
     return { icon: "success", title: "Work result sent" };
   }
   const knownTitle = ({
@@ -6058,8 +6138,8 @@ function renderOperatorEscalationCard(
   return renderOrganizationCard(theme, spec, options);
 }
 
-function defaultOrganizationToolRenderCall(name: string, args: Record<string, any>, theme: any, mentions?: MentionColorizer) {
-  const target = organizationToolTarget(name, args);
+function defaultOrganizationToolRenderCall(organization: string, name: string, args: Record<string, any>, theme: any, mentions?: MentionColorizer) {
+  const target = organizationToolTarget(organization, name, args);
   const icon = organizationToolDomainIcon(name);
   return renderDefaultOrganizationToolCard(theme, {
     kind: "tool-call",
@@ -6073,7 +6153,7 @@ function defaultOrganizationToolRenderCall(name: string, args: Record<string, an
   });
 }
 
-function defaultOrganizationToolRenderResult(name: string, result: any, { expanded }: { expanded?: boolean }, theme: any, mentions?: MentionColorizer) {
+function defaultOrganizationToolRenderResult(organization: string, name: string, result: any, { expanded }: { expanded?: boolean }, theme: any, mentions?: MentionColorizer) {
   const detail = (result?.details ?? {}) as Record<string, any>;
   const output = toolOutputText(result);
   if (!detail.ok) {
@@ -6090,7 +6170,7 @@ function defaultOrganizationToolRenderResult(name: string, result: any, { expand
     // condition (a business-rule refusal); its absence means the card is
     // showing a raw caught exception (launcher/chiefd/runtime/etc.) — flag that
     // distinction so a reader never mistakes a system fault for bad input.
-    const target = organizationToolFailureTarget(detail);
+    const target = organizationToolFailureTarget(organization, detail);
     const unclassified = !retry && typeof detail.status !== "string";
     // The headline's inline decorations — the system-fault / opId / summary tags
     // and (when truncated) the inline expand hint — are structured `titleTags`
@@ -6113,7 +6193,7 @@ function defaultOrganizationToolRenderResult(name: string, result: any, { expand
       boxed: false,
     }, { expanded });
   }
-  const presentation = organizationToolSuccessPresentation(name, detail);
+  const presentation = organizationToolSuccessPresentation(organization, name, detail);
   let body: CardSpec["body"] = { kind: "none" };
   if (name === "org_send" && detail.envelope?.body) {
     const message = String(detail.envelope.body);
@@ -6201,7 +6281,7 @@ function organizationToolRegistrar(pi: ExtensionAPI, context: OrganizationRuntim
               } else if (isGenuineToolFailure(result.details)) {
                 logOperationFailure(context, `tool:${name}`, {
                   actor: context.personId,
-                  target: organizationToolFailureTarget(result.details),
+                  target: organizationToolFailureTarget(context.organization, result.details),
                   inputsDigest,
                   cause: toolOutputText(result),
                   retryable: false,
@@ -6229,8 +6309,8 @@ function organizationToolRegistrar(pi: ExtensionAPI, context: OrganizationRuntim
           }
         },
         renderCall: definition.renderCall ?? ((args: Record<string, any>, theme: any) =>
-          defaultOrganizationToolRenderCall(name, args, theme, personMentionColorizer(theme, context))),
-        renderResult: definition.renderResult ?? ((result: any, options: { expanded?: boolean }, theme: any) => defaultOrganizationToolRenderResult(name, result, options, theme, personMentionColorizer(theme, context))),
+          defaultOrganizationToolRenderCall(context.organization, name, args, theme, personMentionColorizer(theme, context))),
+        renderResult: definition.renderResult ?? ((result: any, options: { expanded?: boolean }, theme: any) => defaultOrganizationToolRenderResult(context.organization, name, result, options, theme, personMentionColorizer(theme, context))),
       } as any);
     }) as ExtensionAPI["registerTool"],
   };
@@ -6506,7 +6586,12 @@ function prepareLaunchDepartmentArguments(input: unknown): {
  * it was deleted from chiefd ("a finished person moves immediately"), so a
  * card branch for it would be a state no route can now return.
  */
-function staffingLifecycleResult(action: string, personId: string, wire: Record<string, unknown>) {
+function staffingLifecycleResult(
+  organization: string,
+  action: string,
+  personId: string,
+  wire: Record<string, unknown>,
+) {
   const handoff = typeof wire.handoff === "string" ? wire.handoff : undefined;
   const transitionId = typeof wire.transitionId === "string" ? wire.transitionId : undefined;
   // Same rule as the department create: `/v1/org/staffing/lifecycle` answers
@@ -6514,7 +6599,7 @@ function staffingLifecycleResult(action: string, personId: string, wire: Record<
   // wrong AFTER that in `warnings`. Dropping them would leave the honesty the
   // route paid for stranded one layer below the manager who needs it.
   const warning = routeWarnings(wire.warnings).join(" ") || undefined;
-  return toolResult(true, `${STAFFING_LIFECYCLE_APPLIED_LABELS[action] ?? action} ${personId}.${warning ? `\n${warning}` : ""}`, {
+  return toolResult(true, `${STAFFING_LIFECYCLE_APPLIED_LABELS[action] ?? action} @${displayHandle(organization, personId)}.${warning ? `\n${warning}` : ""}`, {
     action,
     personId,
     status: "applied",
@@ -6598,7 +6683,7 @@ export async function executeAtomicPersonTransfer(
     });
   }
   const warning = await reconcileRuntime(context, [params.personId]);
-  return toolResult(true, `Transferred ${params.personId} to ${params.departmentId}.${warning ? `\n${warning}` : ""}`, {
+  return toolResult(true, `Transferred @${displayHandle(context.organization, params.personId)} to ${params.departmentId}.${warning ? `\n${warning}` : ""}`, {
     status: "applied", personId: params.personId, moved: result.moved, warning,
   });
 }
@@ -7186,7 +7271,7 @@ async function installSubtreeTools(
         if (!params.incumbentDisposition) {
           return toolResult(
             false,
-            `Replacing ${incumbent.name} (@${incumbent.id}) as head of '${department.name}' needs an operator decision before any change. Ask whether to retain them here, transfer them to another department, demote them to report to you, or offboard them. Then call again with incumbentDisposition (and incumbentDepartmentId for transfer).`,
+            `Replacing ${incumbent.name} (@${displayHandle(context.organization, incumbent.id)}) as head of '${department.name}' needs an operator decision before any change. Ask whether to retain them here, transfer them to another department, demote them to report to you, or offboard them. Then call again with incumbentDisposition (and incumbentDepartmentId for transfer).`,
             {
               status: "incumbent_disposition_required",
               incumbent: {
@@ -7218,7 +7303,7 @@ async function installSubtreeTools(
             successorPersonId: params.newHeadPersonId,
           }, { action: "replace-head-and-offboard", departmentId: params.departmentId, headPersonId: incumbent.id, successorPersonId: params.newHeadPersonId });
           if ("refused" in outcome) return routeRefusal("Head replacement", outcome, { personId: incumbent.id });
-          return toolResult(true, `Appointed ${params.newHeadPersonId} to head '${params.departmentId}' and offboarded ${incumbent.id}.`, {
+          return toolResult(true, `Appointed @${displayHandle(context.organization, params.newHeadPersonId)} to head '${params.departmentId}' and offboarded @${displayHandle(context.organization, incumbent.id)}.`, {
             status: "applied", departmentId: params.departmentId, personId: incumbent.id, successorPersonId: params.newHeadPersonId,
           });
         }
@@ -7244,7 +7329,7 @@ async function installSubtreeTools(
           ...(demoteToDepartmentId ? { demoteToDepartmentId } : {}),
         }, { action: "appoint-department-head", departmentId: params.departmentId, successorPersonId: params.newHeadPersonId, demoteToDepartmentId });
         if ("refused" in outcome) return routeRefusal("Head appointment", outcome, { departmentId: params.departmentId });
-        return toolResult(true, `Appointed ${params.newHeadPersonId} to head '${params.departmentId}'.${demoteToDepartmentId ? ` ${incumbent.id} moved to '${demoteToDepartmentId}'.` : ` ${incumbent.id} stays as an ordinary member.`}`, {
+        return toolResult(true, `Appointed @${displayHandle(context.organization, params.newHeadPersonId)} to head '${params.departmentId}'.${demoteToDepartmentId ? ` @${displayHandle(context.organization, incumbent.id)} moved to '${demoteToDepartmentId}'.` : ` @${displayHandle(context.organization, incumbent.id)} stays as an ordinary member.`}`, {
           status: "applied",
           departmentId: params.departmentId,
           successorPersonId: params.newHeadPersonId,
@@ -7396,7 +7481,7 @@ async function installSubtreeTools(
       };
       if (batch.ok && Array.isArray(batch.hired) && batch.hired.length > 1) {
         const roster = batch.hired
-          .map((entry) => `@${String(entry.name ?? "unknown").replace(/^@/, "")}`)
+          .map((entry) => `@${displayHandle(context.organization, String(entry.name ?? "unknown").replace(/^@/, ""))}`)
           .join("\n");
         return renderOrganizationCard(theme, {
           kind: "tool-success",
@@ -7407,7 +7492,7 @@ async function installSubtreeTools(
           boxed: false,
         }, { expanded: expanded === true });
       }
-      return defaultOrganizationToolRenderResult("org_hire", result, { expanded }, theme);
+      return defaultOrganizationToolRenderResult(context.organization, "org_hire", result, { expanded }, theme);
     },
   });
 
@@ -7456,7 +7541,7 @@ async function installSubtreeTools(
       if (action === "bench" && error instanceof ChiefdUnavailableError && error.status === 503
         && (await loadIntercomOrganization(context)).people[personId]?.employmentState === "benched") {
         return {
-          result: toolResult(true, `Benched ${personId}. Their pane's teardown was not confirmed in time; the bench itself is durable, so do not repeat the bench.`, {
+          result: toolResult(true, `Benched @${displayHandle(context.organization, personId)}. Their pane's teardown was not confirmed in time; the bench itself is durable, so do not repeat the bench.`, {
             ok: true, status: "applied", personId, handoff: "unconfirmed",
             warning: "The bench is durable; the pane's teardown was not confirmed.",
           }),
@@ -7469,15 +7554,15 @@ async function installSubtreeTools(
       // which for a recall is the caller's desired end state, not a
       // failure. Keyed off the machine code, never a message regex.
       if (action === "recall" && outcome.refused === "already-active") {
-        return { result: toolResult(true, `${personId} is already active; no recall was needed.`, { personId, alreadyActive: true }) };
+        return { result: toolResult(true, `@${displayHandle(context.organization, personId)} is already active; no recall was needed.`, { personId, alreadyActive: true }) };
       }
       return { halt: routeRefusal(action === "bench" ? "Bench" : "Recall", outcome, { personId }) };
     }
     const response = action === "bench"
-      ? toolResult(true, `Benched ${personId}. Their identity, sessions, mailbox and workspace are retained.`, {
+      ? toolResult(true, `Benched @${displayHandle(context.organization, personId)}. Their identity, sessions, mailbox and workspace are retained.`, {
         status: "applied", handoff: typeof outcome.wire.handoff === "string" ? outcome.wire.handoff : undefined,
       })
-      : toolResult(true, `${personId} is back in active employment. They are not running yet; start them explicitly with org_start_person if you need them working right now.`, { status: "applied" });
+      : toolResult(true, `@${displayHandle(context.organization, personId)} is back in active employment. They are not running yet; start them explicitly with org_start_person if you need them working right now.`, { status: "applied" });
     return { result: { ...response, details: { ...response.details, personId } } };
   };
   return pi.registerTool({
@@ -7542,7 +7627,7 @@ async function installSubtreeTools(
         if (results.length === 1) return results[0]!;
         const verb = action === "bench" ? "Benched" : "Recalled";
         const roster = applied
-          .map((entry) => (entry.alreadyActive ? `${entry.personId} (already active)` : entry.personId))
+          .map((entry) => `@${displayHandle(context.organization, String(entry.personId))}${entry.alreadyActive ? " (already active)" : ""}`)
           .join(", ");
         const warnings = applied.map((entry) => entry.warning).filter((note): note is string => typeof note === "string");
         return toolResult(true, `${verb} ${applied.length} people: ${roster}.${warnings.length ? `\n${warnings.join("\n")}` : ""}`, {
@@ -7564,9 +7649,9 @@ async function installSubtreeTools(
         title: action === "recall" ? "Returning to active work" : "Benching from active work",
         target: batched.length > 1
           ? `${batched.length} people`
-          : `@${String(batched[0] || args.personId || "unknown").replace(/^@/, "")}`,
+          : `@${displayHandle(context.organization, String(batched[0] || args.personId || "unknown").replace(/^@/, ""))}`,
         body: batched.length > 1
-          ? { kind: "prose", text: batched.map((id) => `@${id.replace(/^@/, "")}`).join("\n") }
+          ? { kind: "prose", text: batched.map((id) => `@${displayHandle(context.organization, id.replace(/^@/, ""))}`).join("\n") }
           : { kind: "none" },
         boxed: false,
       });
@@ -7576,13 +7661,13 @@ async function installSubtreeTools(
         ok?: boolean; personId?: string; status?: string; retryable?: boolean; warning?: string;
         applied?: Array<{ personId?: string; alreadyActive?: boolean; warning?: string }>;
       } | undefined;
-      const target = `@${detail?.personId || "person"}`;
+      const target = `@${displayHandle(context.organization, String(detail?.personId || "person"))}`;
       // A batch gets its own card naming every person. The default one-line
       // message buries the count in a sentence, and the count is the thing an
       // operator is checking after benching a dozen people.
       if (detail?.ok && Array.isArray(detail.applied) && detail.applied.length > 1) {
         const roster = detail.applied
-          .map((entry) => `@${String(entry.personId ?? "unknown").replace(/^@/, "")}${entry.alreadyActive ? " · already active" : ""}`)
+          .map((entry) => `@${displayHandle(context.organization, String(entry.personId ?? "unknown").replace(/^@/, ""))}${entry.alreadyActive ? " · already active" : ""}`)
           .join("\n");
         const warnings = detail.applied
           .map((entry) => entry.warning)
@@ -7730,8 +7815,8 @@ async function installSubtreeTools(
               : { ...refusal, details: { ...refusal.details, applied, appliedPersonIds: applied } };
           }
           const response = action === "start-person"
-            ? toolResult(true, `Starting ${personId}. Only this person was launched; everyone else is untouched.`, { status: "applied" })
-            : toolResult(true, `Stood ${personId} down. They stay employed with their pane down; everyone else keeps running.`, {
+            ? toolResult(true, `Starting @${displayHandle(context.organization, personId)}. Only this person was launched; everyone else is untouched.`, { status: "applied" })
+            : toolResult(true, `Stood @${displayHandle(context.organization, personId)} down. They stay employed with their pane down; everyone else keeps running.`, {
               status: "applied",
               ...(typeof outcome.wire.transitionId === "string" ? { transitionId: outcome.wire.transitionId } : {}),
             });
@@ -7741,11 +7826,18 @@ async function installSubtreeTools(
         // ONE person is byte-identical to before: the same result object the
         // single-target tool has always produced, returned unchanged.
         if (results.length === 1) return results[0]!;
+        // The roster is mapped through the handle BEFORE the join, the same way
+        // the bench/recall batch above builds its own. Wrapping the joined
+        // string instead would hand one blob to a per-person lookup and leave
+        // every id in it raw.
+        const roster = applied
+          .map((personId) => `@${displayHandle(context.organization, String(personId))}`)
+          .join(", ");
         return toolResult(
           true,
           action === "start-person"
-            ? `Starting ${applied.length} people: ${applied.join(", ")}. Only these people were launched; everyone else is untouched.`
-            : `Stood ${applied.length} people down: ${applied.join(", ")}. They stay employed with their panes down; everyone else keeps running.`,
+            ? `Starting ${applied.length} people: ${roster}. Only these people were launched; everyone else is untouched.`
+            : `Stood ${applied.length} people down: ${roster}. They stay employed with their panes down; everyone else keeps running.`,
           { status: "applied", applied, appliedPersonIds: applied },
         );
       } catch (error) {
@@ -7764,9 +7856,9 @@ async function installSubtreeTools(
       return renderOrganizationCard(theme, {
         kind: "tool-call", icon: domainIcon(action === "start-person" ? "🌱" : "🍃"), inProgress: true,
         title: verb,
-        target: many ? "" : `@${String(batched[0] || args.personId || "unknown").replace(/^@/, "")}`,
+        target: many ? "" : `@${displayHandle(context.organization, String(batched[0] || args.personId || "unknown").replace(/^@/, ""))}`,
         body: many
-          ? { kind: "prose", text: batched.map((id) => `@${id.replace(/^@/, "")}`).join("\n") }
+          ? { kind: "prose", text: batched.map((id) => `@${displayHandle(context.organization, id.replace(/^@/, ""))}`).join("\n") }
           : { kind: "none" },
         boxed: false,
       });
@@ -7775,7 +7867,7 @@ async function installSubtreeTools(
       const detail = result.details as {
         ok?: boolean; personId?: string; status?: string; retryable?: boolean; warning?: string; applied?: string[];
       } | undefined;
-      const target = `@${detail?.personId || "person"}`;
+      const target = `@${displayHandle(context.organization, String(detail?.personId || "person"))}`;
       // A batch gets its own card naming every person: the default renderer
       // buries the count in a sentence, and the count is what an operator
       // checks after standing a dozen people down.
@@ -7788,7 +7880,7 @@ async function installSubtreeTools(
             text: action === "start-person" ? "· only these people were launched" : "· everyone else keeps running",
             token: "dim",
           }],
-          body: { kind: "prose", text: detail.applied.map((id) => `@${String(id).replace(/^@/, "")}`).join("\n") },
+          body: { kind: "prose", text: detail.applied.map((id) => `@${displayHandle(context.organization, String(id).replace(/^@/, ""))}`).join("\n") },
           boxed: false,
         }, { expanded });
       }
@@ -7894,7 +7986,7 @@ async function installSubtreeTools(
             successorPersonId: params.successorPersonId,
           }, { action: "replace-head-and-offboard", departmentId: headed.id, headPersonId: params.personId, successorPersonId: params.successorPersonId });
           if ("refused" in replaced) return routeRefusal("Offboard", replaced, { personId: params.personId });
-          return toolResult(true, `Offboarded ${params.personId} and appointed ${params.successorPersonId} to head '${headed.id}'.`, {
+          return toolResult(true, `Offboarded @${displayHandle(context.organization, params.personId)} and appointed @${displayHandle(context.organization, params.successorPersonId)} to head '${headed.id}'.`, {
             status: "applied", personId: params.personId, departmentId: headed.id, successorPersonId: params.successorPersonId,
           });
         }
@@ -7909,7 +8001,7 @@ async function installSubtreeTools(
           personId: params.personId,
         }, { action: "offboard", personId: params.personId });
         if ("refused" in outcome) return routeRefusal("Offboard", outcome, { personId: params.personId });
-        return staffingLifecycleResult("offboard", params.personId, outcome.wire);
+        return staffingLifecycleResult(context.organization, "offboard", params.personId, outcome.wire);
       } catch (error) { return lifecycleFailure(error); }
     },
   });
@@ -8061,6 +8153,30 @@ function deliveryGuidance(role: RecipientRole): string {
   return "\n\n" + shared + " Reply only with a needed result, precise blocker, or necessary question.";
 }
 
+/**
+ * Test seams for the naming rules. The resolver and the display helper are
+ * internal; these expose them so the RULES can be asserted directly rather
+ * than inferred from a delivered message, which is what let the old behaviour
+ * survive — every surface agreed with every other surface, and all of them
+ * were showing the key.
+ */
+/** The wake guidance a sender is shown, for the naming rules. */
+export function messageWakeDispositionForTest(
+  manifest: IntercomOrganizationManifest,
+  personId: string,
+): { wake: boolean; guidance?: string } {
+  return messageWakeDisposition(manifest, personId);
+}
+
+export function recipientsForTest(manifest: IntercomOrganizationManifest, sender: string, to: string): string[] {
+  return recipientsFor(manifest, sender, to);
+}
+
+/** Seed the display-time roster the way a live pane does, for tests. */
+export function primeManifestForTest(organization: string, manifest: IntercomOrganizationManifest): void {
+  lastKnownIntercomManifest.set(organization, manifest);
+}
+
 export function messageContextForTest(envelope: OrganizationEnvelope, recipient: string, role: RecipientRole = "unknown"): string {
   return messageContext(envelope, recipient, role);
 }
@@ -8071,12 +8187,18 @@ export function mailboxBatchContextForTest(batch: OrganizationMailboxBatch, reci
 }
 
 function messageContext(envelope: OrganizationEnvelope, recipient: string, role: RecipientRole = "unknown"): string {
-  return `Organization message ${envelope.id} from ${envelope.fromPersonId} to ${recipient}:\n\n${envelope.body}${deliveryGuidance(role)}`;
+  // THE SENDER IS NAMED BY USERNAME. This string is what the receiving agent
+  // reads and replies to, so naming the sender by internal key is precisely
+  // how an agent learns to address people by key — and then addresses somebody
+  // who does not exist. The envelope id keeps its own id: ids inside ids are
+  // fine, it is the PERSON that must be a name.
+  const sender = displayHandle(envelope.organization, envelope.fromPersonId);
+  return `Organization message ${envelope.id} from @${sender} to @${displayHandle(envelope.organization, recipient)}:\n\n${envelope.body}${deliveryGuidance(role)}`;
 }
 
 function mailboxBatchContext(batch: OrganizationMailboxBatch, recipient: string, role: RecipientRole = "unknown"): string {
   const checklist = batch.envelopes.map((envelope, index) => (
-    `## ${index + 1}. ${envelope.id} from ${envelope.fromPersonId}\n${messageContext(envelope, recipient, role)}`
+    `## ${index + 1}. ${envelope.id} from @${displayHandle(envelope.organization, envelope.fromPersonId)}\n${messageContext(envelope, recipient, role)}`
   )).join("\n\n");
   const triage = role === "manager"
     ? "Treat the numbered entries below as a checklist: review every item and ROUTE it to an owner with org_send. Do not work through the checklist yourself. "
@@ -9749,7 +9871,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
     if (isOrganizationMailboxBatch(envelope)) {
       const visible = expanded ? envelope.envelopes : envelope.envelopes.slice(0, 3);
       const lines: CardLine[] = visible.map((item, index) => ({
-        text: `${index + 1}. @${item.fromPersonId}: ${item.body}`,
+        text: `${index + 1}. @${displayHandle(item.organization, item.fromPersonId)}: ${item.body}`,
         token: "customMessageText",
       }));
       if (!expanded && envelope.envelopes.length > visible.length) {
@@ -9817,8 +9939,8 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
       }, { expanded });
     }
     const sender = !envelope.organization || envelope.organization === context.organization
-      ? `@${envelope.fromPersonId}`
-      : `${envelope.organization}/@${envelope.fromPersonId}`;
+      ? `@${displayHandle(envelope.organization ?? context.organization, envelope.fromPersonId)}`
+      : `${envelope.organization}/@${displayHandle(envelope.organization, envelope.fromPersonId)}`;
     // #433: the sender's own identity accent colors their `@name`, matching
     // their pane header exactly. A broadcast / cross-org / unknown sender has
     // no roster accent to borrow, so it keeps the neutral `muted` token.
@@ -9903,7 +10025,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
         // SESSION_MAINTENANCE_OPERATOR_REQUESTER sentinel — the extension
         // cannot import ../src/, so this literal must be kept in sync by hand.
         : request.requestedBy === "operator" ? "Requested by the operator"
-          : `Requested by @${request.requestedBy}`;
+          : `Requested by @${displayHandle(context.organization, String(request.requestedBy))}`;
     // #319: interrupt/force applies to any single-target request now, not
     // only company-wide fanout — show the mode whenever `force` is set.
     const mode = request.force !== undefined ? ` · ${request.force ? "interrupt now" : "after current work"}` : "";
@@ -9921,7 +10043,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
       icon: domainIcon(icon),
       titleStyle: "bold",
       title,
-      target: `@${request.personId}`,
+      target: `@${displayHandle(context.organization, String(request.personId))}`,
       detail: modelLine ? [modelLine, description] : [description],
       // The expanded reason block is a multi-line dim body (collapsed to the
       // hint); `wrap: "per-line"` keeps every line dim across the newlines.
@@ -9968,7 +10090,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
       icon: domainIcon(firstBoot ? "🌱" : "⚡"),
       titleStyle: "bold",
       title: firstBoot ? "New post" : "Work resumed",
-      target: firstBoot ? `@${details?.personId ?? ""}` : undefined,
+      target: firstBoot ? `@${displayHandle(context.organization, String(details?.personId ?? ""))}` : undefined,
       body: { kind: "lines", lines: bodyLines },
       boxed: true,
     }, { expanded });
@@ -10031,9 +10153,9 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
     // current model operation, so it must finish each call before Pi is
     // allowed to begin the next one in the same assistant response.
     executionMode: "sequential",
-    description: "Within this organization only: first use org_roster for an exact person id; 'launcher' is never a recipient. Durably send one work-only direct message or one true broadcast with to='all'. THE SEND IS THE WAKE — a message to somebody who is not running starts them, so you never have to start a person before delegating to them and 'they are asleep' is never a reason to do their work yourself. A benched recipient is the one exception and this tool says so by name: org_recall them, then send again. Always put the complete message text in the required body field; never omit body. Never use the org CLI from a Pi shell. This is how every result, update, blocker and correction reaches its reader, and how a manager hands work to an owner.",
+    description: "Within this organization only: address people by their USERNAME, the @name shown on every message you receive; org_roster lists them. 'launcher' is never a recipient. Durably send one work-only direct message or one true broadcast with to='all'. THE SEND IS THE WAKE — a message to somebody who is not running starts them, so you never have to start a person before delegating to them and 'they are asleep' is never a reason to do their work yourself. A benched recipient is the one exception and this tool says so by name: org_recall them, then send again. Always put the complete message text in the required body field; never omit body. Never use the org CLI from a Pi shell. This is how every result, update, blocker and correction reaches its reader, and how a manager hands work to an owner.",
     parameters: Type.Object({
-      to: Type.String({ description: "Person id or all, without @" }),
+      to: Type.String({ description: "The recipient's username, as shown on their messages and in org_roster (for example priya, with or without the @). Their person id also works. Or all, for a true broadcast." }),
       body: Type.String({ minLength: 1, description: "Required complete message text. Never omit this field." }),
       urgency: Type.Optional(Type.Union([Type.Literal("normal"), Type.Literal("interrupt")])),
       replyTo: Type.Optional(Type.String()),
@@ -11809,7 +11931,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
         });
         try {
           latestExtensionContext?.ui.notify(
-            `The provider account is out of credits (402), so @${context.personId} cannot run a turn. Nothing was retried and no model or session was changed; add credits to clear it.`,
+            `The provider account is out of credits (402), so @${displayHandle(context.organization, context.personId)} cannot run a turn. Nothing was retried and no model or session was changed; add credits to clear it.`,
             "error",
           );
         } catch { /* The card and the exception log remain the record. */ }
@@ -11889,7 +12011,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
               : "";
             await sendOrganizationMessage(context, {
               to: sender,
-              body: `@${context.personId} could not process ${one ? "your message" : "your messages"} (${ids.join(", ")}): the turn ended before completion (${providerFailure.kind}), so ${one ? "it was" : "they were"} receipted and NOT read. Nothing was retried and nothing is queued.${partial} Resend if it still matters, or route the work to somebody else.`,
+              body: `@${displayHandle(context.organization, context.personId)} could not process ${one ? "your message" : "your messages"} (${ids.join(", ")}): the turn ended before completion (${providerFailure.kind}), so ${one ? "it was" : "they were"} receipted and NOT read. Nothing was retried and nothing is queued.${partial} Resend if it still matters, or route the work to somebody else.`,
             }, { id: `content-filter-bounce-${identity}`, now: bouncedAt });
             appendOrganizationEvent(context, {
               event: "message-bounced",
@@ -11949,7 +12071,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
             })).digest("hex").slice(0, 24);
             await sendOrganizationMessage(context, {
               to: recipient,
-              body: `Content refusal for @${context.personId}: the provider declined a turn on what it contained (content_filter). The provider is healthy — this is not an outage and no access or model-health check will find anything. The turn was not replayed, no session or model was changed, and any message that turn had already receipted was returned to its sender unread. It will keep happening for the same material: re-scope what this person is asked to work on, or move them to a model whose filter does not fire on it. Reported once; the durable trail is provider-turn-failed in the company bus.`,
+              body: `Content refusal for @${displayHandle(context.organization, context.personId)}: the provider declined a turn on what it contained (content_filter). The provider is healthy — this is not an outage and no access or model-health check will find anything. The turn was not replayed, no session or model was changed, and any message that turn had already receipted was returned to its sender unread. It will keep happening for the same material: re-scope what this person is asked to work on, or move them to a model whose filter does not fire on it. Reported once; the durable trail is provider-turn-failed in the company bus.`,
             }, { id: `content-filter-${identity}`, now: at });
           } else {
             try {
@@ -12000,7 +12122,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
             })).digest("hex").slice(0, 24);
             await sendOrganizationMessage(context, {
               to: recipient,
-              body: `Provider reliability alert for @${context.personId}: ${consecutiveProviderFailures} consecutive turns ended before completion (last: ${providerFailure.kind}). No turn was replayed and no session was changed. The route is the operator's own Pi, which this company does not choose or record — check that Pi's provider access and model health, then explicitly choose the next action.`,
+              body: `Provider reliability alert for @${displayHandle(context.organization, context.personId)}: ${consecutiveProviderFailures} consecutive turns ended before completion (last: ${providerFailure.kind}). No turn was replayed and no session was changed. The route is the operator's own Pi, which this company does not choose or record — check that Pi's provider access and model health, then explicitly choose the next action.`,
             }, { id: `provider-health-${identity}`, now: at });
             // No wake call. The recipient here is this person's DIRECT MANAGER,
             // so the same upward refusal applied: a company-wide runtime launch

@@ -655,6 +655,16 @@ fn launch_entry(
     let mut env = vec![
         EnvAssignment::new("ORG_LAUNCHER_ORGANIZATION", org.slug.clone()),
         EnvAssignment::new("ORG_LAUNCHER_PERSON", person_id),
+        // THE KEY AND THE NAME ARE DIFFERENT FACTS, and the pane needs both.
+        // `ORG_LAUNCHER_PERSON` is the kebab slug: it addresses document-store
+        // and mailbox paths and must not change. This is the USERNAME, and it
+        // exists because the footer was rendering `@` plus the slug — showing
+        // the operator `@portfolio-management-head` where a person's handle
+        // belongs. Display-only: nothing keys off it.
+        EnvAssignment::new(
+            "ORG_LAUNCHER_PERSON_NAME",
+            crate::person_presentation::handle(&person.name),
+        ),
         // AC6: `ORG_LAUNCHER_RUNTIME_SOCKET` and `ORG_LAUNCHER_RUNTIME_SESSION`
         // are NOT published here. They are a real pane-env contract with real
         // readers (`organization-intercom.ts` requires the pair, and refuses
@@ -728,11 +738,11 @@ fn launch_entry(
         // workspace would hand the agent an empty project scope and therefore
         // no role and no identity.
         workspace: workspace.display().to_string(),
-        display_name: format!(
-            "{} · {}",
-            crate::person_presentation::short_identity(&person.name),
-            crate::person_presentation::role(&person.name, &person.title, is_chief)
-        ),
+        // THE HEADER IS THE ROLE, AND ONLY THE ROLE. The username used to lead
+        // it, which put a second identity in front of every reader while the
+        // footer showed a third. One person is enough identities per pane: the
+        // footer carries who you are, the header carries what you do.
+        display_name: crate::person_presentation::role(&person.name, &person.title, is_chief),
         person_name: crate::person_presentation::first_name(&person.name),
         accent,
         tools: resources.tools,
