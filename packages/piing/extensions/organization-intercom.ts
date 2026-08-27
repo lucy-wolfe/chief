@@ -6015,7 +6015,7 @@ function organizationToolDomainIcon(name: string): { emoji: string; title: strin
 }
 
 function organizationToolTarget(organization: string, name: string, args: Record<string, any>): string {
-  if (name === "org_send") return `@${String(args.to || "recipient").replace(/^@/, "")}`;
+  if (name === "org_send") return `@${displayHandle(organization, String(args.to || "recipient").replace(/^@/, ""))}`;
   if (name === "org_roster") return "disk authority";
   if (args.personId) return `@${displayHandle(organization, String(args.personId).replace(/^@/, ""))}`;
   if (args.unitId) return String(args.unitId);
@@ -6029,8 +6029,8 @@ function organizationToolTarget(organization: string, name: string, args: Record
  * best-effort read of whatever identifying field the tool's own `details`
  * happened to carry (often none, for a bare caught exception). Never worse
  * than the previous "no target at all", only ever better. */
-function organizationToolFailureTarget(detail: Record<string, any>): string {
-  if (typeof detail.personId === "string") return `@${detail.personId.replace(/^@/, "")}`;
+function organizationToolFailureTarget(organization: string, detail: Record<string, any>): string {
+  if (typeof detail.personId === "string") return `@${displayHandle(organization, detail.personId.replace(/^@/, ""))}`;
   if (typeof detail.unitId === "string") return detail.unitId;
   if (typeof detail.departmentId === "string") return detail.departmentId;
   return "";
@@ -6045,11 +6045,11 @@ interface ToolSuccessPresentation {
 /** A read-only op with no mutation keeps its own domain emoji in the
  * success color, per the house style's success carve-out; every mutating op
  * gets the plain ✅. */
-function organizationToolSuccessPresentation(name: string, detail: Record<string, any>): ToolSuccessPresentation {
+function organizationToolSuccessPresentation(organization: string, name: string, detail: Record<string, any>): ToolSuccessPresentation {
   if (name === "org_roster") return { icon: domainIcon("📋", "success"), title: "Roster updated" };
   if (name === "org_send") {
     if (detail.alreadyCompleted) return { icon: "success", title: "Final result already saved", target: "no duplicate sent" };
-    if (detail.envelope) return { icon: "success", title: "Message sent", target: `@${String(detail.envelope.to || "recipient").replace(/^@/, "")}` };
+    if (detail.envelope) return { icon: "success", title: "Message sent", target: `@${displayHandle(organization, String(detail.envelope.to || "recipient").replace(/^@/, ""))}` };
     return { icon: "success", title: "Work result sent" };
   }
   const knownTitle = ({
@@ -6153,7 +6153,7 @@ function defaultOrganizationToolRenderCall(organization: string, name: string, a
   });
 }
 
-function defaultOrganizationToolRenderResult(name: string, result: any, { expanded }: { expanded?: boolean }, theme: any, mentions?: MentionColorizer) {
+function defaultOrganizationToolRenderResult(organization: string, name: string, result: any, { expanded }: { expanded?: boolean }, theme: any, mentions?: MentionColorizer) {
   const detail = (result?.details ?? {}) as Record<string, any>;
   const output = toolOutputText(result);
   if (!detail.ok) {
@@ -6170,7 +6170,7 @@ function defaultOrganizationToolRenderResult(name: string, result: any, { expand
     // condition (a business-rule refusal); its absence means the card is
     // showing a raw caught exception (launcher/chiefd/runtime/etc.) — flag that
     // distinction so a reader never mistakes a system fault for bad input.
-    const target = organizationToolFailureTarget(detail);
+    const target = organizationToolFailureTarget(organization, detail);
     const unclassified = !retry && typeof detail.status !== "string";
     // The headline's inline decorations — the system-fault / opId / summary tags
     // and (when truncated) the inline expand hint — are structured `titleTags`
@@ -6193,7 +6193,7 @@ function defaultOrganizationToolRenderResult(name: string, result: any, { expand
       boxed: false,
     }, { expanded });
   }
-  const presentation = organizationToolSuccessPresentation(name, detail);
+  const presentation = organizationToolSuccessPresentation(organization, name, detail);
   let body: CardSpec["body"] = { kind: "none" };
   if (name === "org_send" && detail.envelope?.body) {
     const message = String(detail.envelope.body);
@@ -6281,7 +6281,7 @@ function organizationToolRegistrar(pi: ExtensionAPI, context: OrganizationRuntim
               } else if (isGenuineToolFailure(result.details)) {
                 logOperationFailure(context, `tool:${name}`, {
                   actor: context.personId,
-                  target: organizationToolFailureTarget(result.details),
+                  target: organizationToolFailureTarget(context.organization, result.details),
                   inputsDigest,
                   cause: toolOutputText(result),
                   retryable: false,
@@ -6310,7 +6310,7 @@ function organizationToolRegistrar(pi: ExtensionAPI, context: OrganizationRuntim
         },
         renderCall: definition.renderCall ?? ((args: Record<string, any>, theme: any) =>
           defaultOrganizationToolRenderCall(context.organization, name, args, theme, personMentionColorizer(theme, context))),
-        renderResult: definition.renderResult ?? ((result: any, options: { expanded?: boolean }, theme: any) => defaultOrganizationToolRenderResult(name, result, options, theme, personMentionColorizer(theme, context))),
+        renderResult: definition.renderResult ?? ((result: any, options: { expanded?: boolean }, theme: any) => defaultOrganizationToolRenderResult(context.organization, name, result, options, theme, personMentionColorizer(theme, context))),
       } as any);
     }) as ExtensionAPI["registerTool"],
   };
@@ -7271,7 +7271,7 @@ async function installSubtreeTools(
         if (!params.incumbentDisposition) {
           return toolResult(
             false,
-            `Replacing ${incumbent.name} (@${incumbent.id}) as head of '${department.name}' needs an operator decision before any change. Ask whether to retain them here, transfer them to another department, demote them to report to you, or offboard them. Then call again with incumbentDisposition (and incumbentDepartmentId for transfer).`,
+            `Replacing ${incumbent.name} (@${displayHandle(context.organization, incumbent.id)}) as head of '${department.name}' needs an operator decision before any change. Ask whether to retain them here, transfer them to another department, demote them to report to you, or offboard them. Then call again with incumbentDisposition (and incumbentDepartmentId for transfer).`,
             {
               status: "incumbent_disposition_required",
               incumbent: {
@@ -7303,7 +7303,7 @@ async function installSubtreeTools(
             successorPersonId: params.newHeadPersonId,
           }, { action: "replace-head-and-offboard", departmentId: params.departmentId, headPersonId: incumbent.id, successorPersonId: params.newHeadPersonId });
           if ("refused" in outcome) return routeRefusal("Head replacement", outcome, { personId: incumbent.id });
-          return toolResult(true, `Appointed ${params.newHeadPersonId} to head '${params.departmentId}' and offboarded ${incumbent.id}.`, {
+          return toolResult(true, `Appointed @${displayHandle(context.organization, params.newHeadPersonId)} to head '${params.departmentId}' and offboarded @${displayHandle(context.organization, incumbent.id)}.`, {
             status: "applied", departmentId: params.departmentId, personId: incumbent.id, successorPersonId: params.newHeadPersonId,
           });
         }
@@ -7329,7 +7329,7 @@ async function installSubtreeTools(
           ...(demoteToDepartmentId ? { demoteToDepartmentId } : {}),
         }, { action: "appoint-department-head", departmentId: params.departmentId, successorPersonId: params.newHeadPersonId, demoteToDepartmentId });
         if ("refused" in outcome) return routeRefusal("Head appointment", outcome, { departmentId: params.departmentId });
-        return toolResult(true, `Appointed ${params.newHeadPersonId} to head '${params.departmentId}'.${demoteToDepartmentId ? ` ${incumbent.id} moved to '${demoteToDepartmentId}'.` : ` ${incumbent.id} stays as an ordinary member.`}`, {
+        return toolResult(true, `Appointed @${displayHandle(context.organization, params.newHeadPersonId)} to head '${params.departmentId}'.${demoteToDepartmentId ? ` @${displayHandle(context.organization, incumbent.id)} moved to '${demoteToDepartmentId}'.` : ` @${displayHandle(context.organization, incumbent.id)} stays as an ordinary member.`}`, {
           status: "applied",
           departmentId: params.departmentId,
           successorPersonId: params.newHeadPersonId,
@@ -7481,7 +7481,7 @@ async function installSubtreeTools(
       };
       if (batch.ok && Array.isArray(batch.hired) && batch.hired.length > 1) {
         const roster = batch.hired
-          .map((entry) => `@${String(entry.name ?? "unknown").replace(/^@/, "")}`)
+          .map((entry) => `@${displayHandle(context.organization, String(entry.name ?? "unknown").replace(/^@/, ""))}`)
           .join("\n");
         return renderOrganizationCard(theme, {
           kind: "tool-success",
@@ -7492,7 +7492,7 @@ async function installSubtreeTools(
           boxed: false,
         }, { expanded: expanded === true });
       }
-      return defaultOrganizationToolRenderResult("org_hire", result, { expanded }, theme);
+      return defaultOrganizationToolRenderResult(context.organization, "org_hire", result, { expanded }, theme);
     },
   });
 
@@ -7554,15 +7554,15 @@ async function installSubtreeTools(
       // which for a recall is the caller's desired end state, not a
       // failure. Keyed off the machine code, never a message regex.
       if (action === "recall" && outcome.refused === "already-active") {
-        return { result: toolResult(true, `${personId} is already active; no recall was needed.`, { personId, alreadyActive: true }) };
+        return { result: toolResult(true, `@${displayHandle(context.organization, personId)} is already active; no recall was needed.`, { personId, alreadyActive: true }) };
       }
       return { halt: routeRefusal(action === "bench" ? "Bench" : "Recall", outcome, { personId }) };
     }
     const response = action === "bench"
-      ? toolResult(true, `Benched ${personId}. Their identity, sessions, mailbox and workspace are retained.`, {
+      ? toolResult(true, `Benched @${displayHandle(context.organization, personId)}. Their identity, sessions, mailbox and workspace are retained.`, {
         status: "applied", handoff: typeof outcome.wire.handoff === "string" ? outcome.wire.handoff : undefined,
       })
-      : toolResult(true, `${personId} is back in active employment. They are not running yet; start them explicitly with org_start_person if you need them working right now.`, { status: "applied" });
+      : toolResult(true, `@${displayHandle(context.organization, personId)} is back in active employment. They are not running yet; start them explicitly with org_start_person if you need them working right now.`, { status: "applied" });
     return { result: { ...response, details: { ...response.details, personId } } };
   };
   return pi.registerTool({
@@ -7649,9 +7649,9 @@ async function installSubtreeTools(
         title: action === "recall" ? "Returning to active work" : "Benching from active work",
         target: batched.length > 1
           ? `${batched.length} people`
-          : `@${String(batched[0] || args.personId || "unknown").replace(/^@/, "")}`,
+          : `@${displayHandle(context.organization, String(batched[0] || args.personId || "unknown").replace(/^@/, ""))}`,
         body: batched.length > 1
-          ? { kind: "prose", text: batched.map((id) => `@${id.replace(/^@/, "")}`).join("\n") }
+          ? { kind: "prose", text: batched.map((id) => `@${displayHandle(context.organization, id.replace(/^@/, ""))}`).join("\n") }
           : { kind: "none" },
         boxed: false,
       });
@@ -7661,13 +7661,13 @@ async function installSubtreeTools(
         ok?: boolean; personId?: string; status?: string; retryable?: boolean; warning?: string;
         applied?: Array<{ personId?: string; alreadyActive?: boolean; warning?: string }>;
       } | undefined;
-      const target = `@${detail?.personId || "person"}`;
+      const target = `@${displayHandle(context.organization, String(detail?.personId || "person"))}`;
       // A batch gets its own card naming every person. The default one-line
       // message buries the count in a sentence, and the count is the thing an
       // operator is checking after benching a dozen people.
       if (detail?.ok && Array.isArray(detail.applied) && detail.applied.length > 1) {
         const roster = detail.applied
-          .map((entry) => `@${String(entry.personId ?? "unknown").replace(/^@/, "")}${entry.alreadyActive ? " · already active" : ""}`)
+          .map((entry) => `@${displayHandle(context.organization, String(entry.personId ?? "unknown").replace(/^@/, ""))}${entry.alreadyActive ? " · already active" : ""}`)
           .join("\n");
         const warnings = detail.applied
           .map((entry) => entry.warning)
@@ -7816,7 +7816,7 @@ async function installSubtreeTools(
           }
           const response = action === "start-person"
             ? toolResult(true, `Starting @${displayHandle(context.organization, personId)}. Only this person was launched; everyone else is untouched.`, { status: "applied" })
-            : toolResult(true, `Stood ${personId} down. They stay employed with their pane down; everyone else keeps running.`, {
+            : toolResult(true, `Stood @${displayHandle(context.organization, personId)} down. They stay employed with their pane down; everyone else keeps running.`, {
               status: "applied",
               ...(typeof outcome.wire.transitionId === "string" ? { transitionId: outcome.wire.transitionId } : {}),
             });
@@ -7849,9 +7849,9 @@ async function installSubtreeTools(
       return renderOrganizationCard(theme, {
         kind: "tool-call", icon: domainIcon(action === "start-person" ? "🌱" : "🍃"), inProgress: true,
         title: verb,
-        target: many ? "" : `@${String(batched[0] || args.personId || "unknown").replace(/^@/, "")}`,
+        target: many ? "" : `@${displayHandle(context.organization, String(batched[0] || args.personId || "unknown").replace(/^@/, ""))}`,
         body: many
-          ? { kind: "prose", text: batched.map((id) => `@${id.replace(/^@/, "")}`).join("\n") }
+          ? { kind: "prose", text: batched.map((id) => `@${displayHandle(context.organization, id.replace(/^@/, ""))}`).join("\n") }
           : { kind: "none" },
         boxed: false,
       });
@@ -7860,7 +7860,7 @@ async function installSubtreeTools(
       const detail = result.details as {
         ok?: boolean; personId?: string; status?: string; retryable?: boolean; warning?: string; applied?: string[];
       } | undefined;
-      const target = `@${detail?.personId || "person"}`;
+      const target = `@${displayHandle(context.organization, String(detail?.personId || "person"))}`;
       // A batch gets its own card naming every person: the default renderer
       // buries the count in a sentence, and the count is what an operator
       // checks after standing a dozen people down.
@@ -7873,7 +7873,7 @@ async function installSubtreeTools(
             text: action === "start-person" ? "· only these people were launched" : "· everyone else keeps running",
             token: "dim",
           }],
-          body: { kind: "prose", text: detail.applied.map((id) => `@${String(id).replace(/^@/, "")}`).join("\n") },
+          body: { kind: "prose", text: detail.applied.map((id) => `@${displayHandle(context.organization, String(id).replace(/^@/, ""))}`).join("\n") },
           boxed: false,
         }, { expanded });
       }
@@ -10018,7 +10018,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
         // SESSION_MAINTENANCE_OPERATOR_REQUESTER sentinel — the extension
         // cannot import ../src/, so this literal must be kept in sync by hand.
         : request.requestedBy === "operator" ? "Requested by the operator"
-          : `Requested by @${request.requestedBy}`;
+          : `Requested by @${displayHandle(context.organization, String(request.requestedBy))}`;
     // #319: interrupt/force applies to any single-target request now, not
     // only company-wide fanout — show the mode whenever `force` is set.
     const mode = request.force !== undefined ? ` · ${request.force ? "interrupt now" : "after current work"}` : "";
@@ -10036,7 +10036,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
       icon: domainIcon(icon),
       titleStyle: "bold",
       title,
-      target: `@${request.personId}`,
+      target: `@${displayHandle(context.organization, String(request.personId))}`,
       detail: modelLine ? [modelLine, description] : [description],
       // The expanded reason block is a multi-line dim body (collapsed to the
       // hint); `wrap: "per-line"` keeps every line dim across the newlines.
@@ -10083,7 +10083,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
       icon: domainIcon(firstBoot ? "🌱" : "⚡"),
       titleStyle: "bold",
       title: firstBoot ? "New post" : "Work resumed",
-      target: firstBoot ? `@${details?.personId ?? ""}` : undefined,
+      target: firstBoot ? `@${displayHandle(context.organization, String(details?.personId ?? ""))}` : undefined,
       body: { kind: "lines", lines: bodyLines },
       boxed: true,
     }, { expanded });
