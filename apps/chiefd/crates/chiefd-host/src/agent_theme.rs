@@ -67,6 +67,40 @@ pub(crate) fn write_agent_theme_files(
     person_id: &str,
     identity_color: &str,
 ) -> Result<(), MaterializeError> {
+    // A REFRESH MUST BE ABLE TO REPAIR EVERY ABSENCE IT CAN MEET.
+    //
+    // This runs on the branch that finds a home already there, and it publishes
+    // through a trusted-parent primitive that opens `.pi/themes` with
+    // `O_DIRECTORY|O_NOFOLLOW`. Nothing on this branch created that directory —
+    // only the create branch did — so a home that exists WITHOUT it failed here
+    // with ENOENT on every pass and was repaired by none, while the caller's
+    // warning promised the next pass would fix it. A home reaches that state
+    // whenever two callers build the same person at once: one creates the
+    // folder, the other sees it and takes this branch a moment later.
+    //
+    // ABSENT is repaired. ANYTHING ELSE is left exactly as it is and handed to
+    // the primitive below, which refuses a symlinked parent rather than writing
+    // through it.
+    //
+    // `symlink_metadata`, not `metadata`, because the question is "is there an
+    // entry here?" and not "does something resolve here?" — a symlink pointing
+    // at nothing is a redirection, not an absence. NOTE, because the obvious
+    // justification for this is wrong and was measured: `metadata` would NOT
+    // let the link be followed and its target created. `mkdir(2)` does not
+    // follow a final symlink, so `create_dir_all` on a dangling link fails
+    // EEXIST and creates nothing. Both probes are safe.
+    //
+    // What the choice actually decides is WHO refuses. With `symlink_metadata`
+    // the entry reaches the trusted-parent open below and is refused there,
+    // naming the rule. With `metadata` this line grabs it first and dies on an
+    // incidental "File exists" that explains nothing. Pinned by
+    // `a_dangling_theme_directory_symlink_is_refused_and_its_target_is_not_created`.
+    let themes = home.join(".pi").join("themes");
+    if std::fs::symlink_metadata(&themes).is_err() {
+        std::fs::create_dir_all(&themes).map_err(|error| {
+            MaterializeError::filesystem(format!("cannot create {}: {error}", themes.display()))
+        })?;
+    }
     let light_name = theme_name(person_id, "light");
     let dark_name = theme_name(person_id, "dark");
     publish_existing_json(

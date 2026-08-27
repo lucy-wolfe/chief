@@ -270,14 +270,39 @@ pub fn identity_key_path(dir: &Path, person_id: &str) -> PathBuf {
 pub fn chief_identity_key_path(dir: &Path) -> PathBuf {
     dir.join(".chief").join(IDENTITY_KEY_FILENAME)
 }
+/// Write one link, tolerating a link that is ALREADY exactly the one we wanted.
+///
+/// Two production callers build the same person's home concurrently — the
+/// roster-mutation route and the converge pass. When both pass the
+/// `home.exists()` check before either has written anything, both take the
+/// create branch. `create_dir_all` and the publish-by-rename writers are all
+/// idempotent under that race; this was the one step that was not, so the
+/// loser died on `EEXIST` and the operator got a warning about a home that was
+/// in fact being built correctly by the winner.
+///
+/// The tolerance is deliberately narrow: only when the existing link already
+/// points at the target we were about to write. A link pointing SOMEWHERE ELSE
+/// is a real disagreement about the tree and still fails, because silently
+/// accepting it would hide a home wired to the wrong company.
 fn symlink(target: &Path, link: &Path) -> Result<(), MaterializeError> {
-    std::os::unix::fs::symlink(target, link).map_err(|error| {
-        MaterializeError::filesystem(format!(
+    match std::os::unix::fs::symlink(target, link) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            match std::fs::read_link(link) {
+                Ok(existing) if existing == target => Ok(()),
+                _ => Err(MaterializeError::filesystem(format!(
+                    "cannot link {} -> {}: {error}",
+                    link.display(),
+                    target.display()
+                ))),
+            }
+        }
+        Err(error) => Err(MaterializeError::filesystem(format!(
             "cannot link {} -> {}: {error}",
             link.display(),
             target.display()
-        ))
-    })
+        ))),
+    }
 }
 
 #[cfg(test)]
@@ -684,6 +709,183 @@ mod tests {
             "{\"theme\":\"the-agent-chose-this\"}\n"
         );
         assert_eq!(std::fs::read_to_string(extra).expect("extra"), "mine\n");
+    }
+
+    /// THE REFRESH BRANCH MUST REPAIR EVERY ABSENCE IT CAN MEET.
+    ///
+    /// A home can exist without its theme directory. Two production callers run
+    /// the home writer for the same new person at once — the roster-mutation
+    /// route and the converge pass — so one of them can create the folder while
+    /// the other, a moment later, sees `home.exists()` and takes the REFRESH
+    /// branch against a home that is still being built.
+    ///
+    /// The refresh publishes through a trusted-parent primitive that opens
+    /// `<home>/.pi/themes` with `O_DIRECTORY|O_NOFOLLOW` and fails ENOENT when
+    /// it is not there. Nothing in the refresh branch created it — only the
+    /// create branch did — so such a home errored on EVERY pass and was
+    /// repaired by NONE, while the warning above the call promised that the
+    /// next pass would repair it. That promise was false for exactly this
+    /// error.
+    ///
+    /// The `?` also aborted BEFORE `install_role_skill`, so the half-built home
+    /// never got its role skill either: the person stayed roleless for as long
+    /// as the loop ran. Both halves are asserted here.
+    #[test]
+    fn a_home_that_exists_without_its_theme_directory_is_repaired_not_warned_forever() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let dir = root.path();
+        library(dir);
+
+        // The shape a concurrent creator leaves behind: the folder exists, and
+        // nothing else does.
+        let home = agent_home(dir, "vera");
+        std::fs::create_dir_all(home.join("sessions")).expect("the folder, mid-create");
+
+        let outcome = ensure_agent_home(dir, "vera", "#e24033", "# guide\n", RoleSkill::Worker)
+            .expect("the refresh must REPAIR this home, not refuse it every pass");
+        assert_eq!(outcome, AgentHomeOutcome::AlreadyThere);
+
+        for mode in ["light", "dark"] {
+            assert!(
+                home.join(format!(".pi/themes/organization-vera-{mode}.json")).is_file(),
+                "the refresh creates the directory it refreshes into"
+            );
+        }
+        assert!(
+            home.join(".pi/skills/worker").is_symlink(),
+            "and the role skill is installed — the error used to abort before this line, \
+             leaving the person with no role at all"
+        );
+    }
+
+    /// AND THE REPAIR IS ONCE, not on every pass. A repair that rewrote the
+    /// theme files each time would make mtime-based drift detection meaningless
+    /// for every home that ever took this path.
+    #[test]
+    fn a_repaired_home_is_left_alone_by_the_next_pass() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let dir = root.path();
+        library(dir);
+        let home = agent_home(dir, "vera");
+        std::fs::create_dir_all(home.join("sessions")).expect("the folder, mid-create");
+        ensure_agent_home(dir, "vera", "#e24033", "# guide\n", RoleSkill::Worker).expect("repair");
+
+        let light = home.join(".pi/themes/organization-vera-light.json");
+        let dark = home.join(".pi/themes/organization-vera-dark.json");
+        let light_inode = std::fs::metadata(&light).expect("light metadata").ino();
+        let dark_inode = std::fs::metadata(&dark).expect("dark metadata").ino();
+
+        ensure_agent_home(dir, "vera", "#e24033", "# guide\n", RoleSkill::Worker)
+            .expect("idempotent pass");
+
+        assert_eq!(std::fs::metadata(&light).expect("light metadata").ino(), light_inode);
+        assert_eq!(std::fs::metadata(&dark).expect("dark metadata").ino(), dark_inode);
+    }
+
+    /// THE OTHER INTERLEAVE OF THE SAME RACE: both callers pass the
+    /// `exists()` check before either writes, so both run the CREATE branch.
+    ///
+    /// Everything else on that branch is idempotent — `create_dir_all`, and
+    /// writers that publish by rename — so the `company` link was the only step
+    /// that failed the second time through, with `EEXIST`. The loser printed a
+    /// warning about a home the winner had just built correctly.
+    #[test]
+    fn a_second_create_pass_over_a_finished_home_is_silent() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let dir = root.path();
+        library(dir);
+        ensure_agent_home(dir, "vera", "#e24033", "# guide\n", RoleSkill::Worker).expect("winner");
+
+        // Exactly what the losing caller does: it already decided the home was
+        // absent, so it runs the create branch over a home that now exists.
+        let home = agent_home(dir, "vera");
+        symlink(Path::new("../../.."), &home.join("company"))
+            .expect("re-linking the SAME target must be silent, not EEXIST");
+        assert_eq!(
+            std::fs::read_link(home.join("company")).expect("the link"),
+            PathBuf::from("../../..")
+        );
+    }
+
+    /// AND THE TOLERANCE IS NARROW. A link that points somewhere else is a real
+    /// disagreement about the tree, not a race, and must still fail — accepting
+    /// it would leave a home wired to the wrong company and say nothing.
+    #[test]
+    fn a_company_link_pointing_elsewhere_is_still_refused() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let dir = root.path();
+        library(dir);
+        ensure_agent_home(dir, "vera", "#e24033", "# guide\n", RoleSkill::Worker).expect("create");
+        let link = agent_home(dir, "vera").join("company");
+        crate::files::remove_file_if_exists(&link).expect("drop the good link");
+        std::os::unix::fs::symlink("../../../somewhere-else", &link).expect("a WRONG link");
+
+        assert!(
+            symlink(Path::new("../../.."), &link).is_err(),
+            "a link to a different target is a disagreement, not a concurrent create"
+        );
+    }
+
+    /// A DANGLING THEME-DIRECTORY SYMLINK IS REFUSED BY THE PRIMITIVE THAT
+    /// OWNS THAT DECISION, not incidentally by the repair.
+    ///
+    /// The repair above acts only when the directory is genuinely ABSENT, and
+    /// it asks with `symlink_metadata` — "is there an entry here?" — rather
+    /// than `metadata`, which asks "does something resolve here?" and answers
+    /// no for a symlink pointing at nothing.
+    ///
+    /// # What was CHECKED rather than assumed, because the obvious rationale
+    /// # for that choice is wrong
+    ///
+    /// The tempting explanation is that `metadata` would let `create_dir_all`
+    /// follow the link and create its target outside the home. Measured: it
+    /// does not. `mkdir(2)` does not follow a final symlink, so `create_dir_all`
+    /// on a dangling link fails `EEXIST` and creates nothing. Both probes are
+    /// safe, and writing that hazard into the code would have been a false
+    /// rationale for a correct line — the kind that survives review because it
+    /// sounds right.
+    ///
+    /// The REAL difference is who refuses and what the operator is told. With
+    /// `symlink_metadata` the entry is left alone and reaches the trusted-parent
+    /// open, which refuses with `cannot open trusted directory …` — the
+    /// component that owns the no-symlinked-parent rule, saying so in its own
+    /// words. With `metadata` the repair grabs it first and dies on an
+    /// incidental `File exists`, which names neither the rule nor the reason.
+    /// That is what this test pins: not merely THAT it refuses, but that the
+    /// refusal still comes from the trusted-parent check.
+    ///
+    /// The sibling test below uses a link to a directory that EXISTS, where
+    /// both probes behave identically — so it cannot distinguish them, and
+    /// without this test the choice would be unpinned.
+    #[test]
+    fn a_dangling_theme_directory_symlink_is_refused_and_its_target_is_not_created() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let dir = root.path();
+        library(dir);
+        let home = agent_home(dir, "vera");
+        std::fs::create_dir_all(home.join(".pi")).expect("project dir");
+        let never_created = root.path().join("outside-target");
+        std::os::unix::fs::symlink(&never_created, home.join(".pi/themes"))
+            .expect("a theme directory that points at nothing");
+
+        let outcome = ensure_agent_home(dir, "vera", "#e24033", "# guide\n", RoleSkill::Worker);
+
+        let refusal = outcome.expect_err("a dangling theme parent must be REFUSED, not repaired");
+        let refusal = refusal.to_string();
+        assert!(
+            refusal.contains("cannot open trusted directory"),
+            "the trusted-parent check must be the thing that refuses, so the operator is told \
+             which rule stopped them rather than being handed an incidental error from the \
+             repair step: {refusal}"
+        );
+        assert!(
+            !never_created.exists(),
+            "and nothing may be created at the link's target: following it is the whole hazard"
+        );
+        assert!(
+            std::fs::symlink_metadata(home.join(".pi/themes")).expect("the link").is_symlink(),
+            "the link is left exactly as found — it is not ours to replace"
+        );
     }
 
     #[test]
