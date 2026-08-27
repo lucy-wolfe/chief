@@ -228,11 +228,14 @@ async fn profile_route_admits_shadow_and_returns_the_camel_case_nonsecret_wire_s
     // (`--tools a,b`, `--session <path>`), which forced the reader to scan a
     // flag list and re-split a comma string to learn them.
     assert!(ceo["tools"].as_array().is_some_and(|tools| !tools.is_empty()), "{ceo}");
+    // THE HEADER IS THE ROLE AND ONLY THE ROLE. It used to lead with the
+    // person's username, which put one identity in the header while the footer
+    // showed another. The username lives in the footer now, and this asserts
+    // the `@` is gone from here rather than merely that the role is present.
+    assert_eq!(ceo["displayName"], json!("Chief Executive Officer"), "{ceo}");
     assert!(
-        ceo["displayName"].as_str().is_some_and(
-            |name| name.starts_with('@') && name.contains(" · Chief Executive Officer")
-        ),
-        "the person uses one short identity and a real role: {ceo}"
+        !ceo["displayName"].as_str().expect("displayName").contains('@'),
+        "no username in the pane header: {ceo}"
     );
     // Chief is out of the provider/model business AND out of the appearance
     // business: a hosted agent runs as plain Pi on the operator's own defaults,

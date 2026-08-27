@@ -63,7 +63,18 @@ const renderCard = renderTeamUiCard;
 
 export interface TeamIdentity {
   team: string;
+  /**
+   * The FUNCTIONAL key. For an organization pane this is the person's kebab
+   * id, and document-store paths, activity and the mailbox are all addressed
+   * by it. Never render it.
+   */
   role: string;
+  /**
+   * The USERNAME, and the only thing the footer shows. Present for an
+   * organization identity, absent for the Founder, whose `role` is already a
+   * handle rather than a key.
+   */
+  handle?: string;
 }
 
 interface OrganizationRosterPerson {
@@ -854,8 +865,19 @@ const FOOTER_FIELD_TOKENS = {
 export function organizationFooterIdentity(environment: Record<string, string | undefined>): TeamIdentity | undefined {
   const organization = environment.ORG_LAUNCHER_ORGANIZATION?.trim();
   const person = environment.ORG_LAUNCHER_PERSON?.trim();
-  if (!organization || !person) return undefined;
-  return { team: organization, role: person };
+  // The USERNAME is REQUIRED for an organization pane, and its absence means
+  // this is not one — exactly as a missing person id does.
+  //
+  // There is deliberately no fall back to rendering `person`. That is what the
+  // footer used to do, and it is how the operator came to be shown
+  // `@portfolio-management-head`: an internal key presented as a handle, in
+  // the one place a reader looks to learn what to call somebody. A pane with
+  // no handle is better than a pane teaching the wrong name. Extensions ship
+  // from the same release as the daemon that sets this, so there is no version
+  // in which one exists without the other.
+  const handle = environment.ORG_LAUNCHER_PERSON_NAME?.trim();
+  if (!organization || !person || !handle) return undefined;
+  return { team: organization, role: person, handle };
 }
 
 /**
@@ -900,7 +922,9 @@ function readIdentity(): TeamIdentity {
  * makes `@founder` checkable in one place.
  */
 export function footerIdentityFields(identity: TeamIdentity): { team: string; role: string } {
-  return { team: identity.team, role: `@${identity.role}` };
+  // `handle` when there is one, `role` only for the Founder — whose `role` is
+  // `founder`, a handle already, not a key.
+  return { team: identity.team, role: `@${identity.handle ?? identity.role}` };
 }
 
 function formatCost(value: number): string {

@@ -225,8 +225,14 @@ function truecolorMention(hexColor: string, text: string, reopen: string): strin
   return `\x1b[38;2;${r};${g};${b}m${text}\x1b[39m${reopen}`;
 }
 
-/** Matches a bare `@handle` mention — the roster-id grammar used everywhere in
- * these cards (lowercase alphanumerics + hyphens). */
+/** Matches a bare `@handle` mention (lowercase alphanumerics + hyphens).
+ *
+ * The grammar is shared by two different things and that is deliberate: a
+ * person's USERNAME, which is what these cards and every delivered message
+ * now show, and a person's kebab id, which older text and cross-organization
+ * senders may still carry. Both are matched so a mention is colored either
+ * way; the colorizer resolves the roster and leaves anything it cannot place
+ * uncolored. */
 const PERSON_MENTION_PATTERN = /@([a-z0-9][a-z0-9-]*)/gi;
 
 /**
@@ -263,6 +269,20 @@ export function colorizePersonMentions(
  * fresh read — a cold cache renders uncolored, never throws, never stalls.
  */
 const lastKnownIntercomManifest = new Map<string, IntercomOrganizationManifest>();
+
+/**
+ * The USERNAME to SHOW for a person, resolved at render time from the
+ * last-known-good roster.
+ *
+ * Same contract as the mention colorizer below: display-only, never a fresh
+ * read, never throws. An unknown person — a cold cache, or a sender from
+ * another organization whose roster is not ours — renders the raw id, which is
+ * exactly what every surface did before and is therefore never a regression.
+ */
+function displayHandle(organization: string | undefined, personId: string): string {
+  const manifest = organization ? lastKnownIntercomManifest.get(organization) : undefined;
+  return manifest ? personHandle(manifest, personId) : personId;
+}
 
 /** Build a {@link MentionColorizer} for a card target, resolving the roster
  * from the last-known-good in-memory manifest at render time (never a fresh
@@ -2601,6 +2621,39 @@ function appendOrganizationLogLine(
   }
 }
 
+/**
+ * THE USERNAME for a person, which is what every surface an agent reads must
+ * show them.
+ *
+ * Operator ruling: *"Every time, use the USERNAME. That's how we
+ * communicate."* A person's `id` is a kebab slug — `portfolio-management-head`
+ * — and it is the durable key for mailboxes, document-store paths and
+ * transcripts. It is not a name, and showing it to an agent is how an agent
+ * comes to address people by it.
+ *
+ * Normalization matches the pane surfaces exactly: the lowercased first word
+ * of the roster name, keeping only alphanumerics, `_` and `-`.
+ *
+ * An id this roster does not know is returned unchanged. A cross-organization
+ * sender is a real case and its handle is not ours to invent.
+ */
+function personHandle(manifest: IntercomOrganizationManifest, personId: string): string {
+  const name = manifest.people[personId]?.name;
+  if (!name) return personId;
+  const first = name.trim().split(/\s+/)[0] ?? "";
+  const slug = first.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  return slug || personId;
+}
+
+/**
+ * Resolve `to` to person ids, accepting a USERNAME or an id.
+ *
+ * The id path stays first and exact, so nothing that addresses by key changes
+ * behaviour or gets slower. The handle path exists because every surface an
+ * agent reads now shows handles, and an agent that is shown a handle will send
+ * to a handle — a resolver that accepted only ids would turn the naming fix
+ * into a new class of failed delivery.
+ */
 function recipientsFor(manifest: IntercomOrganizationManifest, sender: string, to: string): string[] {
   const recipient = to.trim().replace(/^@/, "");
   if (!recipient) throw new Error("Recipient is required");
@@ -2609,13 +2662,31 @@ function recipientsFor(manifest: IntercomOrganizationManifest, sender: string, t
     if (!recipients.length) throw new Error("Broadcast has no employed peer recipients");
     return recipients;
   }
-  const target = manifest.people[recipient];
+  const employed = manifest.peopleOrder.filter((id) => manifest.people[id]?.employmentState !== "departed");
+  let resolved = recipient;
+  if (!manifest.people[recipient] || manifest.people[recipient]?.employmentState === "departed") {
+    // Not an id, so try it as a USERNAME across employed people.
+    const byHandle = employed.filter((id) => personHandle(manifest, id) === recipient.toLowerCase());
+    if (byHandle.length > 1) {
+      // AMBIGUOUS: two people share a first name. Guessing would deliver
+      // somebody's message to the wrong person silently, which is strictly
+      // worse than refusing, so name both and let the sender choose.
+      const both = byHandle.map((id) => `@${personHandle(manifest, id)} (${id})`).join(" and ");
+      throw new Error(
+        `'${recipient}' is ambiguous — it matches ${both}. Address the one you mean by its id.`,
+      );
+    }
+    if (byHandle.length === 1) resolved = byHandle[0] as string;
+  }
+  const target = manifest.people[resolved];
   if (!target || target.employmentState === "departed") {
-    const available = manifest.peopleOrder.filter((id) => manifest.people[id]?.employmentState !== "departed");
+    // The error text is guidance an agent copies from, so it lists USERNAMES
+    // and carries the id in parentheses for anyone addressing by key.
+    const available = employed.map((id) => `@${personHandle(manifest, id)} (${id})`);
     throw new Error(`Unknown employed recipient '${recipient}'; choose one of ${available.join(", ")} or all`);
   }
-  if (recipient === sender) throw new Error("Send messages to a peer, not yourself");
-  return [recipient];
+  if (resolved === sender) throw new Error("Send messages to a peer, not yourself");
+  return [resolved];
 }
 
 /** Compare caller-owned immutable content for idempotent replay. `createdAt` is
@@ -8061,6 +8132,22 @@ function deliveryGuidance(role: RecipientRole): string {
   return "\n\n" + shared + " Reply only with a needed result, precise blocker, or necessary question.";
 }
 
+/**
+ * Test seams for the naming rules. The resolver and the display helper are
+ * internal; these expose them so the RULES can be asserted directly rather
+ * than inferred from a delivered message, which is what let the old behaviour
+ * survive — every surface agreed with every other surface, and all of them
+ * were showing the key.
+ */
+export function recipientsForTest(manifest: IntercomOrganizationManifest, sender: string, to: string): string[] {
+  return recipientsFor(manifest, sender, to);
+}
+
+/** Seed the display-time roster the way a live pane does, for tests. */
+export function primeManifestForTest(organization: string, manifest: IntercomOrganizationManifest): void {
+  lastKnownIntercomManifest.set(organization, manifest);
+}
+
 export function messageContextForTest(envelope: OrganizationEnvelope, recipient: string, role: RecipientRole = "unknown"): string {
   return messageContext(envelope, recipient, role);
 }
@@ -8071,12 +8158,18 @@ export function mailboxBatchContextForTest(batch: OrganizationMailboxBatch, reci
 }
 
 function messageContext(envelope: OrganizationEnvelope, recipient: string, role: RecipientRole = "unknown"): string {
-  return `Organization message ${envelope.id} from ${envelope.fromPersonId} to ${recipient}:\n\n${envelope.body}${deliveryGuidance(role)}`;
+  // THE SENDER IS NAMED BY USERNAME. This string is what the receiving agent
+  // reads and replies to, so naming the sender by internal key is precisely
+  // how an agent learns to address people by key — and then addresses somebody
+  // who does not exist. The envelope id keeps its own id: ids inside ids are
+  // fine, it is the PERSON that must be a name.
+  const sender = displayHandle(envelope.organization, envelope.fromPersonId);
+  return `Organization message ${envelope.id} from @${sender} to @${displayHandle(envelope.organization, recipient)}:\n\n${envelope.body}${deliveryGuidance(role)}`;
 }
 
 function mailboxBatchContext(batch: OrganizationMailboxBatch, recipient: string, role: RecipientRole = "unknown"): string {
   const checklist = batch.envelopes.map((envelope, index) => (
-    `## ${index + 1}. ${envelope.id} from ${envelope.fromPersonId}\n${messageContext(envelope, recipient, role)}`
+    `## ${index + 1}. ${envelope.id} from @${displayHandle(envelope.organization, envelope.fromPersonId)}\n${messageContext(envelope, recipient, role)}`
   )).join("\n\n");
   const triage = role === "manager"
     ? "Treat the numbered entries below as a checklist: review every item and ROUTE it to an owner with org_send. Do not work through the checklist yourself. "
@@ -9749,7 +9842,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
     if (isOrganizationMailboxBatch(envelope)) {
       const visible = expanded ? envelope.envelopes : envelope.envelopes.slice(0, 3);
       const lines: CardLine[] = visible.map((item, index) => ({
-        text: `${index + 1}. @${item.fromPersonId}: ${item.body}`,
+        text: `${index + 1}. @${displayHandle(item.organization, item.fromPersonId)}: ${item.body}`,
         token: "customMessageText",
       }));
       if (!expanded && envelope.envelopes.length > visible.length) {
@@ -9817,8 +9910,8 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
       }, { expanded });
     }
     const sender = !envelope.organization || envelope.organization === context.organization
-      ? `@${envelope.fromPersonId}`
-      : `${envelope.organization}/@${envelope.fromPersonId}`;
+      ? `@${displayHandle(envelope.organization ?? context.organization, envelope.fromPersonId)}`
+      : `${envelope.organization}/@${displayHandle(envelope.organization, envelope.fromPersonId)}`;
     // #433: the sender's own identity accent colors their `@name`, matching
     // their pane header exactly. A broadcast / cross-org / unknown sender has
     // no roster accent to borrow, so it keeps the neutral `muted` token.
@@ -10031,9 +10124,9 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
     // current model operation, so it must finish each call before Pi is
     // allowed to begin the next one in the same assistant response.
     executionMode: "sequential",
-    description: "Within this organization only: first use org_roster for an exact person id; 'launcher' is never a recipient. Durably send one work-only direct message or one true broadcast with to='all'. THE SEND IS THE WAKE — a message to somebody who is not running starts them, so you never have to start a person before delegating to them and 'they are asleep' is never a reason to do their work yourself. A benched recipient is the one exception and this tool says so by name: org_recall them, then send again. Always put the complete message text in the required body field; never omit body. Never use the org CLI from a Pi shell. This is how every result, update, blocker and correction reaches its reader, and how a manager hands work to an owner.",
+    description: "Within this organization only: address people by their USERNAME, the @name shown on every message you receive; org_roster lists them. 'launcher' is never a recipient. Durably send one work-only direct message or one true broadcast with to='all'. THE SEND IS THE WAKE — a message to somebody who is not running starts them, so you never have to start a person before delegating to them and 'they are asleep' is never a reason to do their work yourself. A benched recipient is the one exception and this tool says so by name: org_recall them, then send again. Always put the complete message text in the required body field; never omit body. Never use the org CLI from a Pi shell. This is how every result, update, blocker and correction reaches its reader, and how a manager hands work to an owner.",
     parameters: Type.Object({
-      to: Type.String({ description: "Person id or all, without @" }),
+      to: Type.String({ description: "The recipient's username, as shown on their messages and in org_roster (for example priya, with or without the @). Their person id also works. Or all, for a true broadcast." }),
       body: Type.String({ minLength: 1, description: "Required complete message text. Never omit this field." }),
       urgency: Type.Optional(Type.Union([Type.Literal("normal"), Type.Literal("interrupt")])),
       replyTo: Type.Optional(Type.String()),

@@ -84,6 +84,80 @@ fn operator_pi_agent_dir(dir: &std::path::Path) -> PathBuf {
     agent_dir
 }
 
+/// THE PANE HEADER CARRIES THE ROLE AND NEVER THE USERNAME.
+///
+/// Operator ruling: the username is how people are addressed, and it belongs
+/// in ONE place. The header used to read `@vera · Head of Quant`, which put a
+/// second identity in front of every reader while the footer showed a third
+/// spelling — the person's kebab id — as though it were a handle. The header
+/// is what you DO; the footer is who you ARE.
+#[test]
+fn the_pane_header_carries_the_role_and_never_the_username() {
+    let manifest = northstar_manifest(EPOCH);
+    let company_dir = tempfile::tempdir().expect("tempdir");
+    let mut config = config();
+    config.dir = company_dir.path().to_path_buf();
+    config.root_pi_agent_dir = operator_pi_agent_dir(company_dir.path());
+    let person = manifest.people_order[1].clone();
+    admit_launch_subject(company_dir.path(), &person);
+
+    let catalog = build_launch_catalog(&manifest, &config);
+    let spec = catalog.people.get(&person).expect("an admitted person");
+
+    let expected_role = crate::person_presentation::role(
+        &manifest.people[&person].name,
+        &manifest.people[&person].title,
+        false,
+    );
+    assert_eq!(spec.display_name, expected_role, "the header is the role, alone");
+    assert!(
+        !spec.display_name.contains('@'),
+        "and carries no username at all: {}",
+        spec.display_name
+    );
+    assert!(
+        !spec.display_name.contains(&person),
+        "and certainly not the person id: {}",
+        spec.display_name
+    );
+}
+
+/// THE USERNAME IS PUBLISHED AS ITS OWN FACT, beside the id rather than
+/// instead of it.
+///
+/// `ORG_LAUNCHER_PERSON` is the kebab id and addresses the mailbox and the
+/// document store; it must not move. The pane footer needs the person's
+/// HANDLE, and rendering `@` in front of the id — which is what it did — shows
+/// the operator `@portfolio-management-head`. Two different facts, two
+/// variables.
+#[test]
+fn the_launch_env_publishes_the_username_beside_the_person_id() {
+    let manifest = northstar_manifest(EPOCH);
+    let company_dir = tempfile::tempdir().expect("tempdir");
+    let mut config = config();
+    config.dir = company_dir.path().to_path_buf();
+    config.root_pi_agent_dir = operator_pi_agent_dir(company_dir.path());
+    let person = manifest.people_order[1].clone();
+    admit_launch_subject(company_dir.path(), &person);
+
+    let catalog = build_launch_catalog(&manifest, &config);
+    let spec = catalog.people.get(&person).expect("an admitted person");
+    let value = |name: &str| {
+        spec.env.iter().find(|entry| entry.name == name).map(|entry| entry.value.clone())
+    };
+
+    assert_eq!(value("ORG_LAUNCHER_PERSON"), Some(person.clone()), "the KEY is unchanged");
+    assert_eq!(
+        value("ORG_LAUNCHER_PERSON_NAME"),
+        Some(crate::person_presentation::handle(&manifest.people[&person].name)),
+        "and the USERNAME travels beside it"
+    );
+    assert!(
+        !value("ORG_LAUNCHER_PERSON_NAME").expect("the handle").contains('@'),
+        "the variable carries the bare handle; the '@' is the renderer's"
+    );
+}
+
 #[test]
 fn build_launch_catalog_derives_paths_tools_and_env() {
     let manifest = northstar_manifest(EPOCH);

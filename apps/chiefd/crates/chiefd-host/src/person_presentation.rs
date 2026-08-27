@@ -11,15 +11,38 @@ pub fn first_name(display_name: &str) -> String {
     display_name.split_whitespace().next().unwrap_or("Person").to_owned()
 }
 
-/// The stable short identity shown by Pi and Chief pane surfaces.
+/// THE USERNAME: a person's communication identity, without the `@`.
+///
+/// Operator ruling: *"Every time, use the USERNAME. That's how we
+/// communicate."* A person has three strings and they are not
+/// interchangeable — the `id` is a kebab slug and is the durable addressing
+/// and storage key, the `name` is the roster display name, and this is the
+/// handle derived from the name. The slug belongs in environment variables,
+/// document-store and mailbox paths, transcripts and logs. It must never be
+/// what a human or an agent is shown, because a reader who copies what they
+/// are shown will address people by it.
+///
+/// This is the ONE normalization. [`short_identity`] is this with an `@` in
+/// front, so a second copy of the rule cannot drift away from the first.
 #[must_use]
-pub fn short_identity(display_name: &str) -> String {
+pub fn handle(display_name: &str) -> String {
     let slug: String = first_name(display_name)
         .chars()
         .flat_map(char::to_lowercase)
         .filter(|character| character.is_alphanumeric() || *character == '_' || *character == '-')
         .collect();
-    format!("@{}", if slug.is_empty() { "person" } else { slug.as_str() })
+    if slug.is_empty() {
+        "person".to_owned()
+    } else {
+        slug
+    }
+}
+
+/// The stable short identity shown by Pi and Chief pane surfaces: the
+/// [`handle`], rendered the way people write it.
+#[must_use]
+pub fn short_identity(display_name: &str) -> String {
+    format!("@{}", handle(display_name))
 }
 
 /// The real roster role, or the explicit product default.

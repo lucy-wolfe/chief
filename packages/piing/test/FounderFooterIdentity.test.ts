@@ -65,16 +65,44 @@ describe('the pre-company footer identity is Founder', () => {
     expect(identity).toEqual(FOUNDER_FOOTER_IDENTITY)
   })
 
-  test('a person inside a company still renders that company and that person', () => {
-    // The Founder fallback must not swallow the org identity — the same line
-    // serves both, and only the fallback was wrong.
+  test('the footer renders the username and never the person id', () => {
+    // SUPERSEDED AND INVERTED, openly. This asserted
+    // `role === '@head-quant-research'` — the person's kebab id with an `@`
+    // stuck on the front, which reads as a handle and is not one. The footer
+    // is where a reader looks to learn what to call somebody, so an internal
+    // key presented there teaches the wrong name to every person who reads it.
+    //
+    // The id is still carried, because the mailbox and the document store are
+    // addressed by it. It is simply not what is shown.
     const identity = footerIdentity({
       ORG_LAUNCHER_ORGANIZATION: 'leo-capital',
-      ORG_LAUNCHER_PERSON: 'head-quant-research'
+      ORG_LAUNCHER_PERSON: 'head-quant-research',
+      ORG_LAUNCHER_PERSON_NAME: 'priya'
     })
-    expect(identity).toEqual({ team: 'leo-capital', role: 'head-quant-research' })
-    expect(footerIdentityFields(identity).role).toBe('@head-quant-research')
+    expect(identity).toEqual({
+      team: 'leo-capital',
+      role: 'head-quant-research',
+      handle: 'priya'
+    })
+    expect(footerIdentityFields(identity).role).toBe('@priya')
+    expect(footerIdentityFields(identity).role).not.toContain('head-quant-research')
+  })
+
+  test('a company pane without a username is not a company pane', () => {
+    // There is deliberately no fall back to rendering the id: that fallback IS
+    // the defect. A pane that cannot name its person correctly must not name
+    // it wrongly instead. Extensions ship in the same release as the daemon
+    // that sets the variable, so there is no version where one exists without
+    // the other.
     expect(organizationFooterIdentity({ ORG_LAUNCHER_ORGANIZATION: 'leo-capital' })).toBeUndefined()
+    expect(organizationFooterIdentity({
+      ORG_LAUNCHER_ORGANIZATION: 'leo-capital',
+      ORG_LAUNCHER_PERSON: 'head-quant-research'
+    })).toBeUndefined()
+  })
+
+  test('the Founder footer is unchanged: its role is already a handle, not a key', () => {
+    expect(footerIdentityFields(FOUNDER_FOOTER_IDENTITY).role).toBe('@founder')
   })
 })
 

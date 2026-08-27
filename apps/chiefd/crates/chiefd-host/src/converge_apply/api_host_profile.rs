@@ -358,11 +358,11 @@ pub fn build_api_host_launch_profile(
         env,
         session_file: resources.session.clone(),
         tools: resources.tools.clone(),
-        display_name: format!(
-            "{} · {}",
-            crate::person_presentation::short_identity(&person.name),
-            crate::person_presentation::role(&person.name, &person.title, is_chief)
-        ),
+        // THE HEADER IS THE ROLE, AND ONLY THE ROLE. The username used to lead
+        // it, which put a second identity in front of every reader while the
+        // footer showed a third. One person is enough identities per pane: the
+        // footer carries who you are, the header carries what you do.
+        display_name: crate::person_presentation::role(&person.name, &person.title, is_chief),
     })
 }
 
@@ -401,6 +401,15 @@ fn api_host_environment(
         // and therefore the same fact said twice. See `cycle.rs`.
         ("ORG_LAUNCHER_ORG_DIR".to_owned(), company_dir.display().to_string()),
         ("ORG_LAUNCHER_PERSON".to_owned(), person_id.to_owned()),
+        // The USERNAME, display-only — see `cycle.rs` for why the slug alone
+        // was not enough.
+        (
+            "ORG_LAUNCHER_PERSON_NAME".to_owned(),
+            org.people
+                .get(person_id)
+                .map(|person| crate::person_presentation::handle(&person.name))
+                .unwrap_or_else(|| "person".to_owned()),
+        ),
         ("ORG_LAUNCHER_ROOT".to_owned(), config.launcher_root.display().to_string()),
         // Sessions only — see `cycle.rs`. Pi inherits the operator's own
         // `~/.pi/agent` for everything else, which is what deleted chief's
