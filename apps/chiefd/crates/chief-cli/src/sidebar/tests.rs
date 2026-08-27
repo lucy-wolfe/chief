@@ -7698,3 +7698,58 @@ fn the_safe_border_default_reveals_nothing_about_the_machine() {
     assert!(!default.contains("host"), "no host format may appear: {default}");
     assert!(!default.contains("pane_index"), "tmux's default shape must not survive: {default}");
 }
+
+/// THE RAIL'S BOTTOM ROW CARRIES THE RUNNING VERSION, RIGHT-ALIGNED.
+///
+/// The operator asked for this after spending an hour telling two releases
+/// apart by hand. The label is only worth having if it is the version of the
+/// process actually drawing the rail, so it is the same build-time constant
+/// `chief --version` prints — a binary cannot be wrong about which binary it
+/// is.
+#[test]
+fn the_rail_footer_carries_the_running_version_right_aligned() {
+    let row = super::render::control_row(24, "<<", "0.5.2");
+
+    assert!(row.starts_with(" <<"), "the control keeps the left edge: {row:?}");
+    assert!(row.ends_with("v0.5.2 "), "the version is right-aligned with padding: {row:?}");
+    assert_eq!(row.chars().count(), 24, "the row fills its width exactly: {row:?}");
+    assert!(
+        !row.ends_with("v0.5.2"),
+        "and is NOT flush against the edge — the operator asked for a little padding"
+    );
+}
+
+/// THE TWO NEVER TOUCH. A version that ran into the chevrons would read as one
+/// corrupted token rather than two facts.
+#[test]
+fn the_footer_version_never_collides_with_the_collapse_control() {
+    for width in 12..40u16 {
+        let row = super::render::control_row(width, "<<", "0.5.2");
+        if let Some(rest) = row.strip_prefix(" <<") {
+            if rest.contains('v') {
+                assert!(
+                    rest.starts_with(' '),
+                    "width {width}: at least one space must separate them: {row:?}"
+                );
+            }
+        }
+        assert!(row.chars().count() <= width as usize, "width {width}: never overflows: {row:?}");
+    }
+}
+
+/// A RAIL TOO NARROW FOR BOTH KEEPS THE CONTROL AND DROPS THE VERSION.
+///
+/// Truncating would be worse than dropping: `v0.5` is not a shorter way of
+/// writing `v0.5.2`, it is a different release, and a label that can lie about
+/// which version is running defeats the reason this exists.
+#[test]
+fn a_narrow_rail_drops_the_version_rather_than_truncating_it() {
+    // A collapsed rail is four columns wide.
+    let collapsed = super::render::control_row(4, ">>", "0.5.2");
+    assert_eq!(collapsed, " >>", "the control survives at the smallest width");
+    assert!(!collapsed.contains('v'), "and no partial version is drawn: {collapsed:?}");
+
+    // The exact boundary: " <<" + "v0.5.2 " is 10 columns, plus one space is 11.
+    assert!(!super::render::control_row(10, "<<", "0.5.2").contains('v'));
+    assert!(super::render::control_row(11, "<<", "0.5.2").ends_with("v0.5.2 "));
+}

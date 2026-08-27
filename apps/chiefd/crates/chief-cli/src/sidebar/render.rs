@@ -374,11 +374,52 @@ fn person_row(
     Line::from(spans)
 }
 
+/// One column of breathing room at each edge, so neither the control nor the
+/// version sits flush against the rail's border.
+const CONTROL_ROW_PADDING: usize = 1;
+
+/// The rail's bottom row: the collapse control at the left, the running version
+/// at the right.
+///
+/// # The version is the one this binary reports, not one read from disk
+///
+/// It is `CHIEF_VERSION`, the build-time constant `chief --version` prints and
+/// `upgrade` reports as the installed version — read here directly because
+/// `upgrade` is declared in the bin target and the rail is in the lib. That is
+/// deliberate: a version read from an install manifest can
+/// disagree with the process actually drawing the rail, which is the exact
+/// confusion this label exists to end. A binary reporting its OWN version
+/// cannot be wrong about which binary you are running.
+///
+/// # It yields the row rather than corrupting it
+///
+/// Pure, so the layout is testable at every width without a terminal. The
+/// version is drawn only when the row can hold both it and the control with at
+/// least one space between them. Below that width the version is DROPPED and
+/// the control keeps its place — a rail too narrow for both is a rail where
+/// the control still has to work, and a truncated version number is worse than
+/// no version number because it reads as a different release.
+pub(super) fn control_row(width: u16, glyph: &str, version: &str) -> String {
+    let width = width as usize;
+    let left = format!("{}{glyph}", " ".repeat(CONTROL_ROW_PADDING));
+    let label = format!("v{version}");
+    let right = format!("{label}{}", " ".repeat(CONTROL_ROW_PADDING));
+    // One space minimum between them, so they can never touch or overlap.
+    if width < left.chars().count() + right.chars().count() + 1 {
+        return left;
+    }
+    let gap = width - left.chars().count() - right.chars().count();
+    format!("{left}{}{right}", " ".repeat(gap))
+}
+
 fn draw_control(frame: &mut Frame<'_>, area: Rect, view: &View) {
     let glyph = if view.collapsed() { EXPAND } else { COLLAPSE };
     let row = area.height.saturating_sub(1);
     frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(format!(" {glyph}"), dim()))),
+        Paragraph::new(Line::from(Span::styled(
+            control_row(area.width, glyph, env!("CHIEF_VERSION")),
+            dim(),
+        ))),
         Rect { x: area.x, y: area.y + row, width: area.width, height: 1 },
     );
 }
