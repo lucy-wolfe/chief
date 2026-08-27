@@ -49,6 +49,50 @@ function gitLsTree(cwd, sha, ...pathspecs) {
     .filter(Boolean)
 }
 
+// Whether the SNAPSHOT CORPUS COMMIT is present in THIS repository.
+//
+// Rules 1 and 1b are the two that read the frozen corpus at `map.capturedAt`.
+// Every other rule in this file is answered against the live tree and needs no
+// history at all.
+//
+// The commit is not always reachable, and that is a legitimate state rather
+// than a bug to be papered over: a repository can be cut fresh — v0.5.0's
+// public release is a single root commit — and a SHA from before that cut
+// exists in no object database here and never will. `git ls-tree` answers such
+// a SHA with `fatal: Not a valid object name`, which `execFileSync` raises as
+// an opaque `Command failed:` throw out of the shared validator, failing every
+// test that calls it including the ones that never needed history. Fourteen of
+// this file's seventeen subtests failed that way for one missing object.
+//
+// So the availability question is asked ONCE, explicitly, and answered in
+// words. A caller that cannot read the corpus must REFUSE and say so, naming
+// the SHA — never fail as though the map were wrong, and never pass as though
+// the corpus had been checked.
+export function snapshotCorpusStatus(cwd, map) {
+  const sha = typeof map?.capturedAt === 'string' && map.capturedAt.length > 0 ? map.capturedAt : null
+  if (!sha) {
+    return {
+      sha: null,
+      reachable: false,
+      refusal: 'CANNOT CHECK: map.capturedAt is missing or empty, so the snapshot corpus cannot be scoped at all.',
+    }
+  }
+  try {
+    execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd, stdio: 'ignore' })
+    return { sha, reachable: true, refusal: null }
+  } catch {
+    return {
+      sha,
+      reachable: false,
+      refusal:
+        `CANNOT CHECK: the snapshot corpus commit ${sha} is not in this repository, so rules 1 and 1b ` +
+        'cannot be evaluated. This is expected in a repository cut fresh (v0.5.0 shipped as a single ' +
+        'root commit); the corpus lives in the pre-release history. Every other rule in this guard is ' +
+        'answered against the live tree and still ran.',
+    }
+  }
+}
+
 // A file already parked-by-rename (`.test.ts.parked`) has the same snapshot
 // identity as its pre-rename name (`.test.ts`) — E0-S2 renamed 3 meta files
 // this way before the snapshot SHA's tree recorded them, so the live map's
@@ -151,12 +195,18 @@ export function validateTriageMap(root, map) {
   // `git ls-tree` at that SHA, not `git ls-files` against the live tree —
   // see the file header for why. A missing/empty capturedAt is itself an
   // error: rule 1 cannot be scoped without it.
-  const capturedAt = typeof map?.capturedAt === 'string' && map.capturedAt.length > 0 ? map.capturedAt : null
-  if (!capturedAt) {
+  //
+  // A capturedAt that is missing is a defect IN THE MAP and stays an error. A
+  // capturedAt that is present but unreachable is a fact about the REPOSITORY,
+  // not about the map, so it is not an error here — rules 1 and 1b simply do
+  // not run, and the tests that own them refuse in words rather than passing
+  // vacuously. See `snapshotCorpusStatus`.
+  const snapshot = snapshotCorpusStatus(root, map)
+  if (!snapshot.sha) {
     errors.push('map.capturedAt is missing or empty; rule 1 cannot scope the snapshot corpus without it')
   }
-  const snapshotTestPaths = capturedAt
-    ? new Set(gitLsTree(root, capturedAt, 'tests').filter((p) => p.endsWith('.test.ts')))
+  const snapshotTestPaths = snapshot.reachable
+    ? new Set(gitLsTree(root, snapshot.sha, 'tests').filter((p) => p.endsWith('.test.ts')))
     : new Set()
 
   // The subset of rows that claim to belong to the parked legacy corpus
@@ -168,10 +218,10 @@ export function validateTriageMap(root, map) {
     mappedNormalized.set(normalizeForSnapshot(e.path), e.path)
   }
 
-  if (capturedAt) {
+  if (snapshot.reachable) {
     for (const snapshotPath of snapshotTestPaths) {
       if (!mappedNormalized.has(snapshotPath)) {
-        errors.push(`snapshot test file (captured at ${capturedAt}) has no triage row: ${snapshotPath}`)
+        errors.push(`snapshot test file (captured at ${snapshot.sha}) has no triage row: ${snapshotPath}`)
       }
     }
 
@@ -184,7 +234,7 @@ export function validateTriageMap(root, map) {
       const normalized = normalizeForSnapshot(e.path)
       if (!snapshotTestPaths.has(normalized)) {
         errors.push(
-          `${e.path}: not part of the snapshot corpus captured at ${capturedAt} (row claims lane "${e.lane}" but this path did not exist under tests/ at that SHA)`,
+          `${e.path}: not part of the snapshot corpus captured at ${snapshot.sha} (row claims lane "${e.lane}" but this path did not exist under tests/ at that SHA)`,
         )
       }
     }
@@ -306,12 +356,18 @@ test('no duplicate paths across all rows (Mandate 0: no file carries two disposi
   assert.deepEqual(errors, [], errors.join('\n'))
 })
 
-test('rule 1: every test file in the snapshot corpus (captured at map.capturedAt) has exactly one row — NOT scoped to the live tree, so a story that adds a new tests/*.test.ts file later is unaffected', () => {
+test('rule 1: every test file in the snapshot corpus (captured at map.capturedAt) has exactly one row — NOT scoped to the live tree, so a story that adds a new tests/*.test.ts file later is unaffected', (t) => {
+  // REFUSE, do not pass. Without the corpus commit this rule has no subject,
+  // and a green tick here would claim the corpus was checked when it was not.
+  const snapshot = snapshotCorpusStatus(repoRoot, map)
+  if (!snapshot.reachable) return t.skip(snapshot.refusal)
   const errors = validateTriageMap(repoRoot, map).filter((m) => m.startsWith('snapshot test file'))
   assert.deepEqual(errors, [], errors.join('\n'))
 })
 
-test('rule 1b: every corpus-lane row (unit/e2e/manual) names a path that was actually in the snapshot', () => {
+test('rule 1b: every corpus-lane row (unit/e2e/manual) names a path that was actually in the snapshot', (t) => {
+  const snapshot = snapshotCorpusStatus(repoRoot, map)
+  if (!snapshot.reachable) return t.skip(snapshot.refusal)
   const errors = validateTriageMap(repoRoot, map).filter((m) => m.includes('not part of the snapshot corpus'))
   assert.deepEqual(errors, [], errors.join('\n'))
 })
@@ -463,7 +519,7 @@ test('the JSON entries total (451) matches the sum of unit(280) + e2e(130) + man
 // indistinguishable from a correct map (issue #834's explicit requirement).
 // ---------------------------------------------------------------------------
 
-test('negative self-test: a doctored map with a bogus disposition and a missing path fails validation', () => {
+test('negative self-test: a doctored map with a bogus disposition and a missing path fails validation', (t) => {
   const doctored = {
     capturedAt: 'de72d660',
     generatedBy: 'fixture',
@@ -481,6 +537,9 @@ test('negative self-test: a doctored map with a bogus disposition and a missing 
     ],
   }
   const errors = validateTriageMap(repoRoot, doctored)
+  // THESE TWO NEED NO HISTORY, and they are what makes this self-test
+  // non-vacuous: they prove the validator still rejects a bad map rather than
+  // rubber-stamping whatever it is handed.
   assert.ok(
     errors.some((m) => m.includes('is outside the closed enum')),
     'expected a disposition-enum violation',
@@ -489,8 +548,17 @@ test('negative self-test: a doctored map with a bogus disposition and a missing 
     errors.some((m) => m.includes('does not exist in the working tree')),
     'expected a missing-path violation',
   )
-  // And it must ALSO still report every real snapshot test file as
-  // unmapped, since the doctored map has only one (fabricated) row.
+  // The remaining two assertions are about the SNAPSHOT rules, so they can
+  // only be made when the corpus commit is present. They are not dropped when
+  // it is absent — they are announced as unmade, because a self-test that
+  // quietly checks less than it claims is the exact failure it exists to catch.
+  const snapshot = snapshotCorpusStatus(repoRoot, doctored)
+  if (!snapshot.reachable) {
+    t.diagnostic(`snapshot-scoped half of this self-test not exercised — ${snapshot.refusal}`)
+    return
+  }
+  // It must ALSO still report every real snapshot test file as unmapped,
+  // since the doctored map has only one (fabricated) row.
   assert.ok(
     errors.some((m) => m.startsWith('snapshot test file')),
     'expected the doctored (near-empty) map to report missing coverage for the real corpus',
