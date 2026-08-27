@@ -2,6 +2,12 @@
 # chief installer — download a prebuilt release, verify it, and install it under
 # ~/.chief. No clone, no Rust toolchain, no build.
 #
+#   curl -fsSL https://chief.zipbox.ai/install.sh | sh
+#
+# That short URL is a redirect to this file's raw address on GitHub, kept
+# outside this repository. The raw address keeps working and is equally
+# supported, so nothing here depends on the redirect existing:
+#
 #   curl -fsSL https://raw.githubusercontent.com/tribes-protocol/chief/main/install.sh | sh
 #
 # It installs the SAME versioned layout `bun run release` and `chief upgrade`
