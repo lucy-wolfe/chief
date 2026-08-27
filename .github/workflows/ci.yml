@@ -439,10 +439,31 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          # THREE CASES, and the third is the one that used to be missing.
+          #
+          # On a pull request GitHub supplies both endpoints, so the scan is
+          # exactly the commits the PR adds. Off a pull request there is no
+          # base, so the fallback scans the tip commit against its parent.
+          #
+          # A PARENTLESS HEAD has no parent to name. `HEAD~1..HEAD` is then
+          # `fatal: ambiguous argument 'HEAD~1..HEAD': unknown revision`, and
+          # under `set -euo pipefail` the step fails without scanning anything
+          # — a secret scan that reports red for a reason unrelated to secrets
+          # is worse than one that is simply absent, because the red teaches
+          # people to ignore it. That is not hypothetical: this repository was
+          # published as a single root commit, and the first CI run on `main`
+          # failed here.
+          #
+          # For a root commit the honest range is the commit itself. Naming
+          # `HEAD` alone scans everything reachable from it, which for a
+          # parentless commit is precisely that one commit.
           if [[ -n "${BASE_SHA:-}" && -n "${HEAD_SHA:-}" ]]; then
             range="${BASE_SHA}..${HEAD_SHA}"
-          else
+          elif git rev-parse --verify --quiet HEAD^ >/dev/null; then
             range="HEAD~1..HEAD"
+          else
+            range="HEAD"
+            echo "HEAD has no parent (root commit): scanning the commit itself"
           fi
           echo "scanning $range"
           gitleaks git --no-banner --redact --log-opts="--no-merges $range" .
