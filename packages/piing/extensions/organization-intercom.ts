@@ -1711,7 +1711,7 @@ function nearestDepartmentHint(
   const key = departmentMatchKey(departmentId);
   if (!key) return undefined;
   if (key === departmentMatchKey(manifest.slug) || key === departmentMatchKey(manifest.name)) {
-    return `'${departmentId}' names the company, not a department: the company's root department id is '${manifest.rootDepartmentId}'.`;
+    return `The root department id is '${manifest.rootDepartmentId}' — '${departmentId}' names the company, not a department.`;
   }
   const byName = Object.values(manifest.departments).find(
     (department) => departmentMatchKey(department.name) === key,
@@ -1914,7 +1914,7 @@ async function requireManagedDepartment(context: OrganizationRuntimeContext, dep
   // An id that names nothing is not an authority problem, and reporting it as
   // one is what sent a CEO hunting a permission it already had (#1048).
   if (departmentScopeDenial(manifest, person, departmentId) === "unknown-department") {
-    throw new Error(unknownDepartmentMessage(manifest, person, departmentId, "act on"));
+    throw new CallerRefusal(unknownDepartmentMessage(manifest, person, departmentId, "act on"));
   }
   // SCOPE, and nothing else. `manager(person)` — a kind of `executive` or
   // `head` — stood beside this check and decided nothing: `departmentIsInScope`
@@ -1934,7 +1934,7 @@ async function requireManagedDepartment(context: OrganizationRuntimeContext, dep
   // or "head-level". chiefd remains the authority and re-checks every
   // mutation; this is a pre-flight.
   if (!departmentIsInScope(manifest, person, departmentId)) {
-    throw new Error(`'${person.id}' does not manage department '${departmentId}'`);
+    throw new CallerRefusal(`'${person.id}' does not manage department '${departmentId}'`);
   }
   return manifest;
 }
@@ -1969,12 +1969,12 @@ async function requireDepartmentCreationParent(
   // Say WHICH check failed: an unknown parent is not an authority problem, and
   // reporting it as one sends the caller hunting a permission they do have.
   if (!manifest.departments[parentDepartmentId]) {
-    throw new Error(unknownDepartmentMessage(manifest, person, parentDepartmentId, "create a department beneath"));
+    throw new CallerRefusal(unknownDepartmentMessage(manifest, person, parentDepartmentId, "create a department beneath"));
   }
   const authorityRoot = authorityRootDepartmentId(manifest, person);
   if (parentDepartmentId === authorityRoot) return manifest;
   if (departmentIsInScope(manifest, person, parentDepartmentId)) return manifest;
-  throw new Error(
+  throw new CallerRefusal(
     `'${person.id}' may create a department beneath ${authorityRoot ? `'${authorityRoot}'` : "no department"} or anything under it, not beneath '${parentDepartmentId}'`,
   );
 }
@@ -2014,14 +2014,14 @@ function requireManagedTarget(gate: StaffingAuthority, personId: string): Person
   // it as the tree model being broken, and hunted authority they were never
   // missing.
   if (!target) {
-    throw new Error(
+    throw new CallerRefusal(
       `no person '${personId}' exists in this company — this is not an authority refusal. ` +
         `If they were just created, the manifest this call read predates them; read the roster ` +
         `again and retry.`,
     );
   }
   if (!departmentIsInScope(gate.manifest, gate.person, target.departmentId)) {
-    throw new Error(
+    throw new CallerRefusal(
       `'${gate.person.id}' does not manage person '${personId}': authority is the subtree you ` +
         `head, and '${personId}' sits in '${target.departmentId}', which is not under it.`,
     );
@@ -2667,10 +2667,10 @@ function personHandle(manifest: IntercomOrganizationManifest, personId: string):
  */
 function recipientsFor(manifest: IntercomOrganizationManifest, sender: string, to: string): string[] {
   const recipient = to.trim().replace(/^@/, "");
-  if (!recipient) throw new Error("Recipient is required");
+  if (!recipient) throw new CallerRefusal("Recipient is required");
   if (recipient === "all") {
     const recipients = manifest.peopleOrder.filter((id) => id !== sender && manifest.people[id]?.employmentState !== "departed");
-    if (!recipients.length) throw new Error("Broadcast has no employed peer recipients");
+    if (!recipients.length) throw new CallerRefusal("Broadcast has no employed peer recipients");
     return recipients;
   }
   const employed = manifest.peopleOrder.filter((id) => manifest.people[id]?.employmentState !== "departed");
@@ -2683,7 +2683,7 @@ function recipientsFor(manifest: IntercomOrganizationManifest, sender: string, t
       // somebody's message to the wrong person silently, which is strictly
       // worse than refusing, so name both and let the sender choose.
       const both = byHandle.map((id) => `@${personHandle(manifest, id)} (${id})`).join(" and ");
-      throw new Error(
+      throw new CallerRefusal(
         `'${recipient}' is ambiguous — it matches ${both}. Address the one you mean by its id.`,
       );
     }
@@ -2694,9 +2694,9 @@ function recipientsFor(manifest: IntercomOrganizationManifest, sender: string, t
     // The error text is guidance an agent copies from, so it lists USERNAMES
     // and carries the id in parentheses for anyone addressing by key.
     const available = employed.map((id) => `@${personHandle(manifest, id)} (${id})`);
-    throw new Error(`Unknown employed recipient '${recipient}'; choose one of ${available.join(", ")} or all`);
+    throw new CallerRefusal(`Unknown employed recipient '${recipient}'; choose one of ${available.join(", ")} or all`);
   }
-  if (resolved === sender) throw new Error("Send messages to a peer, not yourself");
+  if (resolved === sender) throw new CallerRefusal("Send messages to a peer, not yourself");
   return [resolved];
 }
 
@@ -2762,7 +2762,7 @@ export async function sendOrganizationMessage(
   const manifest = await loadIntercomOrganization(context);
   currentPerson(context, manifest);
   const body = typeof input.body === "string" ? input.body.trim() : "";
-  if (!body) throw new Error(ORGANIZATION_SEND_BODY_REQUIRED_GUIDANCE);
+  if (!body) throw new CallerRefusal(ORGANIZATION_SEND_BODY_REQUIRED_GUIDANCE);
   const recipients = recipientsFor(manifest, context.personId, input.to);
   // Replay identity, when the caller does not own one. Scan this fingerprint's
   // candidate ids oldest-first: the newest one that already exists is either
@@ -2803,11 +2803,11 @@ export async function sendOrganizationMessage(
   )));
   const canonical = existing.values().next().value as OrganizationEnvelope | undefined ?? envelope;
   if (!messageReplayContentMatches(canonical, envelope)) {
-    throw new Error(`Message id '${envelope.id}' already has conflicting content`);
+    throw new CallerRefusal(`Message id '${envelope.id}' already has conflicting content`);
   }
   for (const [recipient, prior] of existing) {
     if (prior && !messageReplayContentMatches(prior, canonical)) {
-      throw new Error(`Message id '${envelope.id}' has conflicting content for '${recipient}'`);
+      throw new CallerRefusal(`Message id '${envelope.id}' has conflicting content for '${recipient}'`);
     }
   }
   let queued = false;
@@ -3383,9 +3383,9 @@ function departmentPersonSeed(
     return typeof value === "string" && value.trim() ? value.trim() : undefined;
   };
   const name = text("name");
-  if (!name) throw new Error(`Department ${personKind} requires a name`);
+  if (!name) throw new CallerRefusal(`Department ${personKind} requires a name`);
   const mandate = text("mandate");
-  if (!mandate) throw new Error(`Department ${personKind} '${name}' requires a mandate`);
+  if (!mandate) throw new CallerRefusal(`Department ${personKind} '${name}' requires a mandate`);
   const tools = declarablePersonTools(raw, `Department ${personKind} '${name}'`);
   return {
     kind: "hire-new",
@@ -3476,7 +3476,7 @@ export function departmentCreateRequest(input: {
   vacates?: ChiefdHeadVacancy;
 }): ChiefdDepartmentCreateRequest {
   const { slug, parentUnitId, spec, requesterPersonId, reason } = input;
-  if (!spec.name?.trim()) throw new Error("A department requires a name");
+  if (!spec.name?.trim()) throw new CallerRefusal("A department requires a name");
   const head: ChiefdDepartmentHead = input.existingHeadPersonId?.trim()
     ? { kind: "appoint-existing", personId: input.existingHeadPersonId.trim() }
     : departmentPersonSeed(spec.head, "head");
@@ -3550,9 +3550,9 @@ export function hireRequest(input: {
     return typeof value === "string" && value.trim() ? value.trim() : undefined;
   };
   const name = text("name");
-  if (!name) throw new Error("A hire requires a name");
+  if (!name) throw new CallerRefusal("A hire requires a name");
   const mandate = text("mandate");
-  if (!mandate) throw new Error(`Hire '${name}' requires a mandate`);
+  if (!mandate) throw new CallerRefusal(`Hire '${name}' requires a mandate`);
   const tools = declarablePersonTools(person, `Hire '${name}'`) ?? [];
   return {
     slug: input.slug,
@@ -4209,7 +4209,7 @@ async function publishMailboxEnvelope(context: OrganizationRuntimeContext, recip
   const existing = findMailboxEntryByMessageId(context, doc, envelope.id, ["pending", "accepted"]);
   if (existing) {
     if (!messageReplayContentMatches(existing.envelope, envelope)) {
-      throw new Error(`Message id '${envelope.id}' already has conflicting content for '${recipient}'`);
+      throw new CallerRefusal(`Message id '${envelope.id}' already has conflicting content for '${recipient}'`);
     }
     return;
   }
@@ -5890,7 +5890,8 @@ const HIRE_PARAMETERS = Type.Object({
       + "asked for it. Name a different one only when the operator named it. This call never "
       + "creates a department, and a job title never asks for one: \"hire a Chief of Staff\" is a "
       + "hire into your own department, not a new unit. Create a department only when the "
-      + "operator asked for a department in those words.",
+      + "operator asked for a department in those words. "
+      + "The company name or slug is NEVER a department id — the root department's id is in org_roster.",
   }),
   /** One person, the original shape. */
   person: Type.Optional(PERSON_SEED),
@@ -6321,6 +6322,71 @@ function organizationToolRegistrar(pi: ExtensionAPI, context: OrganizationRuntim
   };
 }
 
+/**
+ * A refusal the tool DECIDED, as opposed to an exception it suffered.
+ *
+ * # The lie this exists to end
+ *
+ * Card rendering classifies a failure by whether the result carries a
+ * `status`: with one it is a named, business-rule refusal; without one it is a
+ * raw caught exception and the card is tagged `(system fault)`. That
+ * distinction is right, and the throw path defeated it. Validation refusals
+ * were raised as plain `Error`s, and the adapters that catch them flatten an
+ * error into a status-less result — so every carefully-worded caller refusal
+ * arrived at the renderer indistinguishable from a crash, and was labelled as
+ * one.
+ *
+ * **A refusal that lies about whose fault it is invites the wrong recovery.**
+ * A system fault invites the same call again; a caller error invites a
+ * corrected one. An agent told "(system fault)" for naming a company where a
+ * department belongs will retry the identical call, because retrying is what
+ * that label means.
+ *
+ * # When to throw this instead of `Error`
+ *
+ * Throw `CallerRefusal` when the tool has DECIDED something and can say why:
+ * the caller can act on it, whether by correcting the call or by changing the
+ * company. Throw a plain `Error` for an invariant no input should reach — a
+ * malformed docstore reply, an unparseable authority file, an impossible
+ * state. Those ARE system faults and the tag on them is correct and useful.
+ *
+ * The marker travels ON the error because this file forbids a second parser:
+ * classifying by matching message text would be exactly that.
+ */
+class CallerRefusal extends Error {
+  readonly status: string;
+
+  constructor(message: string, status = "refused") {
+    super(message);
+    this.name = "CallerRefusal";
+    this.status = status;
+  }
+}
+
+/**
+ * The result a caught error becomes, preserving a decided refusal's status.
+ *
+ * EVERY catch path that flattens a throw into a `toolResult` funnels through
+ * here. It has to: flattening an error by hand drops the status, and the
+ * renderer then calls a decided refusal a system fault again — which is the
+ * whole defect this helper exists to close.
+ *
+ * No count is written here on purpose. An earlier draft of this comment named
+ * one, and the number was already wrong when it shipped — the audit that
+ * produced it had found three of the eight sites. A remembered number in a
+ * comment is a claim that goes stale silently, and this file is the last place
+ * that should carry one. `CallerRefusalClassification`'s
+ * "every catch path funnels through refusalResult" sweep enforces the rule
+ * mechanically instead, so it covers the site somebody adds next month as well
+ * as the ones here today.
+ */
+function refusalResult(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return error instanceof CallerRefusal
+    ? toolResult(false, message, { status: error.status })
+    : toolResult(false, message);
+}
+
 function lifecycleFailure(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   // #751/G9-S0: a `status: "busy"` branch used to sit here, keyed off the
@@ -6341,7 +6407,7 @@ function lifecycleFailure(error: unknown) {
   // `org_reflect`. Its only producer was chiefd's blocking handoff fence,
   // which is gone ("a finished person moves immediately"), and the tool it
   // pointed at is deleted, so nothing can reach it.
-  return toolResult(false, message);
+  return refusalResult(error);
 }
 
 /**
@@ -6380,7 +6446,7 @@ function organizationSendFailure(error: unknown, context: OrganizationRuntimeCon
       organization: context.organization,
     });
   }
-  return toolResult(false, message);
+  return refusalResult(error);
 }
 
 type LaunchDepartmentInputFailureStatus = "launch_department_input_invalid";
@@ -6654,19 +6720,19 @@ export async function executeAtomicPersonTransfer(
   // absent person is a missing SUBJECT, not a missing permission. One sentence
   // for both sent a CEO hunting authority it already held.
   if (!target) {
-    throw new Error(
+    throw new CallerRefusal(
       `no person '${params.personId}' exists in this company — this is not an authority refusal.`,
     );
   }
   if (!departmentIsInScope(manifest, managerPerson, target.departmentId)) {
-    throw new Error(
+    throw new CallerRefusal(
       `'${managerPerson.id}' does not manage person '${params.personId}': authority is the ` +
         `subtree you head, and '${params.personId}' sits in '${target.departmentId}'.`,
     );
   }
   const transferDenial = departmentScopeDenial(manifest, managerPerson, params.departmentId);
   if (transferDenial === "unknown-department") {
-    throw new Error(unknownDepartmentMessage(manifest, managerPerson, params.departmentId, "transfer into"));
+    throw new CallerRefusal(unknownDepartmentMessage(manifest, managerPerson, params.departmentId, "transfer into"));
   }
   if (transferDenial) {
     throw new Error(`Permanent transfer target '${params.departmentId}' is outside '${managerPerson.id}' management scope`);
@@ -6753,12 +6819,12 @@ async function installRootExecutiveTools(
           const manifest = await loadIntercomOrganization(context);
           const sender = currentPerson(context, manifest);
           if (directManagerId(manifest, sender) !== undefined) {
-            throw new Error("Only the organization's top-level executive, which has no manager to escalate to, may escalate to the human operator");
+            throw new CallerRefusal("Only the organization's top-level executive, which has no manager to escalate to, may escalate to the human operator");
           }
           const blocker = params.blocker.trim();
           const operatorAction = params.operatorAction.trim();
-          if (!blocker) throw new Error("An operator escalation needs a concrete blocker");
-          if (!operatorAction) throw new Error("An operator escalation needs the exact operator action required");
+          if (!blocker) throw new CallerRefusal("An operator escalation needs a concrete blocker");
+          if (!operatorAction) throw new CallerRefusal("An operator escalation needs the exact operator action required");
           const intent = await queueOperatorEscalationIntent(context, sender.id, blocker, operatorAction);
           return toolResult(true, "Escalation recorded durably for the human operator. It reaches them out of band; keep working.", {
             status: "queued",
@@ -6766,7 +6832,7 @@ async function installRootExecutiveTools(
             blocker,
             operatorAction,
           });
-        } catch (error) { return toolResult(false, error instanceof Error ? error.message : String(error)); }
+        } catch (error) { return refusalResult(error); }
       },
       renderCall(args, theme) {
         const blocker = compactPresentation(String(args.blocker || "a blocker"), 84);
@@ -7002,7 +7068,7 @@ async function installSubtreeTools(
                   `Removing this ${kind} also fires its head (${head}) + ${count} member${count === 1 ? "" : "s"}: ${impact.memberNames.join(", ")}. `
                   + `To proceed and fire them all, call again with confirmImpact: true — each keeps their record and audit trail, exactly as org_offboard leaves a departed person. `
                   + `To keep them employed, first move them out (org_move_department_members, or org_transfer per person) and then remove the empty ${kind}.`,
-                  { unitId: params.unitId, kind, impact },
+                  { status: "refused", unitId: params.unitId, kind, impact },
                 );
               }
             }
@@ -7043,14 +7109,14 @@ async function installSubtreeTools(
           return toolResult(
             false,
             `Creating a department needs exactly one head decision: either hire a NEW person to lead it (head), or name an EXISTING person to lead it (existingHeadPersonId). ${hasHire ? "You gave both — pick one." : "You gave neither — pick one."}`,
-            {},
+            { status: "refused" },
           );
         }
         if (hasExisting && (params.staff?.length ?? 0) > 0) {
           return toolResult(
             false,
             "A department created with an existing head takes no initial staff. Create it first, then add staff with org_hire or move people in with org_transfer / org_move_department_members.",
-            {},
+            { status: "refused" },
           );
         }
         // WHICH vacancy answer applies is chiefd's decision, never this file's.
@@ -7065,11 +7131,11 @@ async function installSubtreeTools(
           return toolResult(
             false,
             "vacates says what becomes of a department the new head ALREADY leads, so it belongs only with existingHeadPersonId. A newly hired head leads nothing yet.",
-            {},
+            { status: "refused" },
           );
         }
         const vacancy = normalizeHeadVacancy(params.vacates, "vacates");
-        if ("refusal" in vacancy) return toolResult(false, vacancy.refusal, {});
+        if ("refusal" in vacancy) return toolResult(false, vacancy.refusal, { status: "refused" });
         const vacates = vacancy.value;
         const result = await runManagedUnitLifecycle(context, {
           kind: "department",
@@ -7106,7 +7172,11 @@ async function installSubtreeTools(
     description: action === "pause"
       ? "Compatibility alias for org_stop_department. It retains state and waits for each live person's bounded handoff."
       : "Compatibility alias for org_launch_department's resume shape: it brings one stopped department back.",
-    parameters: Type.Object({ departmentId: Type.String() }),
+    parameters: Type.Object({
+      departmentId: Type.String({
+        description: "The department to act on. The company name or slug is NEVER a department id — the root department's id is in org_roster.",
+      }),
+    }),
     async execute(_toolCallId, params) {
       try {
         const managed = await managedUnit(context, params.departmentId, "department");
@@ -7143,7 +7213,9 @@ async function installSubtreeTools(
     label: "Move an organization department",
     description: "Move a department -- with its head, its members, and everything under it -- to sit beneath a different parent department. Use this to reorganize the company tree: it is the only way to move a head that keeps them heading their department, and nobody is separated from anybody. Department ids never change. To move ONE person instead, use org_transfer; a head moved that way must also say what becomes of the department they leave (vacates).",
     parameters: Type.Object({
-      departmentId: Type.String({ description: "The department to move, with its whole subtree" }),
+      departmentId: Type.String({
+        description: "The department to move, with its whole subtree. The company name or slug is NEVER a department id — the root department's id is in org_roster.",
+      }),
       newParentDepartmentId: Type.String({ description: "The department it should sit beneath afterwards" }),
     }),
     async execute(_toolCallId, params) {
@@ -7157,7 +7229,7 @@ async function installSubtreeTools(
           // does not exist at all sends the caller hunting a permissions
           // problem they do not have (gh#498's class).
           if (!gate.manifest.departments[departmentId]) {
-            throw new Error(unknownDepartmentMessage(gate.manifest, gate.person, departmentId, "move"));
+            throw new CallerRefusal(unknownDepartmentMessage(gate.manifest, gate.person, departmentId, "move"));
           }
           if (!departmentIsInScope(gate.manifest, gate.person, departmentId)) {
             throw new Error(`Department '${departmentId}' is outside '${gate.person.id}' management scope`);
@@ -7198,7 +7270,7 @@ async function installSubtreeTools(
         const gate = await staffingAuthority(context);
         for (const departmentId of [params.fromDepartmentId, params.toDepartmentId]) {
           if (!gate.manifest.departments[departmentId]) {
-            throw new Error(unknownDepartmentMessage(gate.manifest, gate.person, departmentId, "move people between"));
+            throw new CallerRefusal(unknownDepartmentMessage(gate.manifest, gate.person, departmentId, "move people between"));
           }
           if (!departmentIsInScope(gate.manifest, gate.person, departmentId)) {
             throw new Error(`Department '${departmentId}' is outside '${gate.person.id}' management scope`);
@@ -7249,7 +7321,9 @@ async function installSubtreeTools(
     label: "Appoint an organization department head",
     description: "Replace a department's head with an existing member of that department. First inspect the returned incumbent and ask the operator which disposition is intended: retain them in the department, transfer them to a named department, demote them to report to you, or offboard them. No replacement is written until you make that explicit generic decision. A department is never left headless, so a head only moves or leaves alongside an answer about their department: this tool names the successor, org_transfer takes vacates, and org_offboard takes successorPersonId.",
     parameters: Type.Object({
-      departmentId: Type.String({ description: "The department whose head is changing" }),
+      departmentId: Type.String({
+        description: "The department whose head is changing. The company name or slug is NEVER a department id — the root department's id is in org_roster.",
+      }),
       newHeadPersonId: Type.String({ description: "An existing member of that department to promote to head" }),
       incumbentDisposition: Type.Optional(Type.Union([
         Type.Literal("retain", { description: "Keep the former head as an ordinary worker in this department" }),
@@ -7265,7 +7339,7 @@ async function installSubtreeTools(
         const manifest = gate.manifest;
         const managerPerson = gate.person;
         if (!manifest.departments[params.departmentId]) {
-          throw new Error(unknownDepartmentMessage(manifest, managerPerson, params.departmentId, "act on"));
+          throw new CallerRefusal(unknownDepartmentMessage(manifest, managerPerson, params.departmentId, "act on"));
         }
         if (!departmentIsInScope(manifest, managerPerson, params.departmentId)) {
           throw new Error(`Department '${params.departmentId}' is outside '${managerPerson.id}' management scope`);
@@ -7320,7 +7394,7 @@ async function installSubtreeTools(
         } else if (params.incumbentDisposition === "transfer") {
           const destinationDepartmentId = params.incumbentDepartmentId!;
           if (!manifest.departments[destinationDepartmentId]) {
-            throw new Error(unknownDepartmentMessage(manifest, managerPerson, destinationDepartmentId, "transfer into"));
+            throw new CallerRefusal(unknownDepartmentMessage(manifest, managerPerson, destinationDepartmentId, "transfer into"));
           }
           if (!departmentIsInScope(manifest, managerPerson, destinationDepartmentId)) {
             throw new Error(`Department '${destinationDepartmentId}' is outside '${managerPerson.id}' management scope`);
@@ -7390,6 +7464,7 @@ async function installSubtreeTools(
       const seeds = params.people?.length ? params.people : params.person ? [params.person] : [];
       if (!seeds.length) {
         return toolResult(false, "Hire needs at least one person: pass `person` or a nonempty `people`.", {
+          status: "refused",
           departmentId: params.departmentId,
         });
       }
@@ -7408,7 +7483,7 @@ async function installSubtreeTools(
         // the core refuses. Both halves are derived now, never static.
         const hireDenial = departmentScopeDenial(gate.manifest, hiringManager, params.departmentId);
         if (hireDenial === "unknown-department") {
-          throw new Error(unknownDepartmentMessage(gate.manifest, hiringManager, params.departmentId, "hire into"));
+          throw new CallerRefusal(unknownDepartmentMessage(gate.manifest, hiringManager, params.departmentId, "hire into"));
         }
         if (hireDenial) {
           // Name the ACCEPTED path, not just the refusal. Everyone now carries
@@ -7599,7 +7674,7 @@ async function installSubtreeTools(
       // second attempt answers `already-benched` for the ones that landed.
       const targets = params.personIds?.length ? params.personIds : params.personId ? [params.personId] : [];
       if (!targets.length) {
-        return toolResult(false, `${action === "bench" ? "Bench" : "Recall"} needs at least one person: pass \`personId\` or a nonempty \`personIds\`.`, {});
+        return toolResult(false, `${action === "bench" ? "Bench" : "Recall"} needs at least one person: pass \`personId\` or a nonempty \`personIds\`.`, { status: "refused" });
       }
       // Everyone who has already been through the route this call, so a refusal
       // in position five says which four landed. Silently dropping that list is
@@ -7787,7 +7862,7 @@ async function installSubtreeTools(
       // starts everybody.
       const targets = params.personIds?.length ? params.personIds : params.personId ? [params.personId] : [];
       if (!targets.length) {
-        return toolResult(false, `${action === "start-person" ? "Start" : "Stop"} needs at least one person: pass \`personId\` or a nonempty \`personIds\`.`, {});
+        return toolResult(false, `${action === "start-person" ? "Start" : "Stop"} needs at least one person: pass \`personId\` or a nonempty \`personIds\`.`, { status: "refused" });
       }
       // Everyone already through the route this call, so a refusal in position
       // five says which four landed and a retry cannot re-apply them.
@@ -7934,7 +8009,13 @@ async function installSubtreeTools(
     name: "org_transfer",
     label: "Transfer an organization person",
     description: "Permanently move a person to a new home department. If they HEAD a department, moving them out leaves it without a head, so you must also say what becomes of it with `vacates`: hand it over to one of its members, or dissolve it when they are its last member — chiefd refuses first and names the department and the members who could take it.",
-    parameters: Type.Object({ personId: Type.String(), departmentId: Type.String(), vacates: Type.Optional(HEAD_VACANCY_PARAM) }),
+    parameters: Type.Object({
+      personId: Type.String(),
+      departmentId: Type.String({
+        description: "The department to transfer into. The company name or slug is NEVER a department id — the root department's id is in org_roster.",
+      }),
+      vacates: Type.Optional(HEAD_VACANCY_PARAM),
+    }),
     async execute(_toolCallId, params) {
       try {
         // `vacates` is destructured OUT before the spread: the raw parameter
@@ -7943,7 +8024,7 @@ async function installSubtreeTools(
         // un-normalized union past the check that exists to narrow it.
         const { vacates: requestedVacancy, ...movement } = params;
         const vacancy = normalizeHeadVacancy(requestedVacancy, "vacates");
-        if ("refusal" in vacancy) return toolResult(false, vacancy.refusal, {});
+        if ("refusal" in vacancy) return toolResult(false, vacancy.refusal, { status: "refused" });
         return await executeAtomicPersonTransfer(context, { ...movement, ...(vacancy.value ? { vacates: vacancy.value } : {}) });
       } catch (error) { return lifecycleFailure(error); }
     },
@@ -7972,7 +8053,7 @@ async function installSubtreeTools(
             return toolResult(
               false,
               `'${params.personId}' is the only member of department '${headed.id}'. Firing them means deleting the department — use org_remove_department (with confirmImpact: true) instead.`,
-              { personId: params.personId, departmentId: headed.id },
+              { status: "refused", personId: params.personId, departmentId: headed.id },
             );
           }
           if (!params.successorPersonId) {
@@ -7980,7 +8061,7 @@ async function installSubtreeTools(
             return toolResult(
               false,
               `'${params.personId}' heads department '${headed.id}' — firing a head needs a successor. Pass successorPersonId naming a member of '${headed.id}' to take over (one of: ${names.join(", ")}), or move the members out (org_move_department_members / org_transfer) and delete the department.`,
-              { personId: params.personId, departmentId: headed.id, members },
+              { status: "refused", personId: params.personId, departmentId: headed.id, members },
             );
           }
           // Appoint the successor and fire the head in ONE atomic route: the
@@ -8055,7 +8136,7 @@ async function installSubtreeTools(
         // (chief-home-is-cwd §4c): the daemon boots no pane, so no boot is ever
         // in flight for the board to report.
         return toolResult(true, `Lifecycle status: ${departments} department${departments === 1 ? "" : "s"}, ${people} ${people === 1 ? "person" : "people"}.`, status);
-      } catch (error) { return toolResult(false, error instanceof Error ? error.message : String(error)); }
+      } catch (error) { return refusalResult(error); }
     },
     renderCall(_args, theme) {
       return renderCard(theme, {
@@ -8171,6 +8252,22 @@ export function messageWakeDispositionForTest(
   personId: string,
 ): { wake: boolean; guidance?: string } {
   return messageWakeDisposition(manifest, personId);
+}
+
+/**
+ * Test seams for the refusal classification.
+ *
+ * `refusalResultForTest` is the adapter every catch path funnels through, so a
+ * test can assert the status survives it. `callerRefusalForTest` builds the
+ * error a validation site throws, so the round trip is testable without
+ * driving a whole tool.
+ */
+export function refusalResultForTest(error: unknown): { details?: Record<string, unknown> } {
+  return refusalResult(error) as unknown as { details?: Record<string, unknown> };
+}
+
+export function callerRefusalForTest(message: string, status?: string): Error {
+  return status === undefined ? new CallerRefusal(message) : new CallerRefusal(message, status);
 }
 
 export function recipientsForTest(manifest: IntercomOrganizationManifest, sender: string, to: string): string[] {
@@ -10139,14 +10236,14 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
     }
     if (!bodyText && messageText) canonical.body = message;
     if (typeof canonical.body !== "string" || !canonical.body.trim()) {
-      throw new Error(ORGANIZATION_SEND_BODY_REQUIRED_GUIDANCE);
+      throw new CallerRefusal(ORGANIZATION_SEND_BODY_REQUIRED_GUIDANCE);
     }
     return canonical as never;
   };
 
   const messageTextFromToolParams = (params: { body?: unknown }): string => {
     const body = typeof params.body === "string" ? params.body.trim() : "";
-    if (!body) throw new Error(ORGANIZATION_SEND_BODY_REQUIRED_GUIDANCE);
+    if (!body) throw new CallerRefusal(ORGANIZATION_SEND_BODY_REQUIRED_GUIDANCE);
     return body;
   };
 
@@ -10314,7 +10411,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
         // the reads above already retried once with a brief backoff.
         const degraded = transientDegradeMessage("The roster", error);
         if (degraded) return toolResult(false, degraded, { status: "docstore_unreachable", retryable: true });
-        return toolResult(false, error instanceof Error ? error.message : String(error));
+        return refusalResult(error);
       }
     },
   });
@@ -10440,7 +10537,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
           { reminder },
         );
       } catch (error) {
-        return toolResult(false, error instanceof Error ? error.message : String(error));
+        return refusalResult(error);
       }
     },
     // The SCHEDULED card. Rendered here, by the tool itself, and deliberately
@@ -10492,7 +10589,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
           { reminders: rows },
         );
       } catch (error) {
-        return toolResult(false, error instanceof Error ? error.message : String(error));
+        return refusalResult(error);
       }
     },
     renderResult(result, { expanded }, theme) {
@@ -10541,7 +10638,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
         if (!reminder) return toolResult(false, "chiefd stopped the reminder but returned no record.");
         return toolResult(true, `Removed reminder ${reminder.id}. It fired ${reminder.fireCount ?? 0} time${(reminder.fireCount ?? 0) === 1 ? "" : "s"}.`, { reminder });
       } catch (error) {
-        return toolResult(false, error instanceof Error ? error.message : String(error));
+        return refusalResult(error);
       }
     },
     // The REMOVED card. "Stopped" and "removed" are ONE operation with one
