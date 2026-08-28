@@ -5884,15 +5884,23 @@ const ADD_DEPARTMENT_PARAMETERS = Type.Object({
 }, { additionalProperties: false });
 
 const HIRE_PARAMETERS = Type.Object({
-  departmentId: Type.String({
+  // OPTIONAL, because the description promises a default and a required field
+  // cannot deliver one. It was `Type.String` — required — under a description
+  // opening "DEFAULT: the department YOU head". An agent read the prose,
+  // reasoned that it should omit the field, met a schema that would not let it,
+  // and improvised the most salient name in context: the company. It obeyed
+  // the instrument over the claim, which is the correct thing for it to do.
+  departmentId: Type.Optional(Type.String({
     description:
-      "Where this person lands. DEFAULT: the department YOU head — a hire joins the team that "
-      + "asked for it. Name a different one only when the operator named it. This call never "
-      + "creates a department, and a job title never asks for one: \"hire a Chief of Staff\" is a "
-      + "hire into your own department, not a new unit. Create a department only when the "
-      + "operator asked for a department in those words. "
-      + "The company name or slug is NEVER a department id — the root department's id is in org_roster.",
-  }),
+      "Where this person lands. OMIT IT to hire into the department you head — that is the "
+      + "DEFAULT and it is what you want almost always, because a hire joins the team that "
+      + "asked for it. Pass one only to override that, and only when the operator named a "
+      + "different department. This call never creates a department, and a job title never "
+      + "asks for one: \"hire a Chief of Staff\" is a hire into your own department, not a new "
+      + "unit. Create a department only when the operator asked for a department in those "
+      + "words. If you do pass one, the company name or slug is NEVER a department id — the "
+      + "root department's id is in org_roster.",
+  })),
   /** One person, the original shape. */
   person: Type.Optional(PERSON_SEED),
   /** Several people in ONE call — see the batch note in `execute`. */
@@ -7439,7 +7447,7 @@ async function installSubtreeTools(
   pi.registerTool({
     name: "org_hire",
     label: "Hire an organization person",
-    description: "Hire one durable worker into an EXISTING department — by DEFAULT the one you head — only after the roster shows no suitable existing person. Send person as real JSON, never a quoted string; use people: [ … ] for several at once. Example: {\"departmentId\":\"engineering\",\"person\":{\"name\":\"Rhea\",\"title\":\"Staff Engineer\",\"mandate\":\"Own the SQLite store.\"}}. name is one short first name; the job goes in title. A NEW DEPARTMENT IS THE OPERATOR'S DECISION AND NEVER YOURS TO INFER: if they asked for one in those words use org_add_department, which makes it and its head together; if they did not, this call is the whole answer. \"Chief of Staff\" and \"Head of Growth\" are TITLES, not requests for a unit. No field asks you to justify anything. Put technology requirements in mandate; a hire does not select skills, extensions, or packages. A new hire comes up on its own; you do not have to start them, and nobody is stopped at creation.",
+    description: "Hire one durable worker into an EXISTING department — by DEFAULT the one you head, so OMIT departmentId unless the operator named another — only after the roster shows no suitable existing person. Send person as real JSON, never a quoted string; use people: [ … ] for several at once. Example: {\"person\":{\"name\":\"Rhea\",\"title\":\"Staff Engineer\",\"mandate\":\"Own the SQLite store.\"}}; add departmentId only to override. name is one short first name; the job goes in title. A NEW DEPARTMENT IS THE OPERATOR'S DECISION AND NEVER YOURS TO INFER: if they asked for one in those words use org_add_department, which makes it and its head together; if they did not, this call is the whole answer. \"Chief of Staff\" and \"Head of Growth\" are TITLES, not requests for a unit. No field asks you to justify anything. Put technology requirements in mandate; a hire does not select skills, extensions, or packages. A new hire comes up on its own; you do not have to start them, and nobody is stopped at creation.",
     parameters: HIRE_PARAMETERS,
     prepareArguments: stringifiedArgumentRepair(context, "org_hire", HIRE_PARAMETERS) as never,
     async execute(_toolCallId, params) {
@@ -7481,9 +7489,20 @@ async function installSubtreeTools(
         // department 'belfort-brothers-capital'" for a department that simply
         // did not exist, then followed its remediation sentence into a create
         // the core refuses. Both halves are derived now, never static.
-        const hireDenial = departmentScopeDenial(gate.manifest, hiringManager, params.departmentId);
+        // THE DEFAULT THE DESCRIPTION PROMISES, resolved here rather than
+        // demanded of the caller: the department this person heads, or failing
+        // that the one they sit in. That is `authorityRootDepartmentId`, which
+        // already existed and is character-for-character what the prose says —
+        // the promise was always implementable, it simply was not implemented.
+        const departmentId = params.departmentId ?? authorityRootDepartmentId(gate.manifest, hiringManager);
+        if (departmentId === undefined) {
+          throw new CallerRefusal(
+            "Could not determine which department to hire into, and none was given. Pass departmentId naming one from org_roster.",
+          );
+        }
+        const hireDenial = departmentScopeDenial(gate.manifest, hiringManager, departmentId);
         if (hireDenial === "unknown-department") {
-          throw new CallerRefusal(unknownDepartmentMessage(gate.manifest, hiringManager, params.departmentId, "hire into"));
+          throw new CallerRefusal(unknownDepartmentMessage(gate.manifest, hiringManager, departmentId, "hire into"));
         }
         if (hireDenial) {
           // Name the ACCEPTED path, not just the refusal. Everyone now carries
@@ -7491,7 +7510,7 @@ async function installSubtreeTools(
           // department it merely sits in — and the answer is to grow its own
           // unit first, never to loosen the scope check.
           throw new Error(
-            `'${hiringManager.id}' does not manage department '${params.departmentId}'. ${hiringPathAdvice(gate.manifest, hiringManager)}`,
+            `'${hiringManager.id}' does not manage department '${departmentId}'. ${hiringPathAdvice(gate.manifest, hiringManager)}`,
           );
         }
         for (const seed of seeds) {
@@ -7501,35 +7520,35 @@ async function installSubtreeTools(
           // on the operator's own defaults, like everybody else.
           const request = hireRequest({
             slug: gate.slug,
-            departmentId: params.departmentId,
+            departmentId,
             hiringManagerPersonId: hiringManager.id,
             person: seed as unknown as Record<string, unknown>,
           });
           const outcome = await staffingApply(gate, "/v1/org/person/hire", request as unknown as Record<string, unknown>, {
-            action: "hire", departmentId: params.departmentId, personId: request.personId || undefined, name: request.name,
+            action: "hire", departmentId, personId: request.personId || undefined, name: request.name,
           });
           // A refusal mid-batch reports WHO was already hired. Silently
           // dropping that list is how an operator retries a batch and gets
           // duplicates of the people who succeeded the first time.
           if ("refused" in outcome) {
-            return routeRefusal("Hire", outcome, { departmentId: params.departmentId, hired });
+            return routeRefusal("Hire", outcome, { departmentId: departmentId, hired });
           }
           hired.push({ name: request.name });
         }
 
         if (hired.length === 1) {
           const only = hired[0]!;
-          return toolResult(true, `Hired ${only.name} into '${params.departmentId}'. They come up on their own; they stop on their own once they settle after idling.`, {
+          return toolResult(true, `Hired ${only.name} into '${departmentId}'. They come up on their own; they stop on their own once they settle after idling.`, {
             status: "applied",
-            departmentId: params.departmentId,
+            departmentId: departmentId,
             name: only.name,
             hired,
           });
         }
         const roster = hired.map((entry) => entry.name).join(", ");
-        return toolResult(true, `Hired ${hired.length} people into '${params.departmentId}': ${roster}. They come up on their own; each stops on its own once it settles after idling.`, {
+        return toolResult(true, `Hired ${hired.length} people into '${departmentId}': ${roster}. They come up on their own; each stops on its own once it settles after idling.`, {
           status: "applied",
-          departmentId: params.departmentId,
+          departmentId: departmentId,
           hired,
         });
       } catch (error) {
@@ -8262,6 +8281,19 @@ export function messageWakeDispositionForTest(
  * error a validation site throws, so the round trip is testable without
  * driving a whole tool.
  */
+/**
+ * The default `org_hire` resolves when `departmentId` is omitted — the one the
+ * parameter description promises. Exported so BOTH arms of it can be asserted
+ * without booting a company: the department a head heads, and the department a
+ * non-head merely sits in.
+ */
+export function hireDefaultDepartmentForTest(
+  manifest: IntercomOrganizationManifest,
+  person: PersonRecord,
+): string | undefined {
+  return authorityRootDepartmentId(manifest, person);
+}
+
 export function refusalResultForTest(error: unknown): { details?: Record<string, unknown> } {
   return refusalResult(error) as unknown as { details?: Record<string, unknown> };
 }
