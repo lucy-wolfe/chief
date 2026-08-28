@@ -33,19 +33,17 @@ each other.
 
 You need macOS or Linux and [`tmux`](https://github.com/tmux/tmux).
 
-**1.** Install [Pi](https://github.com/earendil-works/pi), the agent runtime, at 0.80.10 or newer:
-
-```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent
-```
-
-**2.** Install chief:
+**1.** Install chief:
 
 ```bash
 curl -fsSL https://chief.zipbox.ai/install.sh | sh
 ```
 
-**3.** Found your first company in any empty directory:
+Every person in a company runs on [Pi](https://github.com/earendil-works/pi),
+the agent runtime; the installer installs it when it is missing, and asks
+before upgrading one that is older than the required version.
+
+**2.** Found your first company in any empty directory:
 
 ```bash
 mkdir acme && cd acme && chief
@@ -56,7 +54,7 @@ exactly two things, the company's name and its purpose, then creates the
 company and boots its CEO. Founder designs nothing; the CEO is what builds
 the organisation.
 
-**4.** Talk to the CEO. Tell it what you want, for example "a three-person
+**3.** Talk to the CEO. Tell it what you want, for example "a three-person
 research desk that writes me a daily market brief", and it creates the
 departments, appoints the heads, and hires the people. Once the company
 exists, Founder never appears again: from then on, `chief` in that directory
