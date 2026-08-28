@@ -7,6 +7,7 @@ import {
   type CardSpec,
   type CardTheme,
   type RenderCardOptions,
+  CARD_GLYPHS,
 } from "./card-style";
 import {
   ACTIVITY_STATUS_KEY,
@@ -1330,7 +1331,7 @@ function installFooter(
         // #529: the legible stale tag, shown only when the reminder count it
         // qualifies is itself on screen (so a quiet org stays quiet).
         const staleTag = supervisionStale && (organizationActivity?.reminders ?? 0) > 0
-          ? theme.fg(FOOTER_FIELD_TOKENS.supervisionStale, "⚠ stale")
+          ? theme.fg(FOOTER_FIELD_TOKENS.supervisionStale, `${CARD_GLYPHS.failure} stale`)
           : "";
         const first = joinedLine(
           identityFields.filter(Boolean).join(` ${bullet} `),
@@ -1380,7 +1381,7 @@ function installFooter(
           // is being torn down on this very pass, which is what "moments" says
           // -- the local pane does not stop itself, the next reconcile does.
           organizationActivity?.settleShutdownDeadlineAt
-            ? theme.fg(FOOTER_FIELD_TOKENS.shutdown, `⏻ shutting down in ${formatSettleCountdown(organizationActivity.settleShutdownDeadlineAt, now(), "moments")}`)
+            ? theme.fg(FOOTER_FIELD_TOKENS.shutdown, `shutting down in ${formatSettleCountdown(organizationActivity.settleShutdownDeadlineAt, now(), "moments")}`)
             : "",
           // FIVE / task #27: the ephemeral, event-driven activity verb
           // (working) set through

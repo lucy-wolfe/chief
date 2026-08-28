@@ -75,6 +75,8 @@ import {
   type CardIcon,
   type CardState,
   type RenderCardOptions,
+  CARD_GLYPHS,
+  CARD_TEXT_SYMBOLS,
 } from "./card-style";
 
 export { ORGANIZATION_FOREGROUND_BASH_TIMEOUT_SECONDS } from "./organization-runtime-policy";
@@ -796,8 +798,8 @@ export interface LauncherSystemNoticePresentation {
   // leave two different events indistinguishable on screen with nothing on the
   // pane able to reveal which one fired.
   title: "🧠 Learning needs attention"
-    | "⚡ Work recovery" | "⚠️ System needs attention"
-    | "⚙️ System notice" | "⏰ Reminder";
+    | "⚡ Work recovery" | "❗ System needs attention"
+    | "⚙ System notice" | "⏰ Reminder";
   summary: string;
   /**
    * The producer's own prose, for the branches whose body is safe launcher-
@@ -874,7 +876,7 @@ function systemNoticeBody(body: unknown): string | undefined {
 
 function unknownSystemNoticePresentation(): LauncherSystemNoticePresentation {
   return {
-    title: "⚙️ System notice",
+    title: `${CARD_TEXT_SYMBOLS.gear} System notice`,
     summary: "ChiefD supplied a notice this version does not recognize.",
     context: [],
     nextAction: "Inspect org_roster and the restricted health diagnostics; do not repeat or forward the raw payload.",
@@ -925,7 +927,7 @@ function healthNoticePresentation(
     // operator must look at, so it takes the system-attention title and earns
     // its own case purely for the specific summary and next action below —
     // which the generic system-attention card cannot say.
-    title: "⚠️ System needs attention",
+    title: `${CARD_GLYPHS.failure} System needs attention`,
     summary: "A work-free person still holds a pane because their idle transition has not been released.",
     context,
     nextAction: personId
@@ -954,7 +956,7 @@ function healthNoticePresentation(
     };
   }
   if (SYSTEM_ATTENTION_HEALTH_KINDS.has(kind)) return {
-    title: "⚠️ System needs attention",
+    title: `${CARD_GLYPHS.failure} System needs attention`,
     summary: kind === "maintenance_stuck"
       ? "Session maintenance has remained unfinished beyond its recovery window."
       : "A ChiefD runtime health check found an infrastructure problem.",
@@ -5979,35 +5981,38 @@ function toolOutputText(result: unknown): string {
  * line — the tool's own glyph, kept separate from a fixed vocabulary entry
  * per the card house style's in-progress carve-out (docs/cards-style.md). */
 const ORGANIZATION_TOOL_DOMAIN_ICONS: Record<string, { emoji: string; title: string }> = {
-  org_send: { emoji: "📤", title: "Sending message" },
-  org_roster: { emoji: "📋", title: "Checking company roster" },
-  org_launch_department: { emoji: "🏗️", title: "Starting department" },
-  org_stop_department: { emoji: "⏸️", title: "Stopping department" },
-  org_remove_department: { emoji: "🗑️", title: "Removing department" },
-  org_launch_contract: { emoji: "🏗️", title: "Starting contract" },
-  org_stop_contract: { emoji: "⏸️", title: "Stopping contract" },
-  org_remove_contract: { emoji: "🗑️", title: "Removing contract" },
-  org_add_department: { emoji: "🏗️", title: "Adding department" },
-  org_pause_department: { emoji: "⏸️", title: "Pausing department" },
-  org_resume_department: { emoji: "▶️", title: "Resuming department" },
-  org_resume_departments: { emoji: "▶️", title: "Resuming departments" },
-  org_hire: { emoji: "👋", title: "Hiring teammate" },
-  org_bench: { emoji: "🪑", title: "Benching teammate" },
-  org_recall: { emoji: "🔔", title: "Returning teammate to work" },
-  org_stand_down: { emoji: "🛑", title: "Standing the whole company down" },
-  org_resume: { emoji: "▶️", title: "Letting the company work again" },
-  org_start_person: { emoji: "🌱", title: "Bringing up one teammate" },
-  org_stop_person: { emoji: "🍃", title: "Standing one teammate down" },
-  org_transfer: { emoji: "🚚", title: "Moving teammate" },
-  org_reparent_department: { emoji: "🌳", title: "Moving department" },
-  org_appoint_department_head: { emoji: "🪆", title: "Appointing head" },
-  org_offboard: { emoji: "👋", title: "Offboarding teammate" },
-  // Durable reminders. The clock emoji matches
-  // the "⏰ Reminder" card the FIRED envelope renders, so arming a reminder and
-  // being reminded read as the same feature on the pane.
-  org_create_reminder: { emoji: "⏰", title: "Scheduling reminder" },
-  org_list_reminders: { emoji: "⏰", title: "Listing reminders" },
-  org_stop_reminder: { emoji: "⏰", title: "Removing reminder" },
+  org_send: { emoji: CARD_GLYPHS.send, title: "Sending message" },
+  org_roster: { emoji: CARD_GLYPHS.roster, title: "Checking company roster" },
+  org_launch_department: { emoji: CARD_GLYPHS.starting, title: "Starting department" },
+  org_stop_department: { emoji: CARD_GLYPHS.stopping, title: "Stopping department" },
+  org_remove_department: { emoji: CARD_GLYPHS.removing, title: "Removing department" },
+  org_launch_contract: { emoji: CARD_GLYPHS.starting, title: "Starting contract" },
+  org_stop_contract: { emoji: CARD_GLYPHS.stopping, title: "Stopping contract" },
+  org_remove_contract: { emoji: CARD_GLYPHS.removing, title: "Removing contract" },
+  org_add_department: { emoji: CARD_GLYPHS.department, title: "Adding department" },
+  org_pause_department: { emoji: CARD_GLYPHS.pausing, title: "Pausing department" },
+  org_resume_department: { emoji: CARD_GLYPHS.resuming, title: "Resuming department" },
+  org_resume_departments: { emoji: CARD_GLYPHS.resuming, title: "Resuming departments" },
+  org_hire: { emoji: CARD_GLYPHS.hire, title: "Hiring teammate" },
+  org_bench: { emoji: CARD_GLYPHS.bench, title: "Benching teammate" },
+  org_recall: { emoji: CARD_GLYPHS.recall, title: "Returning teammate to work" },
+  org_stand_down: { emoji: CARD_GLYPHS.circuit, title: "Standing the whole company down" },
+  org_resume: { emoji: CARD_GLYPHS.resuming, title: "Letting the company work again" },
+  org_start_person: { emoji: CARD_GLYPHS.startPerson, title: "Bringing up one teammate" },
+  org_stop_person: { emoji: CARD_GLYPHS.stopPerson, title: "Standing one teammate down" },
+  org_transfer: { emoji: CARD_GLYPHS.transfer, title: "Moving teammate" },
+  org_reparent_department: { emoji: CARD_GLYPHS.moveDepartment, title: "Moving department" },
+  org_appoint_department_head: { emoji: CARD_GLYPHS.appointHead, title: "Appointing head" },
+  // NOT the same glyph as hire. One icon for two opposite outcomes tells a
+  // reader nothing: a wave says hello on the way in and goodbye on the way
+  // out, and the card is the only thing distinguishing them.
+  org_offboard: { emoji: CARD_GLYPHS.offboard, title: "Offboarding teammate" },
+  // Durable reminders. Create and list share the alarm because they are the
+  // same subject; STOPPING one is the state that differs, so it is the one
+  // that gets its own glyph.
+  org_create_reminder: { emoji: CARD_GLYPHS.reminder, title: "Scheduling reminder" },
+  org_list_reminders: { emoji: CARD_GLYPHS.reminder, title: "Listing reminders" },
+  org_stop_reminder: { emoji: CARD_GLYPHS.reminderOff, title: "Removing reminder" },
 };
 
 function organizationToolDomainIcon(name: string): { emoji: string; title: string } {
@@ -7645,7 +7650,7 @@ async function installSubtreeTools(
     renderCall(args, theme) {
       const batched = Array.isArray(args.personIds) ? args.personIds.map((id) => String(id)) : [];
       return renderOrganizationCard(theme, {
-        kind: "tool-call", icon: domainIcon(action === "recall" ? "🔔" : "🪑"), inProgress: true,
+        kind: "tool-call", icon: domainIcon(action === "recall" ? CARD_GLYPHS.recall : CARD_GLYPHS.bench), inProgress: true,
         title: action === "recall" ? "Returning to active work" : "Benching from active work",
         target: batched.length > 1
           ? `${batched.length} people`
@@ -7692,7 +7697,7 @@ async function installSubtreeTools(
         const hardFailTitle = action === "bench" ? "Bench failed" : "Recall failed";
         return renderOrganizationCard(theme, {
           kind: "tool-failure",
-          icon: handoff ? "handoff" : domainIcon("⚠️", detail?.retryable ? "warning" : "error"),
+          icon: handoff ? "handoff" : domainIcon(CARD_GLYPHS.failure, detail?.retryable ? "warning" : "error"),
           title: handoff ? "Waiting for handoff" : hardFailTitle,
           titleTags: [{ text: `· ${toolOutputText(result)}`, token: "dim" }],
           body: { kind: "none" },
@@ -7893,7 +7898,7 @@ async function installSubtreeTools(
         const hardFailTitle = action === "start-person" ? "Start failed" : "Stop failed";
         return renderOrganizationCard(theme, {
           kind: "tool-failure",
-          icon: handoff ? "handoff" : domainIcon("⚠️", detail?.retryable ? "warning" : "error"),
+          icon: handoff ? "handoff" : domainIcon(CARD_GLYPHS.failure, detail?.retryable ? "warning" : "error"),
           title: handoff ? "Waiting for handoff" : hardFailTitle,
           titleTags: [{ text: `· ${toolOutputText(result)}`, token: "dim" }],
           body: { kind: "none" },
@@ -10079,7 +10084,7 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
     ];
     if (!pending) bodyLines.push({ prefix: "  ", text: "No message waiting", token: "dim" });
     bodyLines.push({ text: "" }, { prefix: "⟳ ", bold: true, text: `Scheduled checks · ${protectedSchedules.length} protected check${protectedSchedules.length === 1 ? "" : "s"}` });
-    for (const schedule of protectedSchedules) bodyLines.push({ prefix: "  🛡️ ", text: schedule, token: "customMessageText" });
+    for (const schedule of protectedSchedules) bodyLines.push({ prefix: `  ${CARD_GLYPHS.lock} `, text: schedule, token: "customMessageText" });
     if (!protectedSchedules.length) {
       bodyLines.push({ prefix: "  ", text: "No protected check recorded", token: "dim" });
     }

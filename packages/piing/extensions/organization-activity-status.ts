@@ -33,7 +33,7 @@
 /** The extension-status key this line owns in the footer's status map. */
 export const ACTIVITY_STATUS_KEY = "activity";
 
-export const WORKING_LABEL = "⚙ working";
+export const WORKING_LABEL = "\u2699 working";
 
 export interface ActivityStatusDeps {
   /**
