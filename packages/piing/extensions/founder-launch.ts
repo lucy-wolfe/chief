@@ -9,6 +9,7 @@ import {
   type FounderLaunchPhase,
   type FounderLaunchResult,
 } from "@chief/chiefing/extension-runtime";
+import { CARD_GLYPHS } from "./card-style";
 
 /**
  * What this tool reports back to the model. `slug`/`session` exist only on a
@@ -171,7 +172,7 @@ export function reportLaunchFailure(
   reason: string,
 ): { text: string; details: FounderLaunchToolDetails } {
   return {
-    text: `❌ Company launch did not complete · ${name}\n${reason}`,
+    text: `${CARD_GLYPHS.crossMark} Company launch did not complete · ${name}\n${reason}`,
     details: { ok: false },
   };
 }

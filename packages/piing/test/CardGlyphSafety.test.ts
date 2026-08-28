@@ -73,7 +73,13 @@ const SAFE_CODEPOINTS = new Map<number, string>([
   [0x1f69a, 'DELIVERY TRUCK (1.0)'],
   [0x1f333, 'DECIDUOUS TREE (1.0)'],
   [0x1f331, 'SEEDLING (1.0)'],
-  [0x1f343, 'LEAF FLUTTERING IN WIND (1.0)']
+  [0x1f343, 'LEAF FLUTTERING IN WIND (1.0)'],
+  // Emoji_Presentation=Yes and East_Asian_Width=Wide — a two-column emoji, so
+  // it belongs HERE and not in the text-symbol list, whose contract is the
+  // opposite. It sat there until review caught it: a row contradicting the
+  // rule its own table teaches is worse than a missing row, because the next
+  // person adding a wide glyph to the text list would cite it as precedent.
+  [0x274c, 'CROSS MARK (Emoji 1.0)']
 ])
 
 /**
@@ -88,11 +94,20 @@ const SAFE_TEXT_SYMBOLS = new Map<number, string>([
   [0x2264, 'LESS-THAN OR EQUAL TO'],
   [0x27f3, 'CLOCKWISE GAPPED CIRCLE ARROW'],
   [0x2699, 'GEAR (bare: no VS16, drawn as a text symbol)'],
-  [0x2839, 'BRAILLE PATTERN DOTS-1456 (spinner frame)'],
-  [0x274c, 'CROSS MARK']
+  [0x2839, 'BRAILLE PATTERN DOTS-1456 (spinner frame)']
 ])
 
 const VS16 = 0xfe0f
+/**
+ * ZERO WIDTH JOINER. Never sanctioned, and scanned for explicitly.
+ *
+ * A ZWJ composes two individually-safe codepoints into ONE glyph whose width
+ * and font coverage are properties of the composition, not of its parts — and
+ * because each part is sanctioned and the joiner itself is invisible, a sweep
+ * that did not look for it would pass the composed sequence in silence. That
+ * is the one way an unsafe glyph could still reach a card.
+ */
+const ZWJ = 0x200d
 const extensionsDir = fileURLToPath(new URL('../extensions', import.meta.url))
 
 /** Codepoints in the ranges a card glyph could plausibly come from. */
@@ -103,7 +118,8 @@ function interestingCodepoints(text: string): number[] {
       (codepoint) =>
         (codepoint >= 0x2190 && codepoint <= 0x2bff) ||
         (codepoint >= 0x1f000 && codepoint <= 0x1faff) ||
-        codepoint === VS16
+        codepoint === VS16 ||
+        codepoint === ZWJ
     )
 }
 
@@ -114,6 +130,11 @@ function interestingCodepoints(text: string): number[] {
  * intercom quote a retired card's glyph while explaining why it is retired,
  * and a sweep that tripped on those would be teaching people to delete their
  * own history to keep a test quiet.
+ *
+ * Only FULL-LINE `//` comments are stripped, so a trailing `code // 🪞` would
+ * still be refused. That direction is deliberate — it refuses more than it
+ * must, never less — but it means the first such false positive is a comment
+ * to move, not a bug to hunt.
  */
 function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
@@ -153,6 +174,14 @@ describe('every glyph in the table is a safe single codepoint', () => {
   })
 })
 
+/**
+ * NOTE ON SCOPE: this sweep enforces membership of the sanctioned SET, not
+ * provenance from the table. An inline literal that happens to be a sanctioned
+ * codepoint passes. That is deliberate for now — the harm class this exists to
+ * stop is an UNSAFE glyph reaching a card, and that is caught completely.
+ * Requiring every glyph to be imported from `CARD_GLYPHS` is a style rule on
+ * top, and a separate change.
+ */
 describe('no extension draws a glyph from outside the table', () => {
   test('every card glyph in every extension is one the table sanctions', () => {
     const offenders: string[] = []
@@ -165,7 +194,10 @@ describe('no extension draws a glyph from outside the table', () => {
           if (sanctioned.has(codepoint)) continue
           offenders.push(
             `${file}:${index + 1} U+${codepoint.toString(16).toUpperCase().padStart(4, '0')}` +
-              (codepoint === VS16 ? ' (VS16 — request emoji presentation; never safe)' : '')
+              (codepoint === VS16 ? ' (VS16 — request emoji presentation; never safe)' : '') +
+              (codepoint === ZWJ
+                ? ' (ZWJ — composes a glyph whose width is not its parts’; never safe)'
+                : '')
           )
         }
       })
@@ -197,6 +229,14 @@ describe('the sweep can fail', () => {
     const found = interestingCodepoints(stripComments(`const icon = "${VS16_SEQUENCE}";`))
     expect(found).toContain(VS16)
     expect(found).toContain(0x1f3d7)
+  })
+
+  test('a ZWJ sequence is refused even though both halves are sanctioned', () => {
+    // The dangerous case: every component is on the allowlist, so only the
+    // joiner distinguishes a safe pair of glyphs from one composed glyph whose
+    // width and coverage are nobody's guarantee.
+    const composed = `const icon = "\u{1F468}\u{200D}\u{1F4BB}";`
+    expect(interestingCodepoints(stripComments(composed))).toContain(ZWJ)
   })
 
   test('a comment quoting a retired glyph is NOT refused', () => {

@@ -77,6 +77,9 @@ export const CARD_GLYPHS = {
   inputRepair: "🧾",
   failure: "❗",
   circuit: "🛑",
+  // Drawn by the founder launch card. It lives here rather than in the text
+  // symbols because it IS a two-column emoji by both properties.
+  crossMark: "❌",
 
   // Domains. One meaning per glyph — an icon that means two opposite things
   // teaches nothing, which is why hire and offboard no longer share one.
