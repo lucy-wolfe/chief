@@ -183,10 +183,21 @@ describe('#1046 defect 2: the id/name trap gets a corrective hint', () => {
       'hire into'
     )
     expect(message).toContain("Unknown department 'belfort-brothers-capital'.")
+    // THE ACTIONABLE TOKEN COMES FIRST. The collapsed card compacts this to
+    // 120 characters, and the id — the one thing a corrected call needs — used
+    // to sit past that boundary, so the reader saw the diagnosis and not the
+    // fix. The hint now leads with the id.
     expect(message).toContain(
-      "'belfort-brothers-capital' names the company, not a department: the company's root department id is 'executive'."
+      "The root department id is 'executive' — 'belfort-brothers-capital' names the company, not a department."
     )
     expect(message).toContain('Departments you may hire into: executive, office-of-the-ceo.')
+
+    const hintStart = message.indexOf("The root department id is 'executive'")
+    expect(hintStart).toBeGreaterThanOrEqual(0)
+    expect(
+      hintStart + "The root department id is 'executive'".length,
+      'the id must land inside the 120-character window the collapsed card shows'
+    ).toBeLessThanOrEqual(120)
   })
 
   test('a department DISPLAY NAME is named as a name, and its id is given', () => {
