@@ -51,11 +51,16 @@ curl -fsSL https://chief.zipbox.ai/install.sh | sh
 mkdir acme && cd acme && chief
 ```
 
-That opens **Founder**, which asks for exactly two things: the company's name
-and its purpose. It then boots the CEO, and the CEO builds the organisation.
-Tell it what you want, for example "a three-person research desk that writes
-me a daily market brief", and it creates the departments, appoints the heads,
-and hires the people. Come back later with `chief` in the same directory.
+With no company in the directory, `chief` opens **Founder**. Founder asks for
+exactly two things, the company's name and its purpose, then creates the
+company and boots its CEO. Founder designs nothing; the CEO is what builds
+the organisation.
+
+**4.** Talk to the CEO. Tell it what you want, for example "a three-person
+research desk that writes me a daily market brief", and it creates the
+departments, appoints the heads, and hires the people. Once the company
+exists, Founder never appears again: from then on, `chief` in that directory
+starts the company if it is stopped and attaches your terminal to the CEO.
 
 ## Everyday commands
 
