@@ -197,7 +197,13 @@ fi
 
 say ""
 for profile in $written; do say "Added chief to your PATH in $profile."; done
-for profile in $already; do say "$profile already puts chief on your PATH; left it unchanged."; done
+# Reports what was OBSERVED — the path appears in the file — rather than what
+# would be inferred from it. A line that is commented out still mentions the
+# directory, and saying "already puts chief on your PATH" about it would be
+# false in the one place a stranger reads this project's output first. The
+# match is deliberately unchanged: excluding comments would re-add a line the
+# user disabled on purpose.
+for profile in $already; do say "$profile already mentions chief's bin directory; left it unchanged."; done
 for profile in $unwritable; do say "Could not write to $profile."; done
 
 # THE HONEST PART. `curl … | sh` runs in a CHILD shell: nothing this script
