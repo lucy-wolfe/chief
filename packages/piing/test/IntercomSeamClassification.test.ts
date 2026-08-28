@@ -285,6 +285,7 @@ const CLASSIFICATION: Readonly<Record<string, Bucket>> = {
   // the system's. Presentation, because the whole subject is what the card
   // tells a reader about whose fault it is.
   refusalResultForTest: 'B',
+  isCallerRefusalCardForTest: 'B',
   callerRefusalForTest: 'B',
   messageWakeDispositionForTest: 'B',
   primeManifestForTest: 'B',

@@ -20,7 +20,11 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-import { callerRefusalForTest, refusalResultForTest } from '@test-assets/organization-intercom'
+import {
+  callerRefusalForTest,
+  isCallerRefusalCardForTest,
+  refusalResultForTest
+} from '@test-assets/organization-intercom'
 import { describe, expect, test } from 'vitest'
 
 describe('a decided refusal keeps its classification through the adapters', () => {
@@ -103,5 +107,41 @@ describe('every catch path funnels through refusalResult', () => {
     // detector simply never matched anything.
     const offending = `} catch (error) { return toolResult(false, ${FLATTEN}); }`
     expect(handFlattenedResults(offending)).toHaveLength(1)
+  })
+})
+
+/**
+ * THE VERB FOLLOWS THE CLASSIFICATION.
+ *
+ * "refused" invites a corrected call; "failed" invites a retry. Which word a
+ * card uses is therefore a claim about whose fault the failure was, and the
+ * two must not be interchangeable — a crash called "refused" tells a reader to
+ * fix a call that was never wrong, which is the #11 defect pointed the other
+ * way and worse for it.
+ */
+describe('a card says refused only when the tool decided it', () => {
+  test('a classified refusal is refused', () => {
+    expect(isCallerRefusalCardForTest({ status: 'refused' })).toBe(true)
+    expect(isCallerRefusalCardForTest({ status: 'incumbent_disposition_required' })).toBe(true)
+  })
+
+  /**
+   * THE DISCRIMINATING HALF. Without it the rule above passes by returning
+   * true for everything — which would relabel every crash a refusal and delete
+   * the distinction rather than using it.
+   */
+  test('an unclassified failure is NOT refused', () => {
+    expect(isCallerRefusalCardForTest({})).toBe(false)
+    expect(isCallerRefusalCardForTest(undefined)).toBe(false)
+  })
+
+  /**
+   * A status carried for CONTEXT is not a classification. The partial-hire card
+   * names what already landed so a retry does not double-hire; the error it
+   * wraps may be a genuine crash, and only the error's own type knows.
+   */
+  test('a status carried as context with fault:true is NOT refused', () => {
+    expect(isCallerRefusalCardForTest({ status: 'hire_partial', fault: true })).toBe(false)
+    expect(isCallerRefusalCardForTest({ status: 'hire_partial' })).toBe(true)
   })
 })
