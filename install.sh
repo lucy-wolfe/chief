@@ -231,11 +231,125 @@ have tmux || {
   say "    macOS:         brew install tmux"
   say "    Debian/Ubuntu: apt-get install -y tmux"
 }
-have pi || {
-  say ""
-  say "Pi is the agent runtime every person in a company runs, and was not found. Install it:"
-  say "    $PI_INSTALL"
+# --- Pi -------------------------------------------------------------------
+#
+# chief installs and upgrades Pi rather than printing a command and hoping.
+# The asymmetry is deliberate: an ABSENT Pi is installed without asking, since
+# chief cannot run a single person without it and there is nothing to weigh.
+# An EXISTING Pi that is merely too old is the user's, and replacing somebody's
+# working tool without asking is a different act, so that one prompts.
+#
+# THE FLOOR IS READ, NEVER WRITTEN HERE. `pi_floor.rs` holds the single
+# definition, `release-chiefd.ts` stamps it into the release manifest as
+# `piFloor`, and this reads it out of the manifest already unpacked above. A
+# version bump therefore needs no edit to this file, and the repository's
+# single-definition guard stays satisfied — a number restated here would be a
+# second definition wearing a copy's clothes.
+pi_floor="$(grep -m1 '"piFloor"' "$dest/manifest.json" 2>/dev/null \
+  | sed -E 's/.*"piFloor"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
+
+# Sorts dotted versions without assuming a numeric field count.
+version_below() {
+  [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -t. -k1,1n -k2,2n -k3,3n | head -n1)" = "$1" ]
 }
+
+# A PROMPT IN A PIPED SCRIPT MUST NOT READ ITS OWN SOURCE.
+#
+# This file is `curl … | sh`, so stdin is the script text: reading stdin would
+# consume the rest of the installer. The question goes to the terminal
+# directly. Where there is no terminal — CI, a container build — nothing can be
+# asked, so the default answer is taken and SAID, because a silent choice made
+# on somebody's behalf is the thing that surprises them later.
+confirm_default_yes() {
+  # OPENABLE, not merely present. `[ -r /dev/tty ]` is TRUE in a container with
+  # no controlling terminal — the device node exists and the permission bits
+  # allow reading — and the redirect then fails with a raw shell error that no
+  # `2>/dev/null` on the command can suppress, because the shell reports it
+  # while setting the redirection up. Measured, not reasoned: it printed
+  # "cannot create /dev/tty: No such device or address" twice, before the
+  # question. Testing the open is the only honest test of whether it will work.
+  # A SUBSHELL, and that is load-bearing rather than stylistic. `:` is a POSIX
+  # SPECIAL BUILT-IN, and a redirection error on one is fatal to a
+  # non-interactive shell — `{ : < /dev/tty; } 2>/dev/null` does not evaluate
+  # to false in a container, it ENDS THE INSTALLER, silently, with status 2 and
+  # no message. Measured: the run stopped dead at this line. The subshell
+  # contains the death so the `if` sees an ordinary false.
+  if ( : < /dev/tty ) 2>/dev/null; then
+    printf '%s [Y/n] ' "$1" > /dev/tty
+    read -r reply < /dev/tty || reply=""
+  else
+    reply=""
+    say "$1 [Y/n] — no terminal to ask on, taking the default (yes)."
+  fi
+  case "$reply" in
+    [Nn]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+pi_version_now() {
+  pi --version 2>/dev/null | tr -d 'v' | awk '{print $NF}'
+}
+
+install_pi() {
+  have npm || die "npm is required to install Pi, and it is not on PATH. Install Node.js, then run: $PI_INSTALL"
+  say "Installing Pi ($PI_INSTALL)…"
+  # A failure here is REPORTED, never silent, and never claimed as success.
+  if ! $PI_INSTALL; then
+    say "Pi could not be installed. chief is installed; run this yourself and it will work:"
+    say "    $PI_INSTALL"
+    return 1
+  fi
+  have pi || {
+    say "npm reported success but pi is not on PATH yet — open a new shell, or run:"
+    say "    $PI_INSTALL"
+    return 1
+  }
+  installed_version="$(pi_version_now)"
+  # CHECKED, not assumed. npm exiting zero is not the same as the floor being
+  # met — a global install can land somewhere earlier on PATH, or resolve to a
+  # version that is still too old — and reporting "ready" without looking is
+  # the same shape as every other claim that outran its evidence.
+  if [ -n "$pi_floor" ] && [ -n "$installed_version" ] && version_below "$installed_version" "$pi_floor"; then
+    say "Pi is $installed_version, still below $pi_floor. Install it yourself with:"
+    say "    $PI_INSTALL"
+    return 1
+  fi
+  say "Pi ${installed_version:-installed} is ready."
+}
+
+say ""
+if ! have pi; then
+  # ABSENT: no question. chief cannot run a person without it.
+  say "Pi is the agent runtime every person in a company runs, and was not found."
+  # NONZERO, for the same reason the declined upgrade below is nonzero, and more
+  # strongly. `install_pi` has already told the PERSON what to run; what it
+  # cannot do is tell a CALLER. A failed install here leaves the thing that runs
+  # people ABSENT, which is strictly worse than the too-old Pi the decline path
+  # already refuses to call success — so this cannot be the branch that reports
+  # ready. `|| true` said the opposite to every script consuming this installer.
+  install_pi || die "chief itself is installed under $CHIEF_HOME; Pi did not install — run: $PI_INSTALL"
+else
+  pi_version="$(pi_version_now)"
+  if [ -n "$pi_floor" ] && [ -n "$pi_version" ] && version_below "$pi_version" "$pi_floor"; then
+    say "Pi $pi_version is installed; chief needs $pi_floor or newer."
+    if confirm_default_yes "Upgrade Pi to >= $pi_floor?"; then
+      # Nonzero for the reason above: an ACCEPTED upgrade that then failed
+      # leaves exactly the too-old Pi the branch below refuses to call success.
+      # Agreeing to fix it does not make it fixed.
+      install_pi || die "chief itself is installed under $CHIEF_HOME; Pi did not upgrade — run: $PI_INSTALL"
+    else
+      # One of the places this script exits nonzero after chief is installed —
+      # countless, because a count in a comment is a fact that goes stale
+      # silently. It is not a failed install: it is a declined prerequisite, and
+      # saying so with a zero status would tell a script that everything is
+      # ready when the thing that runs people is too old. The failed-install
+      # paths above exit nonzero for the same reason, applied to a worse state.
+      say ""
+      die "chief requires Pi $pi_floor or newer, and the upgrade was declined. chief itself is installed under $CHIEF_HOME."
+    fi
+  fi
+fi
 
 say ""
 say "Then found your first company:"
