@@ -46,18 +46,39 @@ have curl || die "curl is required to download the release, and it is not on PAT
 have tar || die "tar is required to unpack the release, and it is not on PATH."
 
 # --- the release ------------------------------------------------------------
+# The scratch directory is created BEFORE the first request, because the release
+# lookup writes into it too. It used to be created after, which is why that
+# lookup piped instead of saving — see below.
+work="$(mktemp -d "${TMPDIR:-/tmp}/chief-install.XXXXXX")"
+trap 'rm -rf "$work"' EXIT INT TERM
+
 api="https://api.github.com/repos/${REPO}/releases/latest"
 say "Resolving the latest chief release…"
-tag="$(curl -fsSL -H 'Accept: application/vnd.github+json' "$api" \
-  | grep -m1 '"tag_name"' \
+# SAVED, NOT PIPED, and the difference is the first thing a stranger sees.
+#
+# This was `curl … | grep -m1 …`. `grep -m1` exits on its first match, and if
+# curl is still writing when it does, curl's write fails and it prints
+#
+#   curl: (23) Failure writing output to destination
+#
+# on stderr. The tag has already been captured, so the install completes
+# normally — but the message appears immediately under "Resolving the latest
+# chief release…", on the first command anyone ever runs against this project,
+# and it reads as a broken install to somebody with no reason to think
+# otherwise. Whether it appears at all depends on whether the response outruns
+# the pipe buffer, which is why it is intermittent rather than constant.
+#
+# Saving the response first also makes the failure honest: a request that
+# genuinely fails now reports its own error instead of having it swallowed by
+# the pipeline's exit status.
+curl -fsSL -H 'Accept: application/vnd.github+json' -o "$work/release.json" "$api" \
+  || die "could not reach GitHub to resolve the latest release (rate-limited, offline, or no release yet)."
+tag="$(grep -m1 '"tag_name"' "$work/release.json" \
   | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
 [ -n "$tag" ] || die "could not read the latest release tag from GitHub (rate-limited, or no release yet)."
 
 base="https://github.com/${REPO}/releases/download/${tag}"
 asset="chief-$(printf '%s' "$tag" | sed 's/^v//')-${target}.tar.gz"
-
-work="$(mktemp -d "${TMPDIR:-/tmp}/chief-install.XXXXXX")"
-trap 'rm -rf "$work"' EXIT INT TERM
 
 say "Downloading ${asset}…"
 curl -fsSL -o "$work/$asset" "$base/$asset" \
