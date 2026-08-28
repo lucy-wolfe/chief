@@ -288,6 +288,8 @@ const CLASSIFICATION: Readonly<Record<string, Bucket>> = {
   refusalResultForTest: 'B',
   isCallerRefusalCardForTest: 'B',
   showsSystemFaultTagForTest: 'B',
+  mailboxDeliveryForTest: 'A',
+  workResumeDeliveryForTest: 'A',
   callerRefusalForTest: 'B',
   messageWakeDispositionForTest: 'B',
   primeManifestForTest: 'B',
