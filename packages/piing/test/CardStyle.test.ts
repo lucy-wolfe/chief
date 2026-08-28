@@ -81,7 +81,12 @@ describe('card-style: state-emoji vocabulary', () => {
       wait: '⏳',
       handoff: '🤝',
       'input-repair': '🧾',
-      failure: '⚠️',
+      // ❗ U+2757, not ⚠️ U+26A0+VS16. The old spelling was a text-default
+      // codepoint plus a variation selector: one column to a wcwidth terminal,
+      // two to the font, and encoded inconsistently across this codebase (with
+      // VS16 here, bare in the footer). U+2757 is Emoji_Presentation=Yes and
+      // East_Asian_Width=Wide, so every terminal and every font agree.
+      failure: '❗',
       circuit: '🛑'
     })
     expect(CARD_STATE_TOKEN.success).toBe('success')
@@ -109,8 +114,8 @@ describe('card-style: cardTitle', () => {
 
   test('omits the target segment entirely when no target is given', () => {
     const theme = trackingTheme()
-    expect(cardTitle(theme, 'failure', 'Assignment failed')).toBe('⚠️ Assignment failed')
-    expect(theme.calls).toEqual([{ token: 'error', text: '⚠️ Assignment failed' }])
+    expect(cardTitle(theme, 'failure', 'Assignment failed')).toBe('❗ Assignment failed')
+    expect(theme.calls).toEqual([{ token: 'error', text: '❗ Assignment failed' }])
   })
 
   test('accepts a domain icon carve-out for a read-only success (📋 Roster updated)', () => {
@@ -164,9 +169,9 @@ describe('card-style: titleTags (inline title decorations)', () => {
       boxed: false
     })
     // Default sep is a single space; the hint tag uses a double space.
-    expect(text).toBe('⚠️ org_send failed · @a (system fault) · timed out…  (Ctrl+O to expand)')
+    expect(text).toBe('❗ org_send failed · @a (system fault) · timed out…  (Ctrl+O to expand)')
     expect(theme.calls).toEqual([
-      { token: 'error', text: '⚠️ org_send failed' },
+      { token: 'error', text: '❗ org_send failed' },
       { token: 'dim', text: '· @a' },
       { token: 'dim', text: '(system fault)' },
       { token: 'dim', text: '· timed out…' },
@@ -843,8 +848,8 @@ describe('card-style: toolFailureText (#150 shared per-tool failure idiom)', () 
     const theme = trackingTheme()
     const long = 'x'.repeat(150)
     const text = toolFailureText(theme, 'Goal not recorded', long, false)
-    expect(text.split('\n')[0]).toContain('⚠️ Goal not recorded')
-    expect(theme.calls[0]).toEqual({ token: 'error', text: '⚠️ Goal not recorded' })
+    expect(text.split('\n')[0]).toContain('❗ Goal not recorded')
+    expect(theme.calls[0]).toEqual({ token: 'error', text: '❗ Goal not recorded' })
     // Preview is dim, ellipsized INSIDE the dim span, hint dim.
     const dim = theme.calls.filter((c) => c.token === 'dim')
     const [preview, hint] = dim
@@ -855,28 +860,28 @@ describe('card-style: toolFailureText (#150 shared per-tool failure idiom)', () 
   test('collapsed short message: no ellipsis, no hint', () => {
     const theme = trackingTheme()
     const text = toolFailureText(theme, 'Escalation not recorded', 'boom', false)
-    expect(text).toBe('⚠️ Escalation not recorded\n· boom')
+    expect(text).toBe('❗ Escalation not recorded\n· boom')
     expect(theme.calls.some((c) => c.text.includes('Ctrl+O'))).toBe(false)
   })
 
   test('expanded: raw message verbatim after a blank line, uncolored', () => {
     const theme = trackingTheme()
     const text = toolFailureText(theme, 'Department not created', 'raw output', true)
-    expect(text).toBe('⚠️ Department not created\n\nraw output')
+    expect(text).toBe('❗ Department not created\n\nraw output')
     expect(theme.calls.length).toBe(1) // only the title span
   })
 
   test('target renders as a dim `· target` OUTSIDE the failure span (color-pass vocabulary)', () => {
     const theme = trackingTheme()
     toolFailureText(theme, 'Goal not settled', '', false, { target: '@quant-head' })
-    expect(theme.calls[0]).toEqual({ token: 'error', text: '⚠️ Goal not settled' })
+    expect(theme.calls[0]).toEqual({ token: 'error', text: '❗ Goal not settled' })
     expect(theme.calls[1]).toEqual({ token: 'dim', text: '· @quant-head' })
   })
 
   test('expanded with empty message degrades to the bare title', () => {
     const theme = trackingTheme()
     expect(toolFailureText(theme, 'Control board unavailable', '', true)).toBe(
-      '⚠️ Control board unavailable'
+      '❗ Control board unavailable'
     )
   })
 })

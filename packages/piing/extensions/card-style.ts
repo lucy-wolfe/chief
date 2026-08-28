@@ -35,15 +35,117 @@ export interface CardTheme {
  * Deliberately excludes "in-progress": a `renderCall` line uses the tool's
  * own domain emoji instead (see {@link domainIcon}), not a vocabulary entry.
  */
-export type CardState = "success" | "wait" | "handoff" | "input-repair" | "failure" | "circuit";
-
-export const CARD_STATE_EMOJI: Readonly<Record<CardState, string>> = {
+/**
+ * EVERY GLYPH ANY CARD DRAWS, in one reviewed place.
+ *
+ * # Why a table and not a literal at each call site
+ *
+ * A card icon is chosen by whoever writes the card, on their machine, in their
+ * font. It renders there, so it ships. The operator then sees tofu or a glyph
+ * that overdraws the next column, and nothing anywhere failed.
+ *
+ * # The property that makes a glyph safe, which is not "it looked fine"
+ *
+ * A codepoint is admitted here when it is **Emoji_Presentation=Yes** and
+ * **East_Asian_Width=Wide**. Those two together mean every wcwidth-based
+ * terminal — tmux included, and tmux is always in this stack — allocates the
+ * same TWO columns the font wants to draw into, so the glyph cannot overdraw
+ * its neighbour.
+ *
+ * What is excluded, and why each broke:
+ *
+ * * **Text-default codepoints** (`Emoji_Presentation=No`) such as U+1F3D7
+ *   BUILDING CONSTRUCTION, U+23F8, U+25B6, U+1F5D1, U+1F5D3, U+1F6E1. A
+ *   wcwidth terminal gives them ONE column while an emoji font draws two, and
+ *   many font chains carry no text-style glyph for them at all — they exist
+ *   almost only in colour-emoji fonts. Tofu, or a stretched glyph.
+ * * **U+FE0F (VS16)**, the "please draw the previous character as emoji"
+ *   request. It is zero-width to wcwidth and honoured inconsistently by fonts,
+ *   so it widens the disagreement rather than fixing it. No entry here carries
+ *   one.
+ * * **Codepoints newer than Unicode 11.0** (2018) — U+1FA91 CHAIR, U+1FA86
+ *   NESTING DOLLS — which are simply absent from older font chains.
+ *
+ * We cannot see any operator's font, so this optimises for the strongest
+ * property that is provable without one: width agreement and coverage breadth.
+ */
+export const CARD_GLYPHS = {
+  // Card states.
   success: "✅",
   wait: "⏳",
   handoff: "🤝",
-  "input-repair": "🧾",
-  failure: "⚠️",
+  inputRepair: "🧾",
+  failure: "❗",
   circuit: "🛑",
+  // Drawn by the founder launch card. It lives here rather than in the text
+  // symbols because it IS a two-column emoji by both properties.
+  crossMark: "❌",
+
+  // Domains. One meaning per glyph — an icon that means two opposite things
+  // teaches nothing, which is why hire and offboard no longer share one.
+  send: "📤",
+  inbox: "📥",
+  roster: "📋",
+  mailbox: "📬",
+  message: "💬",
+  report: "📊",
+  alert: "🚨",
+  energy: "⚡",
+  goal: "🎯",
+  person: "👤",
+  think: "🧠",
+  compass: "🧭",
+  calendar: "📅",
+  lock: "🔒",
+
+  // Structure and lifecycle.
+  department: "🏢",
+  starting: "🚀",
+  pausing: "💤",
+  stopping: "🔻",
+  resuming: "⏩",
+  removing: "🧹",
+  hire: "👋",
+  offboard: "🚪",
+  bench: "💺",
+  recall: "🔔",
+  appointHead: "👑",
+  transfer: "🚚",
+  moveDepartment: "🌳",
+  startPerson: "🌱",
+  stopPerson: "🍃",
+
+  // Reminders.
+  reminder: "⏰",
+  reminderOff: "🔕",
+} as const;
+
+/**
+ * Bare text symbols — NOT emoji, and they must never gain a VS16.
+ *
+ * These are single-column drawing characters with broad monospace coverage.
+ * They are listed separately because the rule above is the wrong rule for
+ * them: they are width-1 by design and asking a font to draw them as emoji is
+ * what breaks them.
+ */
+export const CARD_TEXT_SYMBOLS = {
+  arrow: "→",
+  branch: "↳",
+  notEqual: "≠",
+  atMost: "≤",
+  refresh: "⟳",
+  gear: "\u2699",
+} as const;
+
+export type CardState = "success" | "wait" | "handoff" | "input-repair" | "failure" | "circuit";
+
+export const CARD_STATE_EMOJI: Readonly<Record<CardState, string>> = {
+  success: CARD_GLYPHS.success,
+  wait: CARD_GLYPHS.wait,
+  handoff: CARD_GLYPHS.handoff,
+  "input-repair": CARD_GLYPHS.inputRepair,
+  failure: CARD_GLYPHS.failure,
+  circuit: CARD_GLYPHS.circuit,
 };
 
 /** Theme token each state's title renders in. */
