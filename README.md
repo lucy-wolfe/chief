@@ -42,7 +42,6 @@ You need macOS or Linux, [`tmux`](https://github.com/tmux/tmux), and
 
 ```bash
 curl -fsSL https://chief.zipbox.ai/install.sh | sh
-export PATH="$HOME/.chief/bin:$PATH"
 ```
 
 Found your first company in any empty directory:
