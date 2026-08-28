@@ -31,15 +31,21 @@ each other.
 
 ## Quick start
 
-You need macOS or Linux, [`tmux`](https://github.com/tmux/tmux), and
-[Pi](https://github.com/earendil-works/pi) 0.80.10 or newer
-(`npm install -g --ignore-scripts @earendil-works/pi-coding-agent`).
+You need macOS or Linux and [`tmux`](https://github.com/tmux/tmux).
+
+**1.** Install [Pi](https://github.com/earendil-works/pi), the agent runtime, at 0.80.10 or newer:
+
+```bash
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+```
+
+**2.** Install chief:
 
 ```bash
 curl -fsSL https://chief.zipbox.ai/install.sh | sh
 ```
 
-Found your first company in any empty directory:
+**3.** Found your first company in any empty directory:
 
 ```bash
 mkdir acme && cd acme && chief
