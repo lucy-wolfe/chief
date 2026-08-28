@@ -1974,7 +1974,7 @@ async function requireDepartmentCreationParent(
   const authorityRoot = authorityRootDepartmentId(manifest, person);
   if (parentDepartmentId === authorityRoot) return manifest;
   if (departmentIsInScope(manifest, person, parentDepartmentId)) return manifest;
-  throw new Error(
+  throw new CallerRefusal(
     `'${person.id}' may create a department beneath ${authorityRoot ? `'${authorityRoot}'` : "no department"} or anything under it, not beneath '${parentDepartmentId}'`,
   );
 }
@@ -4209,7 +4209,7 @@ async function publishMailboxEnvelope(context: OrganizationRuntimeContext, recip
   const existing = findMailboxEntryByMessageId(context, doc, envelope.id, ["pending", "accepted"]);
   if (existing) {
     if (!messageReplayContentMatches(existing.envelope, envelope)) {
-      throw new Error(`Message id '${envelope.id}' already has conflicting content for '${recipient}'`);
+      throw new CallerRefusal(`Message id '${envelope.id}' already has conflicting content for '${recipient}'`);
     }
     return;
   }
@@ -6819,12 +6819,12 @@ async function installRootExecutiveTools(
           const manifest = await loadIntercomOrganization(context);
           const sender = currentPerson(context, manifest);
           if (directManagerId(manifest, sender) !== undefined) {
-            throw new Error("Only the organization's top-level executive, which has no manager to escalate to, may escalate to the human operator");
+            throw new CallerRefusal("Only the organization's top-level executive, which has no manager to escalate to, may escalate to the human operator");
           }
           const blocker = params.blocker.trim();
           const operatorAction = params.operatorAction.trim();
-          if (!blocker) throw new Error("An operator escalation needs a concrete blocker");
-          if (!operatorAction) throw new Error("An operator escalation needs the exact operator action required");
+          if (!blocker) throw new CallerRefusal("An operator escalation needs a concrete blocker");
+          if (!operatorAction) throw new CallerRefusal("An operator escalation needs the exact operator action required");
           const intent = await queueOperatorEscalationIntent(context, sender.id, blocker, operatorAction);
           return toolResult(true, "Escalation recorded durably for the human operator. It reaches them out of band; keep working.", {
             status: "queued",
