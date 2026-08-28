@@ -129,13 +129,93 @@ done
 say ""
 say "chief $version is installed under $CHIEF_HOME."
 
-# --- PATH and the two host prerequisites ------------------------------------
+# --- PATH ------------------------------------------------------------------
+#
+# The installer edits the user's shell profile, and says exactly which files it
+# touched. A script that changes somebody's dotfiles and does not name them is
+# asking to be distrusted, and rightly.
+#
+# There is deliberately no opt-out flag. Putting the binary on PATH is what
+# this script is FOR, it is what every installer of this shape does, and a flag
+# would be a setting nobody discovers on the one run where it matters. What
+# does the work instead is the report: the output names each file, and says
+# when it changed nothing.
+
+export_line="export PATH=\"$CHIEF_HOME/bin:\$PATH\""
+
+# Already exporting this bin directory? Then leave the file alone.
+#
+# Matched on the PATH rather than on the exact line, so a hand-written variant
+# — different quoting, appended rather than prepended, wrapped in a conditional
+# — is recognised as already done. Appending a second line that says the same
+# thing is the failure mode people notice, because it happens on every re-run.
+profile_has_chief() {
+  [ -f "$1" ] || return 1
+  grep -q "PATH=.*$CHIEF_HOME/bin" "$1" 2>/dev/null
+}
+
+add_to_profile() {
+  profile="$1"
+  if profile_has_chief "$profile"; then
+    already="$already $profile"
+    return 0
+  fi
+  # Writability is TESTED, not attempted. A failed `>>` is reported by the
+  # shell itself, before any redirection of stderr can suppress it, and under
+  # `set -e` it would abort the script — so a strange profile path (a
+  # directory, a root-owned file) would end the installer with a raw error
+  # AFTER chief was already installed. Nothing at the PATH step is worth
+  # failing an install that has otherwise succeeded.
+  if [ -e "$profile" ]; then
+    { [ -f "$profile" ] && [ -w "$profile" ]; } || { unwritable="$unwritable $profile"; return 0; }
+  else
+    [ -w "$(dirname "$profile")" ] || { unwritable="$unwritable $profile"; return 0; }
+  fi
+  {
+    printf '\n# Added by the chief installer.\n'
+    printf '%s\n' "$export_line"
+  } >> "$profile" 2>/dev/null || { unwritable="$unwritable $profile"; return 0; }
+  written="$written $profile"
+}
+
+written=""
+already=""
+unwritable=""
+
+for profile in "$HOME/.bashrc" "$HOME/.zshrc"; do
+  [ -e "$profile" ] && add_to_profile "$profile"
+done
+
+# Neither exists: create the one this user's shell will actually read, rather
+# than inventing a config for a shell they do not use.
+if [ -z "$written$already$unwritable" ]; then
+  case "${SHELL:-}" in
+    *zsh) add_to_profile "$HOME/.zshrc" ;;
+    *) add_to_profile "$HOME/.bashrc" ;;
+  esac
+fi
+
+say ""
+for profile in $written; do say "Added chief to your PATH in $profile."; done
+for profile in $already; do say "$profile already puts chief on your PATH; left it unchanged."; done
+for profile in $unwritable; do say "Could not write to $profile."; done
+
+# THE HONEST PART. `curl … | sh` runs in a CHILD shell: nothing this script
+# does can change the PATH of the shell the user is sitting in, and sourcing a
+# profile in here would change it only for the child that is about to exit.
+# Saying otherwise would be a promise the script cannot keep.
 case ":$PATH:" in
   *":$CHIEF_HOME/bin:"*) ;;
   *)
+    first_written="$(printf '%s' "$written" | awk '{print $1}')"
     say ""
-    say "Add chief to your PATH — put this in your shell profile:"
-    say "    export PATH=\"$CHIEF_HOME/bin:\$PATH\""
+    if [ -n "$first_written" ]; then
+      say "New shells will pick that up. For THIS one, run:"
+      say "    source $first_written"
+    else
+      say "Add chief to your PATH — put this in your shell profile:"
+      say "    $export_line"
+    fi
     ;;
 esac
 
