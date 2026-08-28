@@ -29,11 +29,6 @@ each other.
 
 ![Switching between the rail and department panels](docs/assets/panels.gif)
 
-<sub>A capture of a running company: a real `chiefd`, real tmux panes, and
-real Pi agents answering for themselves. The company, Northwind Robotics, and
-everyone in it are fictional. The asciinema recording behind the GIF is
-[`docs/assets/panels.cast`](docs/assets/panels.cast).</sub>
-
 ## Quick start
 
 You need macOS or Linux, [`tmux`](https://github.com/tmux/tmux), and
