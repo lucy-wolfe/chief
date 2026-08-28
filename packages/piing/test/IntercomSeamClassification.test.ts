@@ -286,6 +286,7 @@ const CLASSIFICATION: Readonly<Record<string, Bucket>> = {
   // tells a reader about whose fault it is.
   refusalResultForTest: 'B',
   isCallerRefusalCardForTest: 'B',
+  showsSystemFaultTagForTest: 'B',
   callerRefusalForTest: 'B',
   messageWakeDispositionForTest: 'B',
   primeManifestForTest: 'B',

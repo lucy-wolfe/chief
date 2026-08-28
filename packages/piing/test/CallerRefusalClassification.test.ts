@@ -23,7 +23,8 @@ import { fileURLToPath } from 'node:url'
 import {
   callerRefusalForTest,
   isCallerRefusalCardForTest,
-  refusalResultForTest
+  refusalResultForTest,
+  showsSystemFaultTagForTest
 } from '@test-assets/organization-intercom'
 import { describe, expect, test } from 'vitest'
 
@@ -143,5 +144,53 @@ describe('a card says refused only when the tool decided it', () => {
   test('a status carried as context with fault:true is NOT refused', () => {
     expect(isCallerRefusalCardForTest({ status: 'hire_partial', fault: true })).toBe(false)
     expect(isCallerRefusalCardForTest({ status: 'hire_partial' })).toBe(true)
+  })
+})
+
+/**
+ * THE VERB AND THE TAG READ THE SAME MARKER.
+ *
+ * They diverged: the verb moved to the fault marker while the tag still
+ * measured only the absence of a status. A partial batch wrapping a real crash
+ * therefore said "failed" — correctly — with no crash marker beside the list of
+ * people already hired, which reads as bad input to anyone debugging it.
+ *
+ * One classification, two surfaces, and a test that fails if either moves
+ * without the other.
+ */
+describe('the system-fault tag reads the same marker as the verb', () => {
+  test('an unclassified failure carries the tag', () => {
+    expect(showsSystemFaultTagForTest({})).toBe(true)
+    expect(showsSystemFaultTagForTest(undefined)).toBe(true)
+  })
+
+  test('a decided refusal does NOT carry the tag', () => {
+    expect(showsSystemFaultTagForTest({ status: 'refused' })).toBe(false)
+    expect(showsSystemFaultTagForTest({ status: 'hire_partial' })).toBe(false)
+  })
+
+  test('a context-carried status wrapping a crash DOES carry the tag', () => {
+    expect(showsSystemFaultTagForTest({ status: 'hire_partial', fault: true })).toBe(true)
+  })
+
+  test('verb and tag never disagree about the same detail', () => {
+    // The property that matters is not either rule alone, it is that they are
+    // complementary: anything called "refused" must not be tagged a fault, and
+    // anything tagged a fault must not be called "refused".
+    const cases: Array<{ label: string; detail: Record<string, unknown> }> = [
+      { label: 'no status', detail: {} },
+      { label: 'a decided refusal', detail: { status: 'refused' } },
+      { label: 'a context status', detail: { status: 'hire_partial' } },
+      {
+        label: 'a context status wrapping a crash',
+        detail: { status: 'hire_partial', fault: true }
+      }
+    ]
+    for (const { label, detail } of cases) {
+      expect(
+        isCallerRefusalCardForTest(detail) && showsSystemFaultTagForTest(detail),
+        `${label} must not be both a refusal and a system fault`
+      ).toBe(false)
+    }
   })
 })

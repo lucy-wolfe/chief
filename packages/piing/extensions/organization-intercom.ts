@@ -6216,7 +6216,14 @@ function defaultOrganizationToolRenderResult(organization: string, name: string,
     // is covered without this line changing.
     const refused = !retry && isCallerRefusalCard(detail);
     const titleTags: CardTag[] = [];
-    if (unclassified) titleTags.push({ text: "(system fault)", token: "dim" });
+    // THE TAG READS THE SAME MARKER AS THE VERB. `unclassified` alone measured
+    // only the ABSENCE of a status, so a result carrying one for context while
+    // wrapping a real crash lost the tag — the verb had moved to the fault
+    // marker and the tag had stayed on the old instrument. One classification,
+    // two surfaces, and they must not disagree: a reader debugging a mid-batch
+    // crash would otherwise see "failed" with no crash marker beside a list of
+    // people already hired, and reasonably conclude they had passed bad input.
+    if (unclassified || detail.fault === true) titleTags.push({ text: "(system fault)", token: "dim" });
     if (typeof detail.opId === "string") titleTags.push({ text: `(ref ${detail.opId})`, token: "dim" });
     if (summary.text) titleTags.push({ text: `· ${summary.text}${summary.truncated ? "…" : ""}`, token: "dim" });
     if (!expanded && summary.truncated) titleTags.push({ text: CARD_EXPAND_HINT_TEXT, token: "dim", sep: "  " });
@@ -8309,6 +8316,18 @@ export function messageWakeDispositionForTest(
  * error a validation site throws, so the round trip is testable without
  * driving a whole tool.
  */
+/**
+ * Whether the card carries the `(system fault)` tag.
+ *
+ * The SAME marker the verb reads, exposed separately so a test can prove the
+ * two surfaces cannot drift apart — which they had, the verb having moved to
+ * the fault marker while the tag still measured only the absence of a status.
+ */
+export function showsSystemFaultTagForTest(detail: Record<string, unknown> | undefined): boolean {
+  const hasStatus = typeof detail?.status === "string";
+  return !hasStatus || detail?.fault === true;
+}
+
 /** The verb rule, for the discriminating pair. */
 export function isCallerRefusalCardForTest(detail: Record<string, unknown> | undefined): boolean {
   return isCallerRefusalCard(detail);
