@@ -2449,6 +2449,52 @@ export function workResumeNeedsRedrive(prompted: boolean, pending: boolean): boo
  *
  * Once the gate opens the table below is byte-identical to what it has always
  * been, which `an_open_gate_restores_the_exact_busy_idle_table` pins. */
+/**
+ * The queue a MAILBOX ENVELOPE rides: the same one the operator's own typing
+ * rides.
+ *
+ * Human typing mid-turn is submitted with `streamingBehavior: "steer"` and is
+ * consumed at the next STEP BOUNDARY inside the running turn. Our interrupt
+ * mail already rode that lane. Normal mail rode `followUp`, which Pi consumes
+ * only when the agent has no more tool calls or steering messages — the END of
+ * the turn. So a person mid-way through an hour of work did not see an
+ * ordinary message until the hour was over, while the same words typed by the
+ * operator arrived within seconds.
+ *
+ * Named rather than written twice at the call sites, because it is one
+ * decision and two literals are two decisions waiting to drift — and because a
+ * literal at a call site cannot be asserted, which is why this change arrived
+ * with no test able to notice it.
+ *
+ * The digest is untouched: batching is still the answer to twenty messages in
+ * one turn. Only WHEN the batch is consumed moves.
+ */
+function mailboxDeliveryMode(): "steer" | "followUp" {
+  return "steer";
+}
+
+/** The work-resume prompt's delivery, as ONE definition the call site reads.
+ *
+ * This is a work-resume prompt, not a mailbox envelope: nobody is waiting on it
+ * and it asks the person to pick their own work back up, so arriving at the end
+ * of the current turn is the honest reading. Mail moved to steer; this did not.
+ *
+ * The MODE is its own function, and that is the load-bearing part rather than a
+ * flourish. A first attempt put the literal here AND in the test seam, so the
+ * two were independent copies: reverting this function to "steer" left every
+ * test green, which is the exact false pin the paragraph above warns about —
+ * shipped one function away from the warning. `workResumeDeliveryMode` is now
+ * the single definition both the call site and the seam read, so the mutation
+ * that matters has one place to happen and one test that sees it.
+ */
+function workResumeDeliveryMode(): "steer" | "followUp" {
+  return "followUp";
+}
+
+function workResumeDelivery(): QueuedPiDeliveryOptions {
+  return queuedPiDelivery(workResumeDeliveryMode());
+}
+
 function queuedPiDelivery(
   mode: "steer" | "followUp",
   turnActive: boolean = piTurnInFlight,
@@ -5884,15 +5930,23 @@ const ADD_DEPARTMENT_PARAMETERS = Type.Object({
 }, { additionalProperties: false });
 
 const HIRE_PARAMETERS = Type.Object({
-  departmentId: Type.String({
+  // OPTIONAL, because the description promises a default and a required field
+  // cannot deliver one. It was `Type.String` — required — under a description
+  // opening "DEFAULT: the department YOU head". An agent read the prose,
+  // reasoned that it should omit the field, met a schema that would not let it,
+  // and improvised the most salient name in context: the company. It obeyed
+  // the instrument over the claim, which is the correct thing for it to do.
+  departmentId: Type.Optional(Type.String({
     description:
-      "Where this person lands. DEFAULT: the department YOU head — a hire joins the team that "
-      + "asked for it. Name a different one only when the operator named it. This call never "
-      + "creates a department, and a job title never asks for one: \"hire a Chief of Staff\" is a "
-      + "hire into your own department, not a new unit. Create a department only when the "
-      + "operator asked for a department in those words. "
-      + "The company name or slug is NEVER a department id — the root department's id is in org_roster.",
-  }),
+      "Where this person lands. OMIT IT to hire into the department you head — that is the "
+      + "DEFAULT and it is what you want almost always, because a hire joins the team that "
+      + "asked for it. Pass one only to override that, and only when the operator named a "
+      + "different department. This call never creates a department, and a job title never "
+      + "asks for one: \"hire a Chief of Staff\" is a hire into your own department, not a new "
+      + "unit. Create a department only when the operator asked for a department in those "
+      + "words. If you do pass one, the company name or slug is NEVER a department id — the "
+      + "root department's id is in org_roster.",
+  })),
   /** One person, the original shape. */
   person: Type.Optional(PERSON_SEED),
   /** Several people in ONE call — see the batch note in `execute`. */
@@ -6111,6 +6165,24 @@ function organizationToolSuccessPlainText(presentation: ToolSuccessPresentation)
  * quirk: the specific `recipient_lookup`/`message_text_required` statuses only
  * produce their own label when `waiting` is also true) — `undefined` means this
  * is a hard failure, not a retryable/waiting/busy one. */
+/**
+ * Whether a failure card should say "refused" rather than "failed".
+ *
+ * ONE rule, in one place, because there are three renderers that build a
+ * failure title and a rule copied three times is three rules waiting to
+ * disagree. A classified failure is one the tool DECIDED and can explain, so
+ * "refused" — a word that invites a corrected call. Anything else stays
+ * "failed", which invites a retry.
+ *
+ * `fault: true` is what a producer sets when it carries a status for CONTEXT
+ * rather than as a classification: a partial batch naming what already landed,
+ * where the wrapped error may be a genuine crash. A marker, not a list, so the
+ * next producer in that position is covered without this predicate changing.
+ */
+function isCallerRefusalCard(detail: Record<string, any> | undefined): boolean {
+  return typeof detail?.status === "string" && detail.fault !== true;
+}
+
 function organizationToolRetryPresentation(detail: Record<string, any>): { state: CardState; title: string } | undefined {
   const waiting = detail.retryable === true || detail.status === "awaiting_handoff" || detail.status === "awaiting_handoffs";
   if (!waiting) return undefined;
@@ -6183,15 +6255,38 @@ function defaultOrganizationToolRenderResult(organization: string, name: string,
     // the site describes by token NAME, so renderCard colors them and no color
     // is hand-rolled here (AC1). #333: `opId` is the id the structured failure
     // record was logged under, so a cryptic card is one grep from full context.
+    // THE VERB FOLLOWS THE CLASSIFICATION, not a list of card kinds.
+    //
+    // A classified failure is one the tool DECIDED and can explain, so it is
+    // "refused" — a word that invites a corrected call. An unclassified one is
+    // a caught exception, so it stays "failed", which invites a retry. Getting
+    // this backwards in either direction is the defect: calling a crash
+    // "refused" tells a reader to fix a call that was never wrong.
+    //
+    // `fault: true` is the one thing a producer sets when it carries a status
+    // for CONTEXT rather than as a classification — a partial batch naming
+    // what already landed, where the wrapped error may be a real crash. It is
+    // a marker rather than a list, so a future producer in the same position
+    // is covered without this line changing.
+    const refused = !retry && isCallerRefusalCard(detail);
     const titleTags: CardTag[] = [];
-    if (unclassified) titleTags.push({ text: "(system fault)", token: "dim" });
+    // THE TAG READS THE SAME MARKER AS THE VERB. `unclassified` alone measured
+    // only the ABSENCE of a status, so a result carrying one for context while
+    // wrapping a real crash lost the tag — the verb had moved to the fault
+    // marker and the tag had stayed on the old instrument. One classification,
+    // two surfaces, and they must not disagree: a reader debugging a mid-batch
+    // crash would otherwise see "failed" with no crash marker beside a list of
+    // people already hired, and reasonably conclude they had passed bad input.
+    if (unclassified || detail.fault === true) titleTags.push({ text: "(system fault)", token: "dim" });
     if (typeof detail.opId === "string") titleTags.push({ text: `(ref ${detail.opId})`, token: "dim" });
     if (summary.text) titleTags.push({ text: `· ${summary.text}${summary.truncated ? "…" : ""}`, token: "dim" });
     if (!expanded && summary.truncated) titleTags.push({ text: CARD_EXPAND_HINT_TEXT, token: "dim", sep: "  " });
     return renderDefaultOrganizationToolCard(theme, {
       kind: "tool-failure",
       icon: retry ? retry.state : "failure",
-      title: retry ? retry.title : `${organizationToolDomainIcon(name).title} failed`,
+      title: retry
+        ? retry.title
+        : `${organizationToolDomainIcon(name).title} ${refused ? "refused" : "failed"}`,
       target: retry ? undefined : (target || undefined),
       mentions,
       titleTags,
@@ -7439,7 +7534,7 @@ async function installSubtreeTools(
   pi.registerTool({
     name: "org_hire",
     label: "Hire an organization person",
-    description: "Hire one durable worker into an EXISTING department — by DEFAULT the one you head — only after the roster shows no suitable existing person. Send person as real JSON, never a quoted string; use people: [ … ] for several at once. Example: {\"departmentId\":\"engineering\",\"person\":{\"name\":\"Rhea\",\"title\":\"Staff Engineer\",\"mandate\":\"Own the SQLite store.\"}}. name is one short first name; the job goes in title. A NEW DEPARTMENT IS THE OPERATOR'S DECISION AND NEVER YOURS TO INFER: if they asked for one in those words use org_add_department, which makes it and its head together; if they did not, this call is the whole answer. \"Chief of Staff\" and \"Head of Growth\" are TITLES, not requests for a unit. No field asks you to justify anything. Put technology requirements in mandate; a hire does not select skills, extensions, or packages. A new hire comes up on its own; you do not have to start them, and nobody is stopped at creation.",
+    description: "Hire one durable worker into an EXISTING department — by DEFAULT the one you head, so OMIT departmentId unless the operator named another — only after the roster shows no suitable existing person. Send person as real JSON, never a quoted string; use people: [ … ] for several at once. Example: {\"person\":{\"name\":\"Rhea\",\"title\":\"Staff Engineer\",\"mandate\":\"Own the SQLite store.\"}}; add departmentId only to override. name is one short first name; the job goes in title. A NEW DEPARTMENT IS THE OPERATOR'S DECISION AND NEVER YOURS TO INFER: if they asked for one in those words use org_add_department, which makes it and its head together; if they did not, this call is the whole answer. \"Chief of Staff\" and \"Head of Growth\" are TITLES, not requests for a unit. No field asks you to justify anything. Put technology requirements in mandate; a hire does not select skills, extensions, or packages. A new hire comes up on its own; you do not have to start them, and nobody is stopped at creation.",
     parameters: HIRE_PARAMETERS,
     prepareArguments: stringifiedArgumentRepair(context, "org_hire", HIRE_PARAMETERS) as never,
     async execute(_toolCallId, params) {
@@ -7481,9 +7576,20 @@ async function installSubtreeTools(
         // department 'belfort-brothers-capital'" for a department that simply
         // did not exist, then followed its remediation sentence into a create
         // the core refuses. Both halves are derived now, never static.
-        const hireDenial = departmentScopeDenial(gate.manifest, hiringManager, params.departmentId);
+        // THE DEFAULT THE DESCRIPTION PROMISES, resolved here rather than
+        // demanded of the caller: the department this person heads, or failing
+        // that the one they sit in. That is `authorityRootDepartmentId`, which
+        // already existed and is character-for-character what the prose says —
+        // the promise was always implementable, it simply was not implemented.
+        const departmentId = params.departmentId ?? authorityRootDepartmentId(gate.manifest, hiringManager);
+        if (departmentId === undefined) {
+          throw new CallerRefusal(
+            "Could not determine which department to hire into, and none was given. Pass departmentId naming one from org_roster.",
+          );
+        }
+        const hireDenial = departmentScopeDenial(gate.manifest, hiringManager, departmentId);
         if (hireDenial === "unknown-department") {
-          throw new CallerRefusal(unknownDepartmentMessage(gate.manifest, hiringManager, params.departmentId, "hire into"));
+          throw new CallerRefusal(unknownDepartmentMessage(gate.manifest, hiringManager, departmentId, "hire into"));
         }
         if (hireDenial) {
           // Name the ACCEPTED path, not just the refusal. Everyone now carries
@@ -7491,7 +7597,7 @@ async function installSubtreeTools(
           // department it merely sits in — and the answer is to grow its own
           // unit first, never to loosen the scope check.
           throw new Error(
-            `'${hiringManager.id}' does not manage department '${params.departmentId}'. ${hiringPathAdvice(gate.manifest, hiringManager)}`,
+            `'${hiringManager.id}' does not manage department '${departmentId}'. ${hiringPathAdvice(gate.manifest, hiringManager)}`,
           );
         }
         for (const seed of seeds) {
@@ -7501,35 +7607,35 @@ async function installSubtreeTools(
           // on the operator's own defaults, like everybody else.
           const request = hireRequest({
             slug: gate.slug,
-            departmentId: params.departmentId,
+            departmentId,
             hiringManagerPersonId: hiringManager.id,
             person: seed as unknown as Record<string, unknown>,
           });
           const outcome = await staffingApply(gate, "/v1/org/person/hire", request as unknown as Record<string, unknown>, {
-            action: "hire", departmentId: params.departmentId, personId: request.personId || undefined, name: request.name,
+            action: "hire", departmentId, personId: request.personId || undefined, name: request.name,
           });
           // A refusal mid-batch reports WHO was already hired. Silently
           // dropping that list is how an operator retries a batch and gets
           // duplicates of the people who succeeded the first time.
           if ("refused" in outcome) {
-            return routeRefusal("Hire", outcome, { departmentId: params.departmentId, hired });
+            return routeRefusal("Hire", outcome, { departmentId: departmentId, hired });
           }
           hired.push({ name: request.name });
         }
 
         if (hired.length === 1) {
           const only = hired[0]!;
-          return toolResult(true, `Hired ${only.name} into '${params.departmentId}'. They come up on their own; they stop on their own once they settle after idling.`, {
+          return toolResult(true, `Hired ${only.name} into '${departmentId}'. They come up on their own; they stop on their own once they settle after idling.`, {
             status: "applied",
-            departmentId: params.departmentId,
+            departmentId: departmentId,
             name: only.name,
             hired,
           });
         }
         const roster = hired.map((entry) => entry.name).join(", ");
-        return toolResult(true, `Hired ${hired.length} people into '${params.departmentId}': ${roster}. They come up on their own; each stops on its own once it settles after idling.`, {
+        return toolResult(true, `Hired ${hired.length} people into '${departmentId}': ${roster}. They come up on their own; each stops on its own once it settles after idling.`, {
           status: "applied",
-          departmentId: params.departmentId,
+          departmentId: departmentId,
           hired,
         });
       } catch (error) {
@@ -7541,7 +7647,17 @@ async function installSubtreeTools(
         const landed = hired.length
           ? ` Already hired, do NOT re-send: ${hired.map((entry) => entry.name).join(", ")}. Retry only the rest.`
           : "";
-        if (landed) return toolResult(false, `${safeExceptionMessage(error)}${landed}`, { status: "hire_partial", hired });
+        // The status here carries the already-hired list; it is NOT a claim
+        // about whose fault the failure was. The wrapped error can be either
+        // kind — a mid-batch caller refusal (an unknown department on person
+        // four) or a genuine crash — so the error's own type decides, exactly
+        // as it does everywhere else. Without this the card would call a
+        // crash "refused" and invite a correction to a call that was right.
+        if (landed) return toolResult(false, `${safeExceptionMessage(error)}${landed}`, {
+          status: "hire_partial",
+          hired,
+          ...(error instanceof CallerRefusal ? {} : { fault: true }),
+        });
         return lifecycleFailure(error);
       }
     },
@@ -7769,7 +7885,9 @@ async function installSubtreeTools(
         // #360: this used to interpolate the raw internal verb into the
         // title ("⚠️ bench failed", "⚠️ recall failed") instead of a proper
         // sentence-case title.
-        const hardFailTitle = action === "bench" ? "Bench failed" : "Recall failed";
+        // The same rule as the default card: a decided refusal is "refused".
+        const verb = isCallerRefusalCard(detail) ? "refused" : "failed";
+        const hardFailTitle = action === "bench" ? `Bench ${verb}` : `Recall ${verb}`;
         return renderOrganizationCard(theme, {
           kind: "tool-failure",
           icon: handoff ? "handoff" : domainIcon(CARD_GLYPHS.failure, detail?.retryable ? "warning" : "error"),
@@ -7970,7 +8088,8 @@ async function installSubtreeTools(
         const handoff = detail?.status === "awaiting_handoff" || detail?.status === "awaiting_handoffs";
         // #360: this used to interpolate the raw internal verb into the
         // title ("⚠️ start-person failed", "⚠️ stop-person failed").
-        const hardFailTitle = action === "start-person" ? "Start failed" : "Stop failed";
+        const verb = isCallerRefusalCard(detail) ? "refused" : "failed";
+        const hardFailTitle = action === "start-person" ? `Start ${verb}` : `Stop ${verb}`;
         return renderOrganizationCard(theme, {
           kind: "tool-failure",
           icon: handoff ? "handoff" : domainIcon(CARD_GLYPHS.failure, detail?.retryable ? "warning" : "error"),
@@ -8262,6 +8381,55 @@ export function messageWakeDispositionForTest(
  * error a validation site throws, so the round trip is testable without
  * driving a whole tool.
  */
+/**
+ * The default `org_hire` resolves when `departmentId` is omitted — the one the
+ * parameter description promises. Exported so BOTH arms of it can be asserted
+ * without booting a company: the department a head heads, and the department a
+ * non-head merely sits in.
+ */
+export function hireDefaultDepartmentForTest(
+  manifest: IntercomOrganizationManifest,
+  person: PersonRecord,
+): string | undefined {
+  return authorityRootDepartmentId(manifest, person);
+}
+
+/**
+ * Whether the card carries the `(system fault)` tag.
+ *
+ * The SAME marker the verb reads, exposed separately so a test can prove the
+ * two surfaces cannot drift apart — which they had, the verb having moved to
+ * the fault marker while the tag still measured only the absence of a status.
+ */
+export function showsSystemFaultTagForTest(detail: Record<string, unknown> | undefined): boolean {
+  const hasStatus = typeof detail?.status === "string";
+  return !hasStatus || detail?.fault === true;
+}
+
+/** The verb rule, for the discriminating pair. */
+export function isCallerRefusalCardForTest(detail: Record<string, unknown> | undefined): boolean {
+  return isCallerRefusalCard(detail);
+}
+
+/**
+ * The queue mailbox envelopes ride, and the options that follow from it —
+ * exposed together so the RULE can be asserted rather than the table alone.
+ *
+ * The table was already pinned; which mode the mailbox passes into it was not,
+ * which is why this change could alter every person's delivery timing without
+ * a single test noticing.
+ */
+/** The work-resume prompt's delivery — the boundary of the mail change, from
+ * the other side. Mail steers; this deliberately does not, and that asymmetry
+ * is the one place this change kept code rather than deleting it. */
+export function workResumeDeliveryForTest(turnActive: boolean, bootWindow: boolean): QueuedPiDeliveryOptions {
+  return queuedPiDelivery(workResumeDeliveryMode(), turnActive, bootWindow);
+}
+
+export function mailboxDeliveryForTest(turnActive: boolean, bootWindow: boolean): QueuedPiDeliveryOptions {
+  return queuedPiDelivery(mailboxDeliveryMode(), turnActive, bootWindow);
+}
+
 export function refusalResultForTest(error: unknown): { details?: Record<string, unknown> } {
   return refusalResult(error) as unknown as { details?: Record<string, unknown> };
 }
@@ -8399,7 +8567,11 @@ export async function drainOrganizationMailbox(
     try {
       if (!isCurrent()) return delivered;
       pi.sendMessage({ customType: MESSAGE_TYPE, content: messageContext(envelope, context.personId, role), display: true, details: envelope },
-        queuedPiDelivery(isInterruptDelivery ? "steer" : "followUp"));
+        // Always the mailbox lane: a normal envelope is routed into `normal`
+        // three lines above and never reaches here, so the ternary this
+        // replaced had an unreachable false arm even before normal urgency
+        // moved to steer.
+        queuedPiDelivery(mailboxDeliveryMode()));
     } catch (error) {
       appendOrganizationEvent(context, { event: "message-delivery-deferred", id: envelope.id, personId: context.personId, error: safeExceptionMessage(error), at: new Date().toISOString() });
       logOrganizationException(context, "organization-mailbox-delivery", error, { messageId: envelope.id });
@@ -8422,7 +8594,7 @@ export async function drainOrganizationMailbox(
     };
     try {
       if (!isCurrent()) return delivered;
-      pi.sendMessage({ customType: MESSAGE_TYPE, content: mailboxBatchContext(batch, context.personId, role), display: true, details: batch }, queuedPiDelivery("followUp"));
+      pi.sendMessage({ customType: MESSAGE_TYPE, content: mailboxBatchContext(batch, context.personId, role), display: true, details: batch }, queuedPiDelivery(mailboxDeliveryMode()));
     } catch (error) {
       appendOrganizationEvent(context, { event: "message-batch-delivery-deferred", batchId: batch.batchId, personId: context.personId, count: selected.length, error: safeExceptionMessage(error), at: new Date().toISOString() });
       logOrganizationException(context, "organization-mailbox-batch-delivery", error, { batchId: batch.batchId, count: selected.length });
@@ -8438,7 +8610,7 @@ export async function drainOrganizationMailbox(
       if (!isCurrent()) return delivered;
       if (deliveryAttempts.has(file) || deliveryAttempts.size >= ORGANIZATION_MAILBOX_MAX_OUTSTANDING_DELIVERIES) continue;
       try {
-        pi.sendMessage({ customType: MESSAGE_TYPE, content: messageContext(envelope, context.personId, role), display: true, details: envelope }, queuedPiDelivery("followUp"));
+        pi.sendMessage({ customType: MESSAGE_TYPE, content: messageContext(envelope, context.personId, role), display: true, details: envelope }, queuedPiDelivery(mailboxDeliveryMode()));
       } catch (error) {
         appendOrganizationEvent(context, { event: "message-delivery-deferred", id: envelope.id, personId: context.personId, error: safeExceptionMessage(error), at: new Date().toISOString() });
         logOrganizationException(context, "organization-mailbox-delivery", error, { messageId: envelope.id });
@@ -9833,9 +10005,14 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
   // EVERY DELIVERY THIS TURN CONSUMED, so a turn that dies can say what it
   // destroyed.
   //
-  // Acceptance is at `message_start` — TURN START, not completion — and it is
-  // the durable pending→accepted move. That is correct and is not what this
-  // change touches: a message must not stay pending while a turn reads it, or a
+  // Acceptance is at `message_start`, not at turn completion — and it is the
+  // durable pending→accepted move. `message_start` is NOT the same thing as the
+  // start of a turn, and saying so was this comment's old error: a steered
+  // message fires `message_start` in the MIDDLE of a turn already running, which
+  // is the whole point of steering. The rule the code keeps is the one that
+  // survives either case — a message is accepted when a turn begins READING it,
+  // whenever in that turn's life that happens. That is correct and is not what
+  // this change touches: a message must not stay pending while a turn reads it, or a
   // crash re-delivers work that was already begun. The consequence is what was
   // wrong: a turn that then FAILS has consumed the envelope and answered
   // nothing, and before this the sender was never told, so an operator's
@@ -11374,7 +11551,11 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
             content: workResumePrompt(person, details),
             display: true,
             details,
-          }, queuedPiDelivery("followUp"));
+            // CONSIDERED AND KEPT — and now PINNED, via the same one-definition
+            // shape mail uses. A literal at a call site cannot be asserted, so
+            // "considered and kept" was a claim no test could check and a revert
+            // to steer would have passed everything.
+          }, workResumeDelivery());
           appendOrganizationEvent(context, {
             event: "work-resume-prompt-requested",
             personId: context.personId,
