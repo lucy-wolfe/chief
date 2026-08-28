@@ -1711,7 +1711,7 @@ function nearestDepartmentHint(
   const key = departmentMatchKey(departmentId);
   if (!key) return undefined;
   if (key === departmentMatchKey(manifest.slug) || key === departmentMatchKey(manifest.name)) {
-    return `The root department id is '${manifest.departments[manifest.rootDepartmentId]?.id ?? manifest.rootDepartmentId}' — '${departmentId}' names the company, not a department.`;
+    return `The root department id is '${manifest.rootDepartmentId}' — '${departmentId}' names the company, not a department.`;
   }
   const byName = Object.values(manifest.departments).find(
     (department) => departmentMatchKey(department.name) === key,
@@ -6366,11 +6366,18 @@ class CallerRefusal extends Error {
 /**
  * The result a caught error becomes, preserving a decided refusal's status.
  *
- * Every adapter that flattens a throw into a `toolResult` has to do this, or
- * the refusal loses its classification on the way out and the renderer calls
- * it a system fault again. There are three such adapters, which is three
- * chances for a later refactor to drop one — hence one helper and a test per
- * adapter.
+ * EVERY catch path that flattens a throw into a `toolResult` funnels through
+ * here. It has to: flattening an error by hand drops the status, and the
+ * renderer then calls a decided refusal a system fault again — which is the
+ * whole defect this helper exists to close.
+ *
+ * No count is written here on purpose. An earlier draft of this comment named
+ * one, and the number was already wrong when it shipped — the audit that
+ * produced it had found three of the eight sites. A remembered number in a
+ * comment is a claim that goes stale silently, and this file is the last place
+ * that should carry one. `CatchPathsFunnelThroughRefusalResult` in the tests
+ * enforces the rule mechanically instead, so it covers the site somebody adds
+ * next month as well as the ones here today.
  */
 function refusalResult(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
