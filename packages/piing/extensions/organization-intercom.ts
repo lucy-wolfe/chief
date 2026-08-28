@@ -6375,9 +6375,10 @@ class CallerRefusal extends Error {
  * one, and the number was already wrong when it shipped — the audit that
  * produced it had found three of the eight sites. A remembered number in a
  * comment is a claim that goes stale silently, and this file is the last place
- * that should carry one. `CatchPathsFunnelThroughRefusalResult` in the tests
- * enforces the rule mechanically instead, so it covers the site somebody adds
- * next month as well as the ones here today.
+ * that should carry one. `CallerRefusalClassification`'s
+ * "every catch path funnels through refusalResult" sweep enforces the rule
+ * mechanically instead, so it covers the site somebody adds next month as well
+ * as the ones here today.
  */
 function refusalResult(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
