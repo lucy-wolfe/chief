@@ -6119,6 +6119,24 @@ function organizationToolSuccessPlainText(presentation: ToolSuccessPresentation)
  * quirk: the specific `recipient_lookup`/`message_text_required` statuses only
  * produce their own label when `waiting` is also true) — `undefined` means this
  * is a hard failure, not a retryable/waiting/busy one. */
+/**
+ * Whether a failure card should say "refused" rather than "failed".
+ *
+ * ONE rule, in one place, because there are three renderers that build a
+ * failure title and a rule copied three times is three rules waiting to
+ * disagree. A classified failure is one the tool DECIDED and can explain, so
+ * "refused" — a word that invites a corrected call. Anything else stays
+ * "failed", which invites a retry.
+ *
+ * `fault: true` is what a producer sets when it carries a status for CONTEXT
+ * rather than as a classification: a partial batch naming what already landed,
+ * where the wrapped error may be a genuine crash. A marker, not a list, so the
+ * next producer in that position is covered without this predicate changing.
+ */
+function isCallerRefusalCard(detail: Record<string, any> | undefined): boolean {
+  return typeof detail?.status === "string" && detail.fault !== true;
+}
+
 function organizationToolRetryPresentation(detail: Record<string, any>): { state: CardState; title: string } | undefined {
   const waiting = detail.retryable === true || detail.status === "awaiting_handoff" || detail.status === "awaiting_handoffs";
   if (!waiting) return undefined;
@@ -6191,15 +6209,38 @@ function defaultOrganizationToolRenderResult(organization: string, name: string,
     // the site describes by token NAME, so renderCard colors them and no color
     // is hand-rolled here (AC1). #333: `opId` is the id the structured failure
     // record was logged under, so a cryptic card is one grep from full context.
+    // THE VERB FOLLOWS THE CLASSIFICATION, not a list of card kinds.
+    //
+    // A classified failure is one the tool DECIDED and can explain, so it is
+    // "refused" — a word that invites a corrected call. An unclassified one is
+    // a caught exception, so it stays "failed", which invites a retry. Getting
+    // this backwards in either direction is the defect: calling a crash
+    // "refused" tells a reader to fix a call that was never wrong.
+    //
+    // `fault: true` is the one thing a producer sets when it carries a status
+    // for CONTEXT rather than as a classification — a partial batch naming
+    // what already landed, where the wrapped error may be a real crash. It is
+    // a marker rather than a list, so a future producer in the same position
+    // is covered without this line changing.
+    const refused = !retry && isCallerRefusalCard(detail);
     const titleTags: CardTag[] = [];
-    if (unclassified) titleTags.push({ text: "(system fault)", token: "dim" });
+    // THE TAG READS THE SAME MARKER AS THE VERB. `unclassified` alone measured
+    // only the ABSENCE of a status, so a result carrying one for context while
+    // wrapping a real crash lost the tag — the verb had moved to the fault
+    // marker and the tag had stayed on the old instrument. One classification,
+    // two surfaces, and they must not disagree: a reader debugging a mid-batch
+    // crash would otherwise see "failed" with no crash marker beside a list of
+    // people already hired, and reasonably conclude they had passed bad input.
+    if (unclassified || detail.fault === true) titleTags.push({ text: "(system fault)", token: "dim" });
     if (typeof detail.opId === "string") titleTags.push({ text: `(ref ${detail.opId})`, token: "dim" });
     if (summary.text) titleTags.push({ text: `· ${summary.text}${summary.truncated ? "…" : ""}`, token: "dim" });
     if (!expanded && summary.truncated) titleTags.push({ text: CARD_EXPAND_HINT_TEXT, token: "dim", sep: "  " });
     return renderDefaultOrganizationToolCard(theme, {
       kind: "tool-failure",
       icon: retry ? retry.state : "failure",
-      title: retry ? retry.title : `${organizationToolDomainIcon(name).title} failed`,
+      title: retry
+        ? retry.title
+        : `${organizationToolDomainIcon(name).title} ${refused ? "refused" : "failed"}`,
       target: retry ? undefined : (target || undefined),
       mentions,
       titleTags,
@@ -7560,7 +7601,17 @@ async function installSubtreeTools(
         const landed = hired.length
           ? ` Already hired, do NOT re-send: ${hired.map((entry) => entry.name).join(", ")}. Retry only the rest.`
           : "";
-        if (landed) return toolResult(false, `${safeExceptionMessage(error)}${landed}`, { status: "hire_partial", hired });
+        // The status here carries the already-hired list; it is NOT a claim
+        // about whose fault the failure was. The wrapped error can be either
+        // kind — a mid-batch caller refusal (an unknown department on person
+        // four) or a genuine crash — so the error's own type decides, exactly
+        // as it does everywhere else. Without this the card would call a
+        // crash "refused" and invite a correction to a call that was right.
+        if (landed) return toolResult(false, `${safeExceptionMessage(error)}${landed}`, {
+          status: "hire_partial",
+          hired,
+          ...(error instanceof CallerRefusal ? {} : { fault: true }),
+        });
         return lifecycleFailure(error);
       }
     },
@@ -7788,7 +7839,9 @@ async function installSubtreeTools(
         // #360: this used to interpolate the raw internal verb into the
         // title ("⚠️ bench failed", "⚠️ recall failed") instead of a proper
         // sentence-case title.
-        const hardFailTitle = action === "bench" ? "Bench failed" : "Recall failed";
+        // The same rule as the default card: a decided refusal is "refused".
+        const verb = isCallerRefusalCard(detail) ? "refused" : "failed";
+        const hardFailTitle = action === "bench" ? `Bench ${verb}` : `Recall ${verb}`;
         return renderOrganizationCard(theme, {
           kind: "tool-failure",
           icon: handoff ? "handoff" : domainIcon(CARD_GLYPHS.failure, detail?.retryable ? "warning" : "error"),
@@ -7989,7 +8042,8 @@ async function installSubtreeTools(
         const handoff = detail?.status === "awaiting_handoff" || detail?.status === "awaiting_handoffs";
         // #360: this used to interpolate the raw internal verb into the
         // title ("⚠️ start-person failed", "⚠️ stop-person failed").
-        const hardFailTitle = action === "start-person" ? "Start failed" : "Stop failed";
+        const verb = isCallerRefusalCard(detail) ? "refused" : "failed";
+        const hardFailTitle = action === "start-person" ? `Start ${verb}` : `Stop ${verb}`;
         return renderOrganizationCard(theme, {
           kind: "tool-failure",
           icon: handoff ? "handoff" : domainIcon(CARD_GLYPHS.failure, detail?.retryable ? "warning" : "error"),
@@ -8292,6 +8346,23 @@ export function hireDefaultDepartmentForTest(
   person: PersonRecord,
 ): string | undefined {
   return authorityRootDepartmentId(manifest, person);
+}
+
+/**
+ * Whether the card carries the `(system fault)` tag.
+ *
+ * The SAME marker the verb reads, exposed separately so a test can prove the
+ * two surfaces cannot drift apart — which they had, the verb having moved to
+ * the fault marker while the tag still measured only the absence of a status.
+ */
+export function showsSystemFaultTagForTest(detail: Record<string, unknown> | undefined): boolean {
+  const hasStatus = typeof detail?.status === "string";
+  return !hasStatus || detail?.fault === true;
+}
+
+/** The verb rule, for the discriminating pair. */
+export function isCallerRefusalCardForTest(detail: Record<string, unknown> | undefined): boolean {
+  return isCallerRefusalCard(detail);
 }
 
 export function refusalResultForTest(error: unknown): { details?: Record<string, unknown> } {

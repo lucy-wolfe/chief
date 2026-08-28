@@ -20,7 +20,12 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-import { callerRefusalForTest, refusalResultForTest } from '@test-assets/organization-intercom'
+import {
+  callerRefusalForTest,
+  isCallerRefusalCardForTest,
+  refusalResultForTest,
+  showsSystemFaultTagForTest
+} from '@test-assets/organization-intercom'
 import { describe, expect, test } from 'vitest'
 
 describe('a decided refusal keeps its classification through the adapters', () => {
@@ -103,5 +108,89 @@ describe('every catch path funnels through refusalResult', () => {
     // detector simply never matched anything.
     const offending = `} catch (error) { return toolResult(false, ${FLATTEN}); }`
     expect(handFlattenedResults(offending)).toHaveLength(1)
+  })
+})
+
+/**
+ * THE VERB FOLLOWS THE CLASSIFICATION.
+ *
+ * "refused" invites a corrected call; "failed" invites a retry. Which word a
+ * card uses is therefore a claim about whose fault the failure was, and the
+ * two must not be interchangeable — a crash called "refused" tells a reader to
+ * fix a call that was never wrong, which is the #11 defect pointed the other
+ * way and worse for it.
+ */
+describe('a card says refused only when the tool decided it', () => {
+  test('a classified refusal is refused', () => {
+    expect(isCallerRefusalCardForTest({ status: 'refused' })).toBe(true)
+    expect(isCallerRefusalCardForTest({ status: 'incumbent_disposition_required' })).toBe(true)
+  })
+
+  /**
+   * THE DISCRIMINATING HALF. Without it the rule above passes by returning
+   * true for everything — which would relabel every crash a refusal and delete
+   * the distinction rather than using it.
+   */
+  test('an unclassified failure is NOT refused', () => {
+    expect(isCallerRefusalCardForTest({})).toBe(false)
+    expect(isCallerRefusalCardForTest(undefined)).toBe(false)
+  })
+
+  /**
+   * A status carried for CONTEXT is not a classification. The partial-hire card
+   * names what already landed so a retry does not double-hire; the error it
+   * wraps may be a genuine crash, and only the error's own type knows.
+   */
+  test('a status carried as context with fault:true is NOT refused', () => {
+    expect(isCallerRefusalCardForTest({ status: 'hire_partial', fault: true })).toBe(false)
+    expect(isCallerRefusalCardForTest({ status: 'hire_partial' })).toBe(true)
+  })
+})
+
+/**
+ * THE VERB AND THE TAG READ THE SAME MARKER.
+ *
+ * They diverged: the verb moved to the fault marker while the tag still
+ * measured only the absence of a status. A partial batch wrapping a real crash
+ * therefore said "failed" — correctly — with no crash marker beside the list of
+ * people already hired, which reads as bad input to anyone debugging it.
+ *
+ * One classification, two surfaces, and a test that fails if either moves
+ * without the other.
+ */
+describe('the system-fault tag reads the same marker as the verb', () => {
+  test('an unclassified failure carries the tag', () => {
+    expect(showsSystemFaultTagForTest({})).toBe(true)
+    expect(showsSystemFaultTagForTest(undefined)).toBe(true)
+  })
+
+  test('a decided refusal does NOT carry the tag', () => {
+    expect(showsSystemFaultTagForTest({ status: 'refused' })).toBe(false)
+    expect(showsSystemFaultTagForTest({ status: 'hire_partial' })).toBe(false)
+  })
+
+  test('a context-carried status wrapping a crash DOES carry the tag', () => {
+    expect(showsSystemFaultTagForTest({ status: 'hire_partial', fault: true })).toBe(true)
+  })
+
+  test('verb and tag never disagree about the same detail', () => {
+    // The property that matters is not either rule alone, it is that they are
+    // complementary: anything called "refused" must not be tagged a fault, and
+    // anything tagged a fault must not be called "refused".
+    const cases: Array<{ label: string; detail: Record<string, unknown> }> = [
+      { label: 'no status', detail: {} },
+      { label: 'a decided refusal', detail: { status: 'refused' } },
+      { label: 'a context status', detail: { status: 'hire_partial' } },
+      {
+        label: 'a context status wrapping a crash',
+        detail: { status: 'hire_partial', fault: true }
+      }
+    ]
+    for (const { label, detail } of cases) {
+      expect(
+        isCallerRefusalCardForTest(detail) && showsSystemFaultTagForTest(detail),
+        `${label} must not be both a refusal and a system fault`
+      ).toBe(false)
+    }
   })
 })
