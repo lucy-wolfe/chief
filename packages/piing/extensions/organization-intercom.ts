@@ -2449,6 +2449,52 @@ export function workResumeNeedsRedrive(prompted: boolean, pending: boolean): boo
  *
  * Once the gate opens the table below is byte-identical to what it has always
  * been, which `an_open_gate_restores_the_exact_busy_idle_table` pins. */
+/**
+ * The queue a MAILBOX ENVELOPE rides: the same one the operator's own typing
+ * rides.
+ *
+ * Human typing mid-turn is submitted with `streamingBehavior: "steer"` and is
+ * consumed at the next STEP BOUNDARY inside the running turn. Our interrupt
+ * mail already rode that lane. Normal mail rode `followUp`, which Pi consumes
+ * only when the agent has no more tool calls or steering messages — the END of
+ * the turn. So a person mid-way through an hour of work did not see an
+ * ordinary message until the hour was over, while the same words typed by the
+ * operator arrived within seconds.
+ *
+ * Named rather than written twice at the call sites, because it is one
+ * decision and two literals are two decisions waiting to drift — and because a
+ * literal at a call site cannot be asserted, which is why this change arrived
+ * with no test able to notice it.
+ *
+ * The digest is untouched: batching is still the answer to twenty messages in
+ * one turn. Only WHEN the batch is consumed moves.
+ */
+function mailboxDeliveryMode(): "steer" | "followUp" {
+  return "steer";
+}
+
+/** The work-resume prompt's delivery, as ONE definition the call site reads.
+ *
+ * This is a work-resume prompt, not a mailbox envelope: nobody is waiting on it
+ * and it asks the person to pick their own work back up, so arriving at the end
+ * of the current turn is the honest reading. Mail moved to steer; this did not.
+ *
+ * The MODE is its own function, and that is the load-bearing part rather than a
+ * flourish. A first attempt put the literal here AND in the test seam, so the
+ * two were independent copies: reverting this function to "steer" left every
+ * test green, which is the exact false pin the paragraph above warns about —
+ * shipped one function away from the warning. `workResumeDeliveryMode` is now
+ * the single definition both the call site and the seam read, so the mutation
+ * that matters has one place to happen and one test that sees it.
+ */
+function workResumeDeliveryMode(): "steer" | "followUp" {
+  return "followUp";
+}
+
+function workResumeDelivery(): QueuedPiDeliveryOptions {
+  return queuedPiDelivery(workResumeDeliveryMode());
+}
+
 function queuedPiDelivery(
   mode: "steer" | "followUp",
   turnActive: boolean = piTurnInFlight,
@@ -8365,6 +8411,25 @@ export function isCallerRefusalCardForTest(detail: Record<string, unknown> | und
   return isCallerRefusalCard(detail);
 }
 
+/**
+ * The queue mailbox envelopes ride, and the options that follow from it —
+ * exposed together so the RULE can be asserted rather than the table alone.
+ *
+ * The table was already pinned; which mode the mailbox passes into it was not,
+ * which is why this change could alter every person's delivery timing without
+ * a single test noticing.
+ */
+/** The work-resume prompt's delivery — the boundary of the mail change, from
+ * the other side. Mail steers; this deliberately does not, and that asymmetry
+ * is the one place this change kept code rather than deleting it. */
+export function workResumeDeliveryForTest(turnActive: boolean, bootWindow: boolean): QueuedPiDeliveryOptions {
+  return queuedPiDelivery(workResumeDeliveryMode(), turnActive, bootWindow);
+}
+
+export function mailboxDeliveryForTest(turnActive: boolean, bootWindow: boolean): QueuedPiDeliveryOptions {
+  return queuedPiDelivery(mailboxDeliveryMode(), turnActive, bootWindow);
+}
+
 export function refusalResultForTest(error: unknown): { details?: Record<string, unknown> } {
   return refusalResult(error) as unknown as { details?: Record<string, unknown> };
 }
@@ -8502,7 +8567,11 @@ export async function drainOrganizationMailbox(
     try {
       if (!isCurrent()) return delivered;
       pi.sendMessage({ customType: MESSAGE_TYPE, content: messageContext(envelope, context.personId, role), display: true, details: envelope },
-        queuedPiDelivery(isInterruptDelivery ? "steer" : "followUp"));
+        // Always the mailbox lane: a normal envelope is routed into `normal`
+        // three lines above and never reaches here, so the ternary this
+        // replaced had an unreachable false arm even before normal urgency
+        // moved to steer.
+        queuedPiDelivery(mailboxDeliveryMode()));
     } catch (error) {
       appendOrganizationEvent(context, { event: "message-delivery-deferred", id: envelope.id, personId: context.personId, error: safeExceptionMessage(error), at: new Date().toISOString() });
       logOrganizationException(context, "organization-mailbox-delivery", error, { messageId: envelope.id });
@@ -8525,7 +8594,7 @@ export async function drainOrganizationMailbox(
     };
     try {
       if (!isCurrent()) return delivered;
-      pi.sendMessage({ customType: MESSAGE_TYPE, content: mailboxBatchContext(batch, context.personId, role), display: true, details: batch }, queuedPiDelivery("followUp"));
+      pi.sendMessage({ customType: MESSAGE_TYPE, content: mailboxBatchContext(batch, context.personId, role), display: true, details: batch }, queuedPiDelivery(mailboxDeliveryMode()));
     } catch (error) {
       appendOrganizationEvent(context, { event: "message-batch-delivery-deferred", batchId: batch.batchId, personId: context.personId, count: selected.length, error: safeExceptionMessage(error), at: new Date().toISOString() });
       logOrganizationException(context, "organization-mailbox-batch-delivery", error, { batchId: batch.batchId, count: selected.length });
@@ -8541,7 +8610,7 @@ export async function drainOrganizationMailbox(
       if (!isCurrent()) return delivered;
       if (deliveryAttempts.has(file) || deliveryAttempts.size >= ORGANIZATION_MAILBOX_MAX_OUTSTANDING_DELIVERIES) continue;
       try {
-        pi.sendMessage({ customType: MESSAGE_TYPE, content: messageContext(envelope, context.personId, role), display: true, details: envelope }, queuedPiDelivery("followUp"));
+        pi.sendMessage({ customType: MESSAGE_TYPE, content: messageContext(envelope, context.personId, role), display: true, details: envelope }, queuedPiDelivery(mailboxDeliveryMode()));
       } catch (error) {
         appendOrganizationEvent(context, { event: "message-delivery-deferred", id: envelope.id, personId: context.personId, error: safeExceptionMessage(error), at: new Date().toISOString() });
         logOrganizationException(context, "organization-mailbox-delivery", error, { messageId: envelope.id });
@@ -9936,9 +10005,14 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
   // EVERY DELIVERY THIS TURN CONSUMED, so a turn that dies can say what it
   // destroyed.
   //
-  // Acceptance is at `message_start` — TURN START, not completion — and it is
-  // the durable pending→accepted move. That is correct and is not what this
-  // change touches: a message must not stay pending while a turn reads it, or a
+  // Acceptance is at `message_start`, not at turn completion — and it is the
+  // durable pending→accepted move. `message_start` is NOT the same thing as the
+  // start of a turn, and saying so was this comment's old error: a steered
+  // message fires `message_start` in the MIDDLE of a turn already running, which
+  // is the whole point of steering. The rule the code keeps is the one that
+  // survives either case — a message is accepted when a turn begins READING it,
+  // whenever in that turn's life that happens. That is correct and is not what
+  // this change touches: a message must not stay pending while a turn reads it, or a
   // crash re-delivers work that was already begun. The consequence is what was
   // wrong: a turn that then FAILS has consumed the envelope and answered
   // nothing, and before this the sender was never told, so an operator's
@@ -11477,7 +11551,11 @@ export async function installOrganizationIntercom(pi: ExtensionAPI, options: Ins
             content: workResumePrompt(person, details),
             display: true,
             details,
-          }, queuedPiDelivery("followUp"));
+            // CONSIDERED AND KEPT — and now PINNED, via the same one-definition
+            // shape mail uses. A literal at a call site cannot be asserted, so
+            // "considered and kept" was a claim no test could check and a revert
+            // to steer would have passed everything.
+          }, workResumeDelivery());
           appendOrganizationEvent(context, {
             event: "work-resume-prompt-requested",
             personId: context.personId,

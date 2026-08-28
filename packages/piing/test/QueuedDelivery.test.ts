@@ -16,7 +16,9 @@
  */
 import {
   firstRunGateForTest,
+  mailboxDeliveryForTest,
   queuedPiDeliveryForTest,
+  workResumeDeliveryForTest,
   workResumeNeedsRedrive
 } from '@test-assets/organization-intercom'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -209,5 +211,74 @@ describe('the boot gate', () => {
     expect(queuedPiDeliveryForTest('steer', false).deliverAs).toBe('nextTurn')
     gate.open()
     expect(queuedPiDeliveryForTest('steer', false).deliverAs).toBe('steer')
+  })
+})
+
+describe('mail rides the same queue as the operator’s own typing', () => {
+  /**
+   * The operator typing mid-turn is submitted with `streamingBehavior: "steer"`
+   * and consumed at the next STEP BOUNDARY inside the running turn. Mail rode
+   * `followUp`, which Pi consumes only when the agent has no more tool calls or
+   * steering messages — the END of the turn. A person mid-way through an hour
+   * of work therefore did not see an ordinary message until the hour was over,
+   * while the same words typed by the operator arrived in seconds.
+   *
+   * This asserts the RULE, not the table. The table was already pinned; which
+   * mode the mailbox passed into it was not, which is exactly why the timing of
+   * every delivery could change without one test noticing.
+   */
+  it('a normal message on a busy pane rides the steering queue', () => {
+    expect(mailboxDeliveryForTest(true, false)).toEqual({
+      deliverAs: 'steer',
+      streamingBehavior: 'steer'
+    })
+  })
+
+  it('an idle pane still starts a turn, unchanged', () => {
+    // BEHAVIOUR-identical, not byte-identical — and the assertion below is why
+    // the distinction has to be made here rather than glossed. `deliverAs` DID
+    // change on this row, to 'steer'; it is inert whenever `triggerTurn` fires,
+    // because a turn that is being started has nothing to steer into. So the
+    // person is woken exactly as before while the shape is new, and a comment
+    // claiming the bytes did not move would be contradicted by the very line
+    // under it. This change is about WHEN a busy person reads mail, never about
+    // whether an idle one is woken.
+    const idle = mailboxDeliveryForTest(false, false)
+    expect(idle.triggerTurn, 'an idle pane is still started').toBe(true)
+    expect(idle.deliverAs).toBe('steer')
+  })
+
+  it('the work-resume prompt does NOT steer — the boundary of this change', () => {
+    // Sanchez's finding: "considered and kept" was a claim no test could check.
+    // A revert of the work-resume prompt to steer passed every test in this
+    // file, because the only thing pinning it was a comment saying it had been
+    // thought about. This asserts the boundary from the OTHER side: mail steers,
+    // work-resume does not, and the two now disagree in a way a test can see.
+    const busy = workResumeDeliveryForTest(true, false)
+    expect(busy.deliverAs, 'a work-resume prompt waits for the current turn').toBe('followUp')
+    expect(busy.streamingBehavior).toBe('followUp')
+    expect(busy.triggerTurn, 'a busy person is not interrupted by a resume prompt').toBeUndefined()
+
+    // And it is genuinely a DIFFERENT answer from mail's on the same inputs, so
+    // the pin cannot be satisfied by reverting both sides together.
+    //
+    // THE CONTROL FOR THIS TEST FLIPS `workResumeDeliveryMode` AND NOTHING ELSE,
+    // and that precision is the finding rather than a detail. The first version
+    // of this pin had the mode literal in the product AND in the test seam — two
+    // independent copies — so a revert at the call site left every test green.
+    // The control missed it by flipping BOTH literals: the seam moved with the
+    // product, the test bit, and the run looked like proof. It measured the
+    // adjacent mutation. A control that flips the wrong set is a control that
+    // reports on an instrument nobody is going to use.
+    expect(workResumeDeliveryForTest(true, false).deliverAs).not.toBe(
+      mailboxDeliveryForTest(true, false).deliverAs
+    )
+  })
+
+  it('the boot window still parks, unchanged', () => {
+    // Byte-identical to before: inside the boot window nothing is delivered as
+    // a stream disposition at all, and nothing starts a turn.
+    expect(mailboxDeliveryForTest(true, true)).toEqual({ deliverAs: 'nextTurn' })
+    expect(mailboxDeliveryForTest(false, true)).toEqual({ deliverAs: 'nextTurn' })
   })
 })
