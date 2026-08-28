@@ -1,3 +1,26 @@
+- **fix(install): a failed Pi install exits nonzero, like a declined one.** The
+  script refused to call a DECLINED upgrade success — "a zero status would tell
+  a script that everything is ready when the thing that runs people is too old"
+  — and then reported a FAILED install as success anyway, through two `|| true`
+  sites. A caller got the happy outro and status 0 with the agent runtime
+  absent, which is strictly worse than the too-old Pi the decline path already
+  refuses. **The rationale proved more than the code implemented.** Both sites
+  now end in the same deliberate family as the decline, naming what did not
+  happen and the command that fixes it.
+
+  **And the rule now has an instrument, which it never had.** Every Pi branch
+  was reachable only by running the real installer against the real network, so
+  nothing checked the exit code any of them produced and the rule shipped as a
+  comment. `installer-pi-exit-codes.test.mjs` runs the script's OWN bytes —
+  extracted at a marker, executed against stub `pi` and `npm` — over five
+  behaviours, and carries a control that restores `|| true` in a copy and
+  asserts the block goes green, so the passing assertions are known to measure
+  the defect rather than merely to pass.
+
+- **feat(install): the installer installs and upgrades Pi instead of printing a command and hoping.** An absent Pi is installed without asking — chief cannot run a single person without it, so there is nothing to weigh. A Pi that is merely too old is somebody's working tool, and replacing it is a different act, so that one asks: `Upgrade Pi to >= <floor>? [Y/n]`, default yes. Declining exits nonzero and says why, because telling a script that everything is ready when the thing that runs people is too old is worse than failing.
+  **The floor is read, never restated.** It has one definition in the Rust source, the release process already stamps it into the manifest, and the installer reads it from the manifest it has just unpacked. A version bump needs no edit to the installer, and the repository's single-definition guard stays satisfied — a number copied into a shell script would be a second definition wearing a copy's clothes.
+  **The prompt reads the terminal, not its own source.** This file is piped into `sh`, so stdin is the script text; reading stdin would eat the rest of the installer. Where there is no terminal at all — CI, a container build — the default is taken and SAID, because a silent choice made on somebody's behalf is what surprises them later. Missing `npm` refuses cleanly rather than half-installing, and a Pi that npm reports as installed is CHECKED against the floor rather than announced as ready.
+
 - **feat(intercom): organization mail rides the same queue as the operator's own typing.** A busy person now reads an ordinary message at the next step boundary inside the running turn, instead of at the end of it. The operator typing mid-turn has always been submitted as a steering message and consumed within seconds; ordinary mail rode the follow-up queue, which Pi consumes only once the agent has no more tool calls or steering messages — so somebody an hour into a piece of work did not see a teammate's message until the hour was over, while the identical words typed by the operator arrived immediately.
   **The digest is kept; only its consumption point moves.** Batching is still the answer to twenty messages arriving in one turn, and nothing about how a batch is built has changed.
   **The idle and boot rows are byte-identical.** Mail arriving at somebody doing nothing still starts them; mail arriving inside the boot window is still parked. This changes WHEN a busy person reads a message, never whether an idle one is woken — and it touches nothing in the converge, activity or settle paths, so the operator wake lease is untouched by construction.

@@ -478,6 +478,10 @@ export const GUARD_WIRING_MANIFEST = {
   // --filter=./packages/*` before it shards, and `--ignore-scripts` does not
   // skip devDependencies. A lane of its own was written first and deleted:
   // it would have been a second place to keep those prerequisites correct.
+  // The installer's exit-code contract: a missing prerequisite may not be
+  // reported as success. Runs the script's own bytes against stub `pi`/`npm`,
+  // and carries its own control proving the assertions bite.
+  'installer-pi-exit-codes.test.mjs': { status: 'wired' },
   'installed-release-extensions-load-under-pi.test.mjs': { status: 'wired' },
   // The minimum Pi version, and the documents that quote it. Same shape as the
   // beacond port above and for the same measured reason: a compiled-in constant
