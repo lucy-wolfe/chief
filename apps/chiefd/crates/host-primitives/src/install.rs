@@ -78,7 +78,11 @@ pub const RESOURCES_DIR: &str = "resources";
 /// tools and nobody found out for a day.
 pub fn resource_root_from_exe() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
-    resource_root_beside(&exe)
+    // Canonicalize so a symlink at ~/.chief/bin/chief resolves to the real
+    // binary under versions/<v>/bin/chief, and the grandparent walk lands on
+    // the correct version directory rather than on ~/.chief.
+    let resolved = exe.canonicalize().ok().unwrap_or(exe);
+    resource_root_beside(&resolved)
 }
 
 /// [`resource_root_from_exe`], against a named executable path.
@@ -206,5 +210,37 @@ mod tests {
         assert!(!is_installed_resource_root(std::path::Path::new(
             "/checkout/../versions/2.0.7/resources"
         )));
+    }
+
+    /// A binary invoked through a symlink (e.g. `~/.chief/bin/chief` ->
+    /// `~/.chief/versions/0.5.0/bin/chief`) must resolve resources beside the
+    /// REAL binary, not beside the symlink. The caller canonicalizes the
+    /// executable path before handing it here; this test proves that a
+    /// canonicalized path to a real binary finds the resources correctly.
+    #[test]
+    fn resources_are_found_when_the_binary_is_reached_through_a_symlink() {
+        let root = tempfile::tempdir().expect("tempdir");
+        // Simulate the install layout: ~/.chief/versions/0.5.0/bin/chief
+        let version_dir = root.path().join("versions/v2.0.7");
+        let bin = version_dir.join("bin");
+        std::fs::create_dir_all(&bin).expect("bin");
+        let resources = version_dir.join("resources");
+        std::fs::create_dir_all(&resources).expect("resources");
+        // The real binary must exist for canonicalize to resolve the symlink.
+        let real_binary = bin.join("chief");
+        std::fs::write(&real_binary, b"fake binary").expect("write binary");
+
+        // The symlink at ~/.chief/bin/chief
+        let symlink_dir = root.path().join("bin");
+        std::fs::create_dir_all(&symlink_dir).expect("bin-dir");
+        let symlink = symlink_dir.join("chief");
+        std::os::unix::fs::symlink(&real_binary, &symlink).expect("symlink");
+
+        // The caller canonicalizes the symlink, resolving it to the real path.
+        let resolved = symlink.canonicalize().expect("canonicalize");
+        // On macOS /var is a symlink to /private/var, so canonicalize both
+        // sides of the comparison.
+        let expected = resources.canonicalize().expect("canonicalize resources");
+        assert_eq!(resource_root_beside(&resolved), Some(expected));
     }
 }
