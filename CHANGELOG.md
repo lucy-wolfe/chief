@@ -1,3 +1,7 @@
+- **chore(deps): the three open dependabot branches land as one batch, with the lockfile they never carried.** The npm minor-and-patch group (`@typescript-eslint/*` 8.67.0 to 8.68.0, `eslint` 10.9.0 to 10.9.1, `@types/react-dom` 19.2.4 to 19.2.5, `typebox` 1.3.16 to 1.3.18), `jsdom` 29.0.2 to 30.0.1, and `eslint-plugin-simple-import-sort` 12.1.1 to 14.0.0 are merged together on one branch, because three separate merges of the same lockfile serialize into three conflicts that say nothing.
+  **Dependabot edited only the manifests.** Every one of its three commits touches `package.json` files and no `bun.lock`, and every CI job installs with `--frozen-lockfile` — so each of those branches was individually unmergeable and would have failed at the install step before running one test. The lockfile is regenerated once here, over all three bumps at the same time, and the frozen install is verified against it.
+  **The instrument was checked against the lockfile, not remembered.** `eslint --version` reports 10.9.1 in the tree that lints, which is the check that separates a real lint result from a confident answer given by the wrong binary.
+
 - **fix(install): a failed Pi install exits nonzero, like a declined one.** The
   script refused to call a DECLINED upgrade success — "a zero status would tell
   a script that everything is ready when the thing that runs people is too old"
